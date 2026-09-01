@@ -1,0 +1,104 @@
+## .NET / Visual Studio
+bin/
+obj/
+*.user
+*.suo
+*.cache
+*.vs/
+.vs/
+*.sln.docstates
+packages/
+*.nupkg
+*.snupkg
+project.lock.json
+.nuget/
+*.nuget.props
+*.nuget.targets
+TestResults/
+BenchmarkDotNet.Artifacts/
+
+## User-specific files
+*.rsuser
+*.suo
+*.user
+*.userosscache
+*.sln.docstates
+
+## Build results
+[Dd]ebug/
+[Dd]ebugPublic/
+[Rr]elease/
+[Rr]eleases/
+x64/
+x86/
+[Ww][Ii][Nn]32/
+[Aa][Rr][Mm]/
+[Aa][Rr][Mm]64/
+bld/
+[Bb]in/
+[Oo]bj/
+[Ll]og/
+[Ll]ogs/
+
+## Node / Frontend
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+.pnpm-store/
+dist/
+build/
+.next/
+.nuxt/
+.output/
+*.tsbuildinfo
+
+## IDE
+.idea/
+*.iml
+.vscode/
+!.vscode/settings.json
+!.vscode/extensions.json
+!.vscode/launch.json
+*.code-workspace
+
+## Coverage / Test Results
+coverage/
+*.lcov
+
+## Environment / Secrets
+.env
+.env.*
+!.env.example
+!.env.template
+.env.local
+.env.*.local
+appsettings.*.local.json
+secrets.json
+*.pfx
+*.key
+*.pem
+*.cer
+*.crt
+*.p12
+*.kdbx
+
+## OS
+.DS_Store
+Thumbs.db
+Desktop.ini
+
+## Logs
+*.log
+logs/
+
+## Playwright
+playwright-report/
+test-results/
+playwright/.cache/
+
+## Temporary
+tmp/
+temp/
+*.tmp
