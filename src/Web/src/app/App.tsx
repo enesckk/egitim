@@ -44,6 +44,9 @@ import { TeacherAcademicView } from '@/features/teacher/academic';
 import { TeacherContentView } from '@/features/teacher/content';
 import { TeacherMessagesView } from '@/features/teacher/messages';
 
+// Parent Portal Features
+import { ParentSummaryView } from '@/features/parent/summary';
+
 interface PortalNavItem extends NavItem {
   path: string;
 }
@@ -307,6 +310,30 @@ const TeacherPortalLayout: React.FC = () => {
   );
 };
 
+// Parent Portal Layout Component
+const ParentPortalLayout: React.FC = () => {
+  return (
+    <AppShell
+      role="parent"
+      showSidebar={false}
+      showBottomNav={false}
+      headerProps={{
+        pageTitle: 'Öğrenci Özeti',
+        brandTitle: 'Bilim Akademi',
+        brandSubtitle: 'Veli Portalı',
+        institutionName: 'Kadıköy Şubesi',
+        userName: 'Merve Kaya',
+        userRole: 'Veli',
+      }}
+    >
+      <Routes>
+        <Route path="/summary" element={<ParentSummaryView />} />
+        <Route path="*" element={<Navigate to="/parent/summary" replace />} />
+      </Routes>
+    </AppShell>
+  );
+};
+
 export const App: React.FC = () => {
   return (
     <BrowserRouter>
@@ -314,6 +341,7 @@ export const App: React.FC = () => {
         <Route path="/student/*" element={<StudentPortalLayout />} />
         <Route path="/coach/*" element={<CoachPortalLayout />} />
         <Route path="/teacher/*" element={<TeacherPortalLayout />} />
+        <Route path="/parent/*" element={<ParentPortalLayout />} />
         <Route path="/" element={<Navigate to="/student/today" replace />} />
         <Route path="*" element={<Navigate to="/student/today" replace />} />
       </Routes>

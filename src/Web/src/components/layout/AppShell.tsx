@@ -34,8 +34,8 @@ export const AppShell: React.FC<AppShellProps> = ({
   const [isDrawerOpen, setIsDrawerOpen] = useState(false);
   const hasNav = navItems.length > 0;
 
-  // Student and Parent use mobile bottom nav; Coach/Teacher/Admin use drawer/sidebar
-  const isMobileBottomNavRole = role === 'student' || role === 'parent';
+  // Student uses mobile bottom nav; Coach/Teacher/Admin use drawer/sidebar; Parent uses clean focused layout
+  const isMobileBottomNavRole = role === 'student';
 
   return (
     <div className="min-h-screen bg-surface flex flex-col text-neutral-900 font-sans">
