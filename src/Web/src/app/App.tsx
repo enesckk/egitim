@@ -20,9 +20,18 @@ import {
   BookOpen,
   UserCheck,
   Building2,
+  LogOut,
 } from 'lucide-react';
 import { AppShell } from '@/components/layout/AppShell';
 import { NavItem } from '@/components/layout/BottomNav';
+import { AuthProvider, useAuth, ProtectedRoute, getRoleDefaultRoute } from '@/auth';
+
+// Auth Features
+import { LoginView, ForgotPasswordView, ResetPasswordView } from '@/features/auth';
+
+// Platform Common Views
+import { ForbiddenView } from '@/features/common/ForbiddenView';
+import { NotFoundView } from '@/features/common/NotFoundView';
 
 // Student Portal Features
 import { StudentTodayView } from '@/features/student/today';
@@ -208,6 +217,7 @@ const ADMIN_NAV_ITEMS: PortalNavItem[] = [
 const StudentPortalLayout: React.FC = () => {
   const location = useLocation();
   const navigate = useNavigate();
+  const { user, logout } = useAuth();
 
   const currentNav =
     STUDENT_NAV_ITEMS.find((item) => location.pathname.startsWith(item.path)) ||
@@ -230,11 +240,24 @@ const StudentPortalLayout: React.FC = () => {
         pageTitle: currentNav.label,
         brandTitle: 'Bilim Akademi',
         brandSubtitle: 'Öğrenci Portalı',
-        institutionName: 'Merkez Şube',
-        userName: 'Ayşe Kaya',
-        userRole: '11. Sınıf • Sayısal',
+        institutionName: user?.institutionName || 'Merkez Şube',
+        userName: user?.name || 'Ayşe Kaya',
+        userRole: user?.roleLabel || '11. Sınıf • Sayısal',
         onProfileClick: () => navigate('/student/profile'),
       }}
+      sidebarFooter={
+        <button
+          type="button"
+          onClick={() => {
+            logout();
+            navigate('/login', { replace: true });
+          }}
+          className="flex items-center gap-2 text-xs text-navy-400 hover:text-white px-3 py-2 rounded-lg hover:bg-navy-900 transition-colors w-full"
+        >
+          <LogOut className="h-4 w-4" />
+          <span>Çıkış Yap</span>
+        </button>
+      }
     >
       <Routes>
         <Route path="/today" element={<StudentTodayView />} />
@@ -252,6 +275,7 @@ const StudentPortalLayout: React.FC = () => {
 const CoachPortalLayout: React.FC = () => {
   const location = useLocation();
   const navigate = useNavigate();
+  const { user, logout } = useAuth();
 
   let activeNavId = 'today';
   let pageTitle = 'Genel Bakış';
@@ -284,10 +308,23 @@ const CoachPortalLayout: React.FC = () => {
         pageTitle,
         brandTitle: 'Bilim Akademi',
         brandSubtitle: 'Koçluk Portalı',
-        institutionName: 'Kadıköy Şubesi',
-        userName: 'Hasan Yılmaz',
-        userRole: 'Kıdemli YKS Koçu',
+        institutionName: user?.institutionName || 'Kadıköy Şubesi',
+        userName: user?.name || 'Hasan Yılmaz',
+        userRole: user?.roleLabel || 'Kıdemli YKS Koçu',
       }}
+      sidebarFooter={
+        <button
+          type="button"
+          onClick={() => {
+            logout();
+            navigate('/login', { replace: true });
+          }}
+          className="flex items-center gap-2 text-xs text-navy-400 hover:text-white px-3 py-2 rounded-lg hover:bg-navy-900 transition-colors w-full"
+        >
+          <LogOut className="h-4 w-4" />
+          <span>Çıkış Yap</span>
+        </button>
+      }
     >
       <Routes>
         <Route path="/today" element={<CoachDashboardView />} />
@@ -306,6 +343,7 @@ const CoachPortalLayout: React.FC = () => {
 const TeacherPortalLayout: React.FC = () => {
   const location = useLocation();
   const navigate = useNavigate();
+  const { user, logout } = useAuth();
 
   let activeNavId = 'today';
   let pageTitle = 'Genel Bakış';
@@ -341,10 +379,23 @@ const TeacherPortalLayout: React.FC = () => {
         pageTitle,
         brandTitle: 'Bilim Akademi',
         brandSubtitle: 'Öğretmen Portalı',
-        institutionName: 'Kadıköy Şubesi',
-        userName: 'Kemal Bey',
-        userRole: 'Matematik & Fizik Zümresi',
+        institutionName: user?.institutionName || 'Kadıköy Şubesi',
+        userName: user?.name || 'Kemal Bey',
+        userRole: user?.roleLabel || 'Matematik & Fizik Zümresi',
       }}
+      sidebarFooter={
+        <button
+          type="button"
+          onClick={() => {
+            logout();
+            navigate('/login', { replace: true });
+          }}
+          className="flex items-center gap-2 text-xs text-navy-400 hover:text-white px-3 py-2 rounded-lg hover:bg-navy-900 transition-colors w-full"
+        >
+          <LogOut className="h-4 w-4" />
+          <span>Çıkış Yap</span>
+        </button>
+      }
     >
       <Routes>
         <Route path="/today" element={<TeacherDashboardView />} />
@@ -362,6 +413,9 @@ const TeacherPortalLayout: React.FC = () => {
 
 // Parent Portal Layout Component
 const ParentPortalLayout: React.FC = () => {
+  const navigate = useNavigate();
+  const { user, logout } = useAuth();
+
   return (
     <AppShell
       role="parent"
@@ -371,9 +425,13 @@ const ParentPortalLayout: React.FC = () => {
         pageTitle: 'Öğrenci Özeti',
         brandTitle: 'Bilim Akademi',
         brandSubtitle: 'Veli Portalı',
-        institutionName: 'Kadıköy Şubesi',
-        userName: 'Merve Kaya',
-        userRole: 'Veli',
+        institutionName: user?.institutionName || 'Kadıköy Şubesi',
+        userName: user?.name || 'Merve Kaya',
+        userRole: user?.roleLabel || 'Veli',
+        onProfileClick: () => {
+          logout();
+          navigate('/login', { replace: true });
+        },
       }}
     >
       <Routes>
@@ -388,6 +446,7 @@ const ParentPortalLayout: React.FC = () => {
 const AdminPortalLayout: React.FC = () => {
   const location = useLocation();
   const navigate = useNavigate();
+  const { user, logout } = useAuth();
 
   const currentNav =
     ADMIN_NAV_ITEMS.find((item) => location.pathname.startsWith(item.path)) ||
@@ -410,10 +469,23 @@ const AdminPortalLayout: React.FC = () => {
         pageTitle: currentNav.label,
         brandTitle: 'Bilim Akademi',
         brandSubtitle: 'Kurum Yönetim Portalı',
-        institutionName: 'Merkez & 6 Şube',
-        userName: 'Ahmet Yılmaz',
-        userRole: 'Kurum Müdürü',
+        institutionName: user?.institutionName || 'Merkez & 6 Şube',
+        userName: user?.name || 'Ahmet Yılmaz',
+        userRole: user?.roleLabel || 'Kurum Müdürü',
       }}
+      sidebarFooter={
+        <button
+          type="button"
+          onClick={() => {
+            logout();
+            navigate('/login', { replace: true });
+          }}
+          className="flex items-center gap-2 text-xs text-navy-400 hover:text-white px-3 py-2 rounded-lg hover:bg-navy-900 transition-colors w-full"
+        >
+          <LogOut className="h-4 w-4" />
+          <span>Çıkış Yap</span>
+        </button>
+      }
     >
       <Routes>
         <Route path="/overview" element={<InstitutionDashboardView />} />
@@ -428,18 +500,77 @@ const AdminPortalLayout: React.FC = () => {
   );
 };
 
+const RootRedirect: React.FC = () => {
+  const { user, isAuthenticated } = useAuth();
+
+  if (!isAuthenticated || !user) {
+    return <Navigate to="/login" replace />;
+  }
+
+  return <Navigate to={getRoleDefaultRoute(user.role)} replace />;
+};
+
 export const App: React.FC = () => {
   return (
-    <BrowserRouter>
-      <Routes>
-        <Route path="/student/*" element={<StudentPortalLayout />} />
-        <Route path="/coach/*" element={<CoachPortalLayout />} />
-        <Route path="/teacher/*" element={<TeacherPortalLayout />} />
-        <Route path="/parent/*" element={<ParentPortalLayout />} />
-        <Route path="/admin/*" element={<AdminPortalLayout />} />
-        <Route path="/" element={<Navigate to="/student/today" replace />} />
-        <Route path="*" element={<Navigate to="/student/today" replace />} />
-      </Routes>
-    </BrowserRouter>
+    <AuthProvider>
+      <BrowserRouter>
+        <Routes>
+          {/* Public Auth Routes */}
+          <Route path="/login" element={<LoginView />} />
+          <Route path="/forgot-password" element={<ForgotPasswordView />} />
+          <Route path="/reset-password" element={<ResetPasswordView />} />
+
+          {/* Common Error Routes */}
+          <Route path="/403" element={<ForbiddenView />} />
+          <Route path="/404" element={<NotFoundView />} />
+
+          {/* Protected Role Portals */}
+          <Route
+            path="/student/*"
+            element={
+              <ProtectedRoute allowedRoles={['student']}>
+                <StudentPortalLayout />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/coach/*"
+            element={
+              <ProtectedRoute allowedRoles={['coach']}>
+                <CoachPortalLayout />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/teacher/*"
+            element={
+              <ProtectedRoute allowedRoles={['teacher']}>
+                <TeacherPortalLayout />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/parent/*"
+            element={
+              <ProtectedRoute allowedRoles={['parent']}>
+                <ParentPortalLayout />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/admin/*"
+            element={
+              <ProtectedRoute allowedRoles={['admin']}>
+                <AdminPortalLayout />
+              </ProtectedRoute>
+            }
+          />
+
+          {/* Root and Unknown Routes */}
+          <Route path="/" element={<RootRedirect />} />
+          <Route path="*" element={<NotFoundView />} />
+        </Routes>
+      </BrowserRouter>
+    </AuthProvider>
   );
 };
