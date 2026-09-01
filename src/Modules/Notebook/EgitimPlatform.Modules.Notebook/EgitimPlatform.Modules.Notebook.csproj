@@ -1,0 +1,15 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <RootNamespace>EgitimPlatform.Modules.Notebook</RootNamespace>
+    <AssemblyName>EgitimPlatform.Modules.Notebook</AssemblyName>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\..\..\BuildingBlocks\EgitimPlatform.BuildingBlocks\EgitimPlatform.BuildingBlocks.csproj" />
+  </ItemGroup>
+
+</Project>

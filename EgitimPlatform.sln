@@ -1,0 +1,165 @@
+Microsoft Visual Studio Solution File, Format Version 12.00
+# Visual Studio Version 17
+VisualStudioVersion = 17.0.31903.59
+MinimumVisualStudioVersion = 10.0.40219.1
+Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "src", "src", "{A1B2C3D4-0001-0000-0000-000000000000}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "EgitimPlatform.Api", "src\Api\EgitimPlatform.Api\EgitimPlatform.Api.csproj", "{B1B2C3D4-0001-0000-0000-000000000000}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "EgitimPlatform.BuildingBlocks", "src\BuildingBlocks\EgitimPlatform.BuildingBlocks\EgitimPlatform.BuildingBlocks.csproj", "{B2B2C3D4-0002-0000-0000-000000000000}"
+EndProject
+Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Modules", "src\Modules", "{A2B2C3D4-0002-0000-0000-000000000000}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "EgitimPlatform.Modules.Identity", "src\Modules\Identity\EgitimPlatform.Modules.Identity\EgitimPlatform.Modules.Identity.csproj", "{C1B2C3D4-0001-0000-0000-000000000000}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "EgitimPlatform.Modules.Institutions", "src\Modules\Institutions\EgitimPlatform.Modules.Institutions\EgitimPlatform.Modules.Institutions.csproj", "{C2B2C3D4-0002-0000-0000-000000000000}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "EgitimPlatform.Modules.Students", "src\Modules\Students\EgitimPlatform.Modules.Students\EgitimPlatform.Modules.Students.csproj", "{C3B2C3D4-0003-0000-0000-000000000000}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "EgitimPlatform.Modules.Coaching", "src\Modules\Coaching\EgitimPlatform.Modules.Coaching\EgitimPlatform.Modules.Coaching.csproj", "{C4B2C3D4-0004-0000-0000-000000000000}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "EgitimPlatform.Modules.Academic", "src\Modules\Academic\EgitimPlatform.Modules.Academic\EgitimPlatform.Modules.Academic.csproj", "{C5B2C3D4-0005-0000-0000-000000000000}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "EgitimPlatform.Modules.Questions", "src\Modules\Questions\EgitimPlatform.Modules.Questions\EgitimPlatform.Modules.Questions.csproj", "{C6B2C3D4-0006-0000-0000-000000000000}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "EgitimPlatform.Modules.Exams", "src\Modules\Exams\EgitimPlatform.Modules.Exams\EgitimPlatform.Modules.Exams.csproj", "{C7B2C3D4-0007-0000-0000-000000000000}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "EgitimPlatform.Modules.Learning", "src\Modules\Learning\EgitimPlatform.Modules.Learning\EgitimPlatform.Modules.Learning.csproj", "{C8B2C3D4-0008-0000-0000-000000000000}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "EgitimPlatform.Modules.Planning", "src\Modules\Planning\EgitimPlatform.Modules.Planning\EgitimPlatform.Modules.Planning.csproj", "{C9B2C3D4-0009-0000-0000-000000000000}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "EgitimPlatform.Modules.Content", "src\Modules\Content\EgitimPlatform.Modules.Content\EgitimPlatform.Modules.Content.csproj", "{CAB2C3D4-0010-0000-0000-000000000000}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "EgitimPlatform.Modules.Communication", "src\Modules\Communication\EgitimPlatform.Modules.Communication\EgitimPlatform.Modules.Communication.csproj", "{CBB2C3D4-0011-0000-0000-000000000000}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "EgitimPlatform.Modules.Notebook", "src\Modules\Notebook\EgitimPlatform.Modules.Notebook\EgitimPlatform.Modules.Notebook.csproj", "{CCB2C3D4-0012-0000-0000-000000000000}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "EgitimPlatform.Modules.Reporting", "src\Modules\Reporting\EgitimPlatform.Modules.Reporting\EgitimPlatform.Modules.Reporting.csproj", "{CDB2C3D4-0013-0000-0000-000000000000}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "EgitimPlatform.Modules.AI", "src\Modules\AI\EgitimPlatform.Modules.AI\EgitimPlatform.Modules.AI.csproj", "{CEB2C3D4-0014-0000-0000-000000000000}"
+EndProject
+Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "tests", "tests", "{A3B2C3D4-0003-0000-0000-000000000000}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "EgitimPlatform.Unit", "tests\EgitimPlatform.Unit\EgitimPlatform.Unit.csproj", "{D1B2C3D4-0001-0000-0000-000000000000}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "EgitimPlatform.Integration", "tests\EgitimPlatform.Integration\EgitimPlatform.Integration.csproj", "{D2B2C3D4-0002-0000-0000-000000000000}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "EgitimPlatform.Security", "tests\EgitimPlatform.Security\EgitimPlatform.Security.csproj", "{D3B2C3D4-0003-0000-0000-000000000000}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "EgitimPlatform.E2E", "tests\EgitimPlatform.E2E\EgitimPlatform.E2E.csproj", "{D4B2C3D4-0004-0000-0000-000000000000}"
+EndProject
+Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "docs", "docs", "{A4B2C3D4-0004-0000-0000-000000000000}"
+EndProject
+Global
+	GlobalSection(SolutionConfigurationPlatforms) = preSolution
+		Debug|Any CPU = Debug|Any CPU
+		Release|Any CPU = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(ProjectConfigurationPlatforms) = postSolution
+		{B1B2C3D4-0001-0000-0000-000000000000}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{B1B2C3D4-0001-0000-0000-000000000000}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{B1B2C3D4-0001-0000-0000-000000000000}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{B1B2C3D4-0001-0000-0000-000000000000}.Release|Any CPU.Build.0 = Release|Any CPU
+		{B2B2C3D4-0002-0000-0000-000000000000}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{B2B2C3D4-0002-0000-0000-000000000000}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{B2B2C3D4-0002-0000-0000-000000000000}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{B2B2C3D4-0002-0000-0000-000000000000}.Release|Any CPU.Build.0 = Release|Any CPU
+		{C1B2C3D4-0001-0000-0000-000000000000}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{C1B2C3D4-0001-0000-0000-000000000000}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{C1B2C3D4-0001-0000-0000-000000000000}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{C1B2C3D4-0001-0000-0000-000000000000}.Release|Any CPU.Build.0 = Release|Any CPU
+		{C2B2C3D4-0002-0000-0000-000000000000}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{C2B2C3D4-0002-0000-0000-000000000000}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{C2B2C3D4-0002-0000-0000-000000000000}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{C2B2C3D4-0002-0000-0000-000000000000}.Release|Any CPU.Build.0 = Release|Any CPU
+		{C3B2C3D4-0003-0000-0000-000000000000}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{C3B2C3D4-0003-0000-0000-000000000000}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{C3B2C3D4-0003-0000-0000-000000000000}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{C3B2C3D4-0003-0000-0000-000000000000}.Release|Any CPU.Build.0 = Release|Any CPU
+		{C4B2C3D4-0004-0000-0000-000000000000}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{C4B2C3D4-0004-0000-0000-000000000000}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{C4B2C3D4-0004-0000-0000-000000000000}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{C4B2C3D4-0004-0000-0000-000000000000}.Release|Any CPU.Build.0 = Release|Any CPU
+		{C5B2C3D4-0005-0000-0000-000000000000}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{C5B2C3D4-0005-0000-0000-000000000000}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{C5B2C3D4-0005-0000-0000-000000000000}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{C5B2C3D4-0005-0000-0000-000000000000}.Release|Any CPU.Build.0 = Release|Any CPU
+		{C6B2C3D4-0006-0000-0000-000000000000}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{C6B2C3D4-0006-0000-0000-000000000000}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{C6B2C3D4-0006-0000-0000-000000000000}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{C6B2C3D4-0006-0000-0000-000000000000}.Release|Any CPU.Build.0 = Release|Any CPU
+		{C7B2C3D4-0007-0000-0000-000000000000}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{C7B2C3D4-0007-0000-0000-000000000000}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{C7B2C3D4-0007-0000-0000-000000000000}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{C7B2C3D4-0007-0000-0000-000000000000}.Release|Any CPU.Build.0 = Release|Any CPU
+		{C8B2C3D4-0008-0000-0000-000000000000}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{C8B2C3D4-0008-0000-0000-000000000000}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{C8B2C3D4-0008-0000-0000-000000000000}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{C8B2C3D4-0008-0000-0000-000000000000}.Release|Any CPU.Build.0 = Release|Any CPU
+		{C9B2C3D4-0009-0000-0000-000000000000}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{C9B2C3D4-0009-0000-0000-000000000000}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{C9B2C3D4-0009-0000-0000-000000000000}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{C9B2C3D4-0009-0000-0000-000000000000}.Release|Any CPU.Build.0 = Release|Any CPU
+		{CAB2C3D4-0010-0000-0000-000000000000}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{CAB2C3D4-0010-0000-0000-000000000000}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{CAB2C3D4-0010-0000-0000-000000000000}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{CAB2C3D4-0010-0000-0000-000000000000}.Release|Any CPU.Build.0 = Release|Any CPU
+		{CBB2C3D4-0011-0000-0000-000000000000}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{CBB2C3D4-0011-0000-0000-000000000000}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{CBB2C3D4-0011-0000-0000-000000000000}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{CBB2C3D4-0011-0000-0000-000000000000}.Release|Any CPU.Build.0 = Release|Any CPU
+		{CCB2C3D4-0012-0000-0000-000000000000}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{CCB2C3D4-0012-0000-0000-000000000000}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{CCB2C3D4-0012-0000-0000-000000000000}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{CCB2C3D4-0012-0000-0000-000000000000}.Release|Any CPU.Build.0 = Release|Any CPU
+		{CDB2C3D4-0013-0000-0000-000000000000}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{CDB2C3D4-0013-0000-0000-000000000000}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{CDB2C3D4-0013-0000-0000-000000000000}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{CDB2C3D4-0013-0000-0000-000000000000}.Release|Any CPU.Build.0 = Release|Any CPU
+		{CEB2C3D4-0014-0000-0000-000000000000}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{CEB2C3D4-0014-0000-0000-000000000000}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{CEB2C3D4-0014-0000-0000-000000000000}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{CEB2C3D4-0014-0000-0000-000000000000}.Release|Any CPU.Build.0 = Release|Any CPU
+		{D1B2C3D4-0001-0000-0000-000000000000}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{D1B2C3D4-0001-0000-0000-000000000000}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{D1B2C3D4-0001-0000-0000-000000000000}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{D1B2C3D4-0001-0000-0000-000000000000}.Release|Any CPU.Build.0 = Release|Any CPU
+		{D2B2C3D4-0002-0000-0000-000000000000}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{D2B2C3D4-0002-0000-0000-000000000000}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{D2B2C3D4-0002-0000-0000-000000000000}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{D2B2C3D4-0002-0000-0000-000000000000}.Release|Any CPU.Build.0 = Release|Any CPU
+		{D3B2C3D4-0003-0000-0000-000000000000}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{D3B2C3D4-0003-0000-0000-000000000000}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{D3B2C3D4-0003-0000-0000-000000000000}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{D3B2C3D4-0003-0000-0000-000000000000}.Release|Any CPU.Build.0 = Release|Any CPU
+		{D4B2C3D4-0004-0000-0000-000000000000}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{D4B2C3D4-0004-0000-0000-000000000000}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{D4B2C3D4-0004-0000-0000-000000000000}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{D4B2C3D4-0004-0000-0000-000000000000}.Release|Any CPU.Build.0 = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(SolutionProperties) = preSolution
+		HideSolutionNode = FALSE
+	EndGlobalSection
+	GlobalSection(NestedProjects) = preSolution
+		{B1B2C3D4-0001-0000-0000-000000000000} = {A1B2C3D4-0001-0000-0000-000000000000}
+		{B2B2C3D4-0002-0000-0000-000000000000} = {A1B2C3D4-0001-0000-0000-000000000000}
+		{C1B2C3D4-0001-0000-0000-000000000000} = {A2B2C3D4-0002-0000-0000-000000000000}
+		{C2B2C3D4-0002-0000-0000-000000000000} = {A2B2C3D4-0002-0000-0000-000000000000}
+		{C3B2C3D4-0003-0000-0000-000000000000} = {A2B2C3D4-0002-0000-0000-000000000000}
+		{C4B2C3D4-0004-0000-0000-000000000000} = {A2B2C3D4-0002-0000-0000-000000000000}
+		{C5B2C3D4-0005-0000-0000-000000000000} = {A2B2C3D4-0002-0000-0000-000000000000}
+		{C6B2C3D4-0006-0000-0000-000000000000} = {A2B2C3D4-0002-0000-0000-000000000000}
+		{C7B2C3D4-0007-0000-0000-000000000000} = {A2B2C3D4-0002-0000-0000-000000000000}
+		{C8B2C3D4-0008-0000-0000-000000000000} = {A2B2C3D4-0002-0000-0000-000000000000}
+		{C9B2C3D4-0009-0000-0000-000000000000} = {A2B2C3D4-0002-0000-0000-000000000000}
+		{CAB2C3D4-0010-0000-0000-000000000000} = {A2B2C3D4-0002-0000-0000-000000000000}
+		{CBB2C3D4-0011-0000-0000-000000000000} = {A2B2C3D4-0002-0000-0000-000000000000}
+		{CCB2C3D4-0012-0000-0000-000000000000} = {A2B2C3D4-0002-0000-0000-000000000000}
+		{CDB2C3D4-0013-0000-0000-000000000000} = {A2B2C3D4-0002-0000-0000-000000000000}
+		{CEB2C3D4-0014-0000-0000-000000000000} = {A2B2C3D4-0002-0000-0000-000000000000}
+		{D1B2C3D4-0001-0000-0000-000000000000} = {A3B2C3D4-0003-0000-0000-000000000000}
+		{D2B2C3D4-0002-0000-0000-000000000000} = {A3B2C3D4-0003-0000-0000-000000000000}
+		{D3B2C3D4-0003-0000-0000-000000000000} = {A3B2C3D4-0003-0000-0000-000000000000}
+		{D4B2C3D4-0004-0000-0000-000000000000} = {A3B2C3D4-0003-0000-0000-000000000000}
+	EndGlobalSection
+EndGlobal

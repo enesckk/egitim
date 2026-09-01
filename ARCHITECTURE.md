@@ -22,9 +22,9 @@ Microservice değil çünkü:
 ```
 src/
   Api/                          → ASP.NET Core host (composition root)
-    EgittimPlatform.Api/
+    EgitimPlatform.Api/
   BuildingBlocks/               → Ortak altyapı (validation, exceptions, abstractions)
-    EgittimPlatform.BuildingBlocks/
+    EgitimPlatform.BuildingBlocks/
   Modules/
     Identity/                   → Her modül kendi içinde dikey slice
     Institutions/

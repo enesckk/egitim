@@ -1,0 +1,36 @@
+<Project Sdk="Microsoft.NET.Sdk.Web">
+
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <RootNamespace>EgitimPlatform.Api</RootNamespace>
+    <AssemblyName>EgitimPlatform.Api</AssemblyName>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.AspNetCore.OpenApi" Version="10.0.11" />
+    <PackageReference Include="Swashbuckle.AspNetCore" Version="10.2.3" />
+    <PackageReference Include="Serilog.AspNetCore" Version="9.0.0" />
+    <PackageReference Include="Serilog.Sinks.MSSqlServer" Version="8.1.0" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\..\BuildingBlocks\EgitimPlatform.BuildingBlocks\EgitimPlatform.BuildingBlocks.csproj" />
+    <ProjectReference Include="..\..\Modules\Identity\EgitimPlatform.Modules.Identity\EgitimPlatform.Modules.Identity.csproj" />
+    <ProjectReference Include="..\..\Modules\Institutions\EgitimPlatform.Modules.Institutions\EgitimPlatform.Modules.Institutions.csproj" />
+    <ProjectReference Include="..\..\Modules\Students\EgitimPlatform.Modules.Students\EgitimPlatform.Modules.Students.csproj" />
+    <ProjectReference Include="..\..\Modules\Coaching\EgitimPlatform.Modules.Coaching\EgitimPlatform.Modules.Coaching.csproj" />
+    <ProjectReference Include="..\..\Modules\Academic\EgitimPlatform.Modules.Academic\EgitimPlatform.Modules.Academic.csproj" />
+    <ProjectReference Include="..\..\Modules\Questions\EgitimPlatform.Modules.Questions\EgitimPlatform.Modules.Questions.csproj" />
+    <ProjectReference Include="..\..\Modules\Exams\EgitimPlatform.Modules.Exams\EgitimPlatform.Modules.Exams.csproj" />
+    <ProjectReference Include="..\..\Modules\Learning\EgitimPlatform.Modules.Learning\EgitimPlatform.Modules.Learning.csproj" />
+    <ProjectReference Include="..\..\Modules\Planning\EgitimPlatform.Modules.Planning\EgitimPlatform.Modules.Planning.csproj" />
+    <ProjectReference Include="..\..\Modules\Content\EgitimPlatform.Modules.Content\EgitimPlatform.Modules.Content.csproj" />
+    <ProjectReference Include="..\..\Modules\Communication\EgitimPlatform.Modules.Communication\EgitimPlatform.Modules.Communication.csproj" />
+    <ProjectReference Include="..\..\Modules\Notebook\EgitimPlatform.Modules.Notebook\EgitimPlatform.Modules.Notebook.csproj" />
+    <ProjectReference Include="..\..\Modules\Reporting\EgitimPlatform.Modules.Reporting\EgitimPlatform.Modules.Reporting.csproj" />
+    <ProjectReference Include="..\..\Modules\AI\EgitimPlatform.Modules.AI\EgitimPlatform.Modules.AI.csproj" />
+  </ItemGroup>
+
+</Project>

@@ -32,7 +32,7 @@ Seçenekler:
 Log.Logger = new LoggerConfiguration()
     .ReadFrom.Configuration(Configuration)
     .Enrich.FromLogContext()
-    .Enrich.WithProperty("Application", "EgittimPlatform.Api")
+    .Enrich.WithProperty("Application", "EgitimPlatform.Api")
     .Enrich.WithCorrelationId()
     .WriteTo.Console()
     .WriteTo.MSSqlServer(
