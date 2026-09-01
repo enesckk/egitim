@@ -23,6 +23,8 @@ public class CrossInstitutionTests
     {
         var client = _factory.CreateClient();
         var response = await client.PostAsJsonAsync("/api/v1/auth/login", new LoginCommand(email, "Test@12345"));
+        response.StatusCode.Should().Be(System.Net.HttpStatusCode.OK,
+            $"Login as {email} should succeed");
         var result = await response.Content.ReadFromJsonAsync<LoginResponseDto>();
         client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", result!.AccessToken);
         return client;

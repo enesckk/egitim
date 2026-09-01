@@ -12,7 +12,7 @@ using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 namespace EgitimPlatform.Modules.Identity.Migrations
 {
     [DbContext(typeof(ApplicationDbContext))]
-    [Migration("20260901125222_InitialPlatformFoundation")]
+    [Migration("20260901202221_InitialPlatformFoundation")]
     partial class InitialPlatformFoundation
     {
         /// <inheritdoc />
@@ -120,14 +120,17 @@ namespace EgitimPlatform.Modules.Identity.Migrations
 
                     b.HasKey("Id");
 
+                    b.HasIndex("AssignedAt");
+
                     b.HasIndex("InstitutionId");
 
                     b.HasIndex("CoachId", "IsActive");
 
                     b.HasIndex("StudentId", "IsActive");
 
-                    b.HasIndex("StudentId", "CoachId", "AssignedAt")
-                        .IsUnique();
+                    b.HasIndex("StudentId", "IsPrimary")
+                        .IsUnique()
+                        .HasFilter("[IsPrimary] = 1 AND [IsActive] = 1");
 
                     b.ToTable("StudentCoachAssignments", (string)null);
                 });
@@ -376,11 +379,18 @@ namespace EgitimPlatform.Modules.Identity.Migrations
                     b.Property<DateTimeOffset>("ExpiresAt")
                         .HasColumnType("datetimeoffset");
 
+                    b.Property<Guid>("FamilyId")
+                        .HasColumnType("uniqueidentifier");
+
                     b.Property<string>("JwtId")
                         .HasColumnType("nvarchar(max)");
 
                     b.Property<Guid?>("ReplacedByTokenId")
                         .HasColumnType("uniqueidentifier");
+
+                    b.Property<string>("RevocationReason")
+                        .HasMaxLength(100)
+                        .HasColumnType("nvarchar(100)");
 
                     b.Property<DateTimeOffset?>("RevokedAt")
                         .HasColumnType("datetimeoffset");
@@ -388,10 +398,19 @@ namespace EgitimPlatform.Modules.Identity.Migrations
                     b.Property<string>("RevokedByIp")
                         .HasColumnType("nvarchar(max)");
 
-                    b.Property<string>("Token")
+                    b.Property<byte[]>("RowVersion")
+                        .IsConcurrencyToken()
                         .IsRequired()
-                        .HasMaxLength(256)
-                        .HasColumnType("nvarchar(256)");
+                        .ValueGeneratedOnAddOrUpdate()
+                        .HasColumnType("rowversion");
+
+                    b.Property<string>("TokenHash")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("nvarchar(64)");
+
+                    b.Property<DateTimeOffset?>("UsedAt")
+                        .HasColumnType("datetimeoffset");
 
                     b.Property<Guid>("UserId")
                         .HasColumnType("uniqueidentifier");
@@ -400,12 +419,15 @@ namespace EgitimPlatform.Modules.Identity.Migrations
 
                     b.HasIndex("ExpiresAt");
 
-                    b.HasIndex("Token")
+                    b.HasIndex("FamilyId");
+
+                    b.HasIndex("TokenHash")
                         .IsUnique();
 
                     b.HasIndex("UserId");
 
-                    b.HasIndex("UserId", "RevokedAt");
+                    b.HasIndex("UserId", "TokenHash")
+                        .HasFilter("[RevokedAt] IS NULL");
 
                     b.ToTable("RefreshTokens", (string)null);
                 });
@@ -695,6 +717,36 @@ namespace EgitimPlatform.Modules.Identity.Migrations
                     b.ToTable("AspNetUserTokens", (string)null);
                 });
 
+            modelBuilder.Entity("EgitimPlatform.Modules.Coaching.Entities.Coach", b =>
+                {
+                    b.HasOne("EgitimPlatform.Modules.Institutions.Entities.Institution", null)
+                        .WithMany()
+                        .HasForeignKey("InstitutionId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+                });
+
+            modelBuilder.Entity("EgitimPlatform.Modules.Coaching.Entities.StudentCoachAssignment", b =>
+                {
+                    b.HasOne("EgitimPlatform.Modules.Coaching.Entities.Coach", null)
+                        .WithMany()
+                        .HasForeignKey("CoachId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("EgitimPlatform.Modules.Institutions.Entities.Institution", null)
+                        .WithMany()
+                        .HasForeignKey("InstitutionId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("EgitimPlatform.Modules.Students.Entities.Student", null)
+                        .WithMany()
+                        .HasForeignKey("StudentId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+                });
+
             modelBuilder.Entity("EgitimPlatform.Modules.Identity.Entities.RefreshToken", b =>
                 {
                     b.HasOne("EgitimPlatform.Modules.Identity.Entities.ApplicationUser", "User")
@@ -727,6 +779,24 @@ namespace EgitimPlatform.Modules.Identity.Migrations
                     b.Navigation("Permission");
 
                     b.Navigation("Role");
+                });
+
+            modelBuilder.Entity("EgitimPlatform.Modules.Students.Entities.Parent", b =>
+                {
+                    b.HasOne("EgitimPlatform.Modules.Institutions.Entities.Institution", null)
+                        .WithMany()
+                        .HasForeignKey("InstitutionId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+                });
+
+            modelBuilder.Entity("EgitimPlatform.Modules.Students.Entities.Student", b =>
+                {
+                    b.HasOne("EgitimPlatform.Modules.Institutions.Entities.Institution", null)
+                        .WithMany()
+                        .HasForeignKey("InstitutionId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
                 });
 
             modelBuilder.Entity("Microsoft.AspNetCore.Identity.IdentityRoleClaim<System.Guid>", b =>

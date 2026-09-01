@@ -13,7 +13,11 @@ public class AuditService : IAuditService
         _context = context;
     }
 
-    public async Task LogAsync(
+    /// <summary>
+    /// P2-02: Adds an audit log entry to the context WITHOUT saving.
+    /// Caller is responsible for calling SaveChangesAsync atomically with business changes.
+    /// </summary>
+    public Task AddPendingLogAsync(
         Guid userId,
         string action,
         string entityType,
@@ -22,8 +26,7 @@ public class AuditService : IAuditService
         string? metadataJson = null,
         string? correlationId = null,
         string? ipAddress = null,
-        string? userAgent = null,
-        CancellationToken cancellationToken = default)
+        string? userAgent = null)
     {
         var auditLog = new AuditLog
         {
@@ -40,6 +43,26 @@ public class AuditService : IAuditService
         };
 
         _context.AuditLogs.Add(auditLog);
+        return Task.CompletedTask;
+    }
+
+    /// <summary>
+    /// Legacy: adds and saves atomically (own SaveChanges).
+    /// Prefer AddPendingLogAsync + caller SaveChanges for cross-entity atomicity.
+    /// </summary>
+    public async Task LogAsync(
+        Guid userId,
+        string action,
+        string entityType,
+        string entityId,
+        Guid? institutionId = null,
+        string? metadataJson = null,
+        string? correlationId = null,
+        string? ipAddress = null,
+        string? userAgent = null,
+        CancellationToken cancellationToken = default)
+    {
+        await AddPendingLogAsync(userId, action, entityType, entityId, institutionId, metadataJson, correlationId, ipAddress, userAgent);
         await _context.SaveChangesAsync(cancellationToken);
     }
 }

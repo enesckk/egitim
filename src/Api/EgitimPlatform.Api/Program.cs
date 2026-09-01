@@ -2,8 +2,12 @@ using EgitimPlatform.Api.Extensions;
 using EgitimPlatform.Api.Middleware;
 using EgitimPlatform.Modules.Coaching.Extensions;
 using EgitimPlatform.Modules.Identity.Extensions;
+using EgitimPlatform.Modules.Identity.Infrastructure;
 using EgitimPlatform.Modules.Students.Extensions;
+using Microsoft.AspNetCore.RateLimiting;
+using Microsoft.EntityFrameworkCore;
 using Serilog;
+using System.Threading.RateLimiting;
 
 Log.Logger = new LoggerConfiguration()
     .WriteTo.Console()
@@ -37,7 +41,7 @@ try
     // Swagger with JWT auth support
     builder.Services.AddSwaggerWithAuth();
 
-    // CORS
+    // CORS — configured per environment (not AllowAny in production)
     builder.Services.AddCors(options =>
     {
         options.AddDefaultPolicy(policy =>
@@ -51,14 +55,57 @@ try
     // OpenAPI
     builder.Services.AddEndpointsApiExplorer();
 
+    // Rate limiting for auth endpoints
+    builder.Services.AddRateLimiter(options =>
+    {
+        options.AddPolicy("login", httpContext =>
+            RateLimitPartition.GetFixedWindowLimiter(
+                partitionKey: httpContext.Connection.RemoteIpAddress?.ToString() ?? "unknown",
+                factory: _ => new FixedWindowRateLimiterOptions
+                {
+                    PermitLimit = 10,
+                    Window = TimeSpan.FromMinutes(1),
+                    QueueLimit = 0,
+                }));
+
+        options.AddPolicy("refresh", httpContext =>
+            RateLimitPartition.GetFixedWindowLimiter(
+                partitionKey: httpContext.Connection.RemoteIpAddress?.ToString() ?? "unknown",
+                factory: _ => new FixedWindowRateLimiterOptions
+                {
+                    PermitLimit = 30,
+                    Window = TimeSpan.FromMinutes(1),
+                    QueueLimit = 0,
+                }));
+
+        options.RejectionStatusCode = StatusCodes.Status429TooManyRequests;
+    });
+
     var app = builder.Build();
 
-    // Seed identity (roles + SuperAdmin)
-    await app.Services.SeedIdentityAsync();
+    // Database migration — Development/Test only.
+    // Production: migrations must be applied via CI/CD or explicit deployment step.
+    if (app.Environment.IsDevelopment() || app.Environment.EnvironmentName == "IntegrationTest" || app.Environment.EnvironmentName == "SecurityTest")
+    {
+        using var scope = app.Services.CreateScope();
+        var dbContext = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
+        await dbContext.Database.MigrateAsync();
+    }
 
-    // Middleware pipeline
-    app.UseMiddleware<ExceptionHandlingMiddleware>();
+    // Seed roles (deterministic, safe for all environments)
+    await app.Services.SeedIdentityRolesAsync();
+
+    // Bootstrap SuperAdmin — ONLY if explicitly enabled via config
+    // and only in non-Production environments
+    if (!app.Environment.IsProduction())
+    {
+        await app.Services.SeedBootstrapSuperAdminAsync();
+    }
+
+    // Middleware pipeline — CorrelationId BEFORE ExceptionHandling
+    // so exception logs include the correlation context.
     app.UseMiddleware<CorrelationIdMiddleware>();
+    app.UseMiddleware<ExceptionHandlingMiddleware>();
 
     if (app.Environment.IsDevelopment())
     {
@@ -71,9 +118,10 @@ try
     app.UseSerilogRequestLogging();
     app.UseAuthentication();
     app.UseAuthorization();
+    app.UseRateLimiter();
     app.MapControllers();
 
-    Log.Information("Application starting...");
+    Log.Information("Application starting in {Environment}...", app.Environment.EnvironmentName);
     app.Run();
 }
 catch (Exception ex)

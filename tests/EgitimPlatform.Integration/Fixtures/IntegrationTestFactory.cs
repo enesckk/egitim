@@ -36,6 +36,9 @@ public class IntegrationTestFactory : WebApplicationFactory<Program>, IAsyncLife
                 [$"{JwtSettings.SectionName}:SigningKey"] = TestSigningKey,
                 [$"{JwtSettings.SectionName}:AccessTokenExpirationMinutes"] = "30",
                 [$"{JwtSettings.SectionName}:RefreshTokenExpirationDays"] = "7",
+                ["Bootstrap:Enabled"] = "true",
+                ["Bootstrap:SuperAdminEmail"] = "superadmin@egitimplatform.local",
+                ["Bootstrap:SuperAdminPassword"] = "SuperAdmin@123!",
             });
         });
 
@@ -75,7 +78,9 @@ public class IntegrationTestFactory : WebApplicationFactory<Program>, IAsyncLife
         await context.Database.MigrateAsync();
 
         var seeder = scope.ServiceProvider.GetRequiredService<EgitimPlatform.Modules.Identity.Infrastructure.IdentitySeeder>();
-        await seeder.SeedAsync();
+        await seeder.SeedRolesAsync();
+        // Bootstrap SuperAdmin for tests (enabled via test config below)
+        await seeder.SeedBootstrapSuperAdminAsync();
 
         await TestData.TestDataSeeder.SeedTestDataAsync(Services);
     }
