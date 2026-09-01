@@ -1,40 +1,91 @@
+using EgitimPlatform.Api.Extensions;
+using EgitimPlatform.Api.Middleware;
+using EgitimPlatform.Modules.Coaching.Extensions;
+using EgitimPlatform.Modules.Identity.Extensions;
+using EgitimPlatform.Modules.Students.Extensions;
 using Serilog;
 
-var builder = WebApplication.CreateBuilder(args);
-
 Log.Logger = new LoggerConfiguration()
-    .ReadFrom.Configuration(builder.Configuration)
-    .Enrich.FromLogContext()
-    .Enrich.WithProperty("Application", "EgitimPlatform.Api")
     .WriteTo.Console()
-    .CreateLogger();
+    .CreateBootstrapLogger();
 
-builder.Host.UseSerilog();
-
-builder.Services.AddEndpointsApiExplorer();
-builder.Services.AddSwaggerGen(options =>
+try
 {
-    options.SwaggerDoc("v1", new Microsoft.OpenApi.OpenApiInfo
+    var builder = WebApplication.CreateBuilder(args);
+
+    // Serilog
+    builder.Host.UseSerilog((context, services, configuration) => configuration
+        .ReadFrom.Configuration(context.Configuration)
+        .ReadFrom.Services(services)
+        .Enrich.FromLogContext()
+        .Enrich.WithProperty("Application", "EgitimPlatform.Api")
+        .WriteTo.Console());
+
+    // Identity module (includes DbContext, Auth, Identity services)
+    builder.Services.AddIdentityModule(builder.Configuration);
+
+    // Domain modules
+    builder.Services.AddStudentsModule();
+    builder.Services.AddCoachingModule();
+
+    // Controllers
+    builder.Services.AddControllers();
+
+    // ProblemDetails
+    builder.Services.AddProblemDetails();
+
+    // Swagger with JWT auth support
+    builder.Services.AddSwaggerWithAuth();
+
+    // CORS
+    builder.Services.AddCors(options =>
     {
-        Title = "Egitim Platform API",
-        Version = "v1",
-        Description = "Egitim Platform API - Modular Monolith"
+        options.AddDefaultPolicy(policy =>
+        {
+            policy.AllowAnyOrigin()
+                  .AllowAnyMethod()
+                  .AllowAnyHeader();
+        });
     });
-});
 
-builder.Services.AddControllers();
-builder.Services.AddProblemDetails();
+    // OpenAPI
+    builder.Services.AddEndpointsApiExplorer();
 
-var app = builder.Build();
+    var app = builder.Build();
 
-if (app.Environment.IsDevelopment())
+    // Seed identity (roles + SuperAdmin)
+    await app.Services.SeedIdentityAsync();
+
+    // Middleware pipeline
+    app.UseMiddleware<ExceptionHandlingMiddleware>();
+    app.UseMiddleware<CorrelationIdMiddleware>();
+
+    if (app.Environment.IsDevelopment())
+    {
+        app.UseSwagger();
+        app.UseSwaggerUI();
+    }
+
+    app.UseHttpsRedirection();
+    app.UseCors();
+    app.UseSerilogRequestLogging();
+    app.UseAuthentication();
+    app.UseAuthorization();
+    app.MapControllers();
+
+    Log.Information("Application starting...");
+    app.Run();
+}
+catch (Exception ex)
 {
-    app.UseSwagger();
-    app.UseSwaggerUI();
+    Log.Fatal(ex, "Application terminated unexpectedly");
+}
+finally
+{
+    Log.CloseAndFlush();
 }
 
-app.UseHttpsRedirection();
-app.UseSerilogRequestLogging();
-app.MapControllers();
-
-app.Run();
+// Make Program accessible for WebApplicationFactory in tests
+public partial class Program
+{
+}
