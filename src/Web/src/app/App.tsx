@@ -18,6 +18,8 @@ import {
   BarChart3,
   GraduationCap,
   BookOpen,
+  UserCheck,
+  Building2,
 } from 'lucide-react';
 import { AppShell } from '@/components/layout/AppShell';
 import { NavItem } from '@/components/layout/BottomNav';
@@ -46,6 +48,14 @@ import { TeacherMessagesView } from '@/features/teacher/messages';
 
 // Parent Portal Features
 import { ParentSummaryView } from '@/features/parent/summary';
+
+// Admin Portal Features
+import { InstitutionDashboardView } from '@/features/admin/overview';
+import { StudentDirectoryView } from '@/features/admin/students';
+import { AdminCoachesView } from '@/features/admin/coaches';
+import { AdminTeachersView } from '@/features/admin/teachers';
+import { AdminClassesView } from '@/features/admin/classes';
+import { AdminReportsView } from '@/features/admin/reports';
 
 interface PortalNavItem extends NavItem {
   path: string;
@@ -151,6 +161,46 @@ const TEACHER_NAV_ITEMS: PortalNavItem[] = [
     path: '/teacher/messages',
     label: 'Mesajlar',
     icon: <MessageSquare className="h-5 w-5" />,
+  },
+];
+
+// 4. Institution Admin Navigation Items (Desktop Dark Navy Sidebar & Mobile Drawer)
+const ADMIN_NAV_ITEMS: PortalNavItem[] = [
+  {
+    id: 'overview',
+    path: '/admin/overview',
+    label: 'Genel Bakış',
+    icon: <LayoutDashboard className="h-5 w-5" />,
+  },
+  {
+    id: 'students',
+    path: '/admin/students',
+    label: 'Öğrenciler',
+    icon: <Users className="h-5 w-5" />,
+  },
+  {
+    id: 'coaches',
+    path: '/admin/coaches',
+    label: 'Koçlar',
+    icon: <UserCheck className="h-5 w-5" />,
+  },
+  {
+    id: 'teachers',
+    path: '/admin/teachers',
+    label: 'Öğretmenler',
+    icon: <GraduationCap className="h-5 w-5" />,
+  },
+  {
+    id: 'classes',
+    path: '/admin/classes',
+    label: 'Sınıflar',
+    icon: <Building2 className="h-5 w-5" />,
+  },
+  {
+    id: 'reports',
+    path: '/admin/reports',
+    label: 'Raporlar',
+    icon: <BarChart3 className="h-5 w-5" />,
   },
 ];
 
@@ -334,6 +384,50 @@ const ParentPortalLayout: React.FC = () => {
   );
 };
 
+// Institution Admin Portal Layout Component
+const AdminPortalLayout: React.FC = () => {
+  const location = useLocation();
+  const navigate = useNavigate();
+
+  const currentNav =
+    ADMIN_NAV_ITEMS.find((item) => location.pathname.startsWith(item.path)) ||
+    ADMIN_NAV_ITEMS[0];
+
+  const handleNavChange = (id: string) => {
+    const target = ADMIN_NAV_ITEMS.find((item) => item.id === id);
+    if (target) {
+      navigate(target.path);
+    }
+  };
+
+  return (
+    <AppShell
+      role="admin"
+      navItems={ADMIN_NAV_ITEMS}
+      activeNavId={currentNav.id}
+      onNavChange={handleNavChange}
+      headerProps={{
+        pageTitle: currentNav.label,
+        brandTitle: 'Bilim Akademi',
+        brandSubtitle: 'Kurum Yönetim Portalı',
+        institutionName: 'Merkez & 6 Şube',
+        userName: 'Ahmet Yılmaz',
+        userRole: 'Kurum Müdürü',
+      }}
+    >
+      <Routes>
+        <Route path="/overview" element={<InstitutionDashboardView />} />
+        <Route path="/students" element={<StudentDirectoryView />} />
+        <Route path="/coaches" element={<AdminCoachesView />} />
+        <Route path="/teachers" element={<AdminTeachersView />} />
+        <Route path="/classes" element={<AdminClassesView />} />
+        <Route path="/reports" element={<AdminReportsView />} />
+        <Route path="*" element={<Navigate to="/admin/overview" replace />} />
+      </Routes>
+    </AppShell>
+  );
+};
+
 export const App: React.FC = () => {
   return (
     <BrowserRouter>
@@ -342,6 +436,7 @@ export const App: React.FC = () => {
         <Route path="/coach/*" element={<CoachPortalLayout />} />
         <Route path="/teacher/*" element={<TeacherPortalLayout />} />
         <Route path="/parent/*" element={<ParentPortalLayout />} />
+        <Route path="/admin/*" element={<AdminPortalLayout />} />
         <Route path="/" element={<Navigate to="/student/today" replace />} />
         <Route path="*" element={<Navigate to="/student/today" replace />} />
       </Routes>

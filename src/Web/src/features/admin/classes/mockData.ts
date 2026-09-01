@@ -1,0 +1,50 @@
+import { AdminClassesViewModel } from './types';
+
+export const initialAdminClassesData: AdminClassesViewModel = {
+  classes: [
+    {
+      id: 'cls-1',
+      name: '11-A Sayısal',
+      grade: '11. Sınıf',
+      field: 'Sayısal',
+      studentCount: 22,
+      assignedTeachers: ['Kemal Bey (Matematik/Fizik)', 'Ahmet Hoca (Kimya/Biyoloji)'],
+      averageAdherencePercentage: 86,
+      averageNet: 24.8,
+      branch: 'Kadıköy',
+    },
+    {
+      id: 'cls-2',
+      name: '12-B Sayısal',
+      grade: '12. Sınıf',
+      field: 'Sayısal (AYT)',
+      studentCount: 18,
+      assignedTeachers: ['Kemal Bey (Matematik/Fizik)', 'Ahmet Hoca (Kimya/Biyoloji)'],
+      averageAdherencePercentage: 82,
+      averageNet: 28.4,
+      branch: 'Kadıköy',
+    },
+    {
+      id: 'cls-3',
+      name: '11-B TM',
+      grade: '11. Sınıf',
+      field: 'Eşit Ağırlık',
+      studentCount: 20,
+      assignedTeachers: ['Zehra Öğretmen (Türkçe/Edebiyat)', 'Selin Öğretmen (Tarih/Coğrafya)'],
+      averageAdherencePercentage: 74,
+      averageNet: 21.2,
+      branch: 'Kadıköy',
+    },
+    {
+      id: 'cls-4',
+      name: '10-C Karma',
+      grade: '10. Sınıf',
+      field: 'Alan Öncesi',
+      studentCount: 24,
+      assignedTeachers: ['Kemal Bey (Matematik)', 'Zehra Öğretmen (Türkçe)'],
+      averageAdherencePercentage: 68,
+      averageNet: 18.2,
+      branch: 'Kadıköy',
+    },
+  ],
+};
