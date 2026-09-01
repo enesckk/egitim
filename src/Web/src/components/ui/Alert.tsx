@@ -1,14 +1,16 @@
 import React from 'react';
+import { X } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
 export interface AlertProps extends React.HTMLAttributes<HTMLDivElement> {
   variant?: 'success' | 'warning' | 'danger' | 'attention' | 'info';
   icon?: React.ReactNode;
   title?: string;
+  onClose?: () => void;
 }
 
 export const Alert = React.forwardRef<HTMLDivElement, AlertProps>(
-  ({ className, variant = 'info', icon, title, children, ...props }, ref) => {
+  ({ className, variant = 'info', icon, title, onClose, children, ...props }, ref) => {
     const variants = {
       success: 'bg-success-light border-green-200 text-success-dark',
       warning: 'bg-warning-light border-amber-200 text-warning-dark',
@@ -22,7 +24,7 @@ export const Alert = React.forwardRef<HTMLDivElement, AlertProps>(
         ref={ref}
         role="alert"
         className={cn(
-          'flex items-start gap-3 px-4 py-3 rounded-xl border text-sm transition-all',
+          'flex items-start gap-3 px-4 py-3 rounded-xl border text-sm transition-all select-none',
           variants[variant],
           className
         )}
@@ -33,6 +35,16 @@ export const Alert = React.forwardRef<HTMLDivElement, AlertProps>(
           {title && <h5 className="font-semibold text-sm mb-0.5 leading-tight">{title}</h5>}
           <div className="text-xs leading-relaxed opacity-95">{children}</div>
         </div>
+        {onClose && (
+          <button
+            type="button"
+            onClick={onClose}
+            className="flex-shrink-0 p-1 -mr-1 -mt-1 rounded-lg hover:bg-black/5 transition-colors opacity-70 hover:opacity-100"
+            aria-label="Kapat"
+          >
+            <X className="h-3.5 w-3.5" />
+          </button>
+        )}
       </div>
     );
   }
