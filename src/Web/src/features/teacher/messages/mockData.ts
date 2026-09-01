@@ -1,0 +1,93 @@
+import { TeacherMessagesViewModel } from './types';
+
+export const initialTeacherMessagesData: TeacherMessagesViewModel = {
+  conversations: [
+    {
+      id: 'tconv-1',
+      studentId: 'student-1',
+      studentName: 'Ayşe Kaya',
+      studentInitials: 'AK',
+      studentGrade: '11-A Sayısal',
+      subject: 'Matematik',
+      lastMessage: 'Yarın dersten sonra 10 dakika tahtada o soruyu birlikte çözelim Ayşe.',
+      lastMessageTime: '11:20',
+      unreadCount: 0,
+      messages: [
+        {
+          id: 'tm-1',
+          senderId: 'student-1',
+          senderName: 'Ayşe Kaya',
+          senderRole: 'student',
+          content: 'Kemal Hocam iyi günler, Limit fasikülündeki 18. soruda trigonometrik sadeleştirmede takıldım.',
+          timestamp: 'Dün 17:40',
+        },
+        {
+          id: 'tm-2',
+          senderId: 'teacher-1',
+          senderName: 'Kemal Bey',
+          senderRole: 'teacher',
+          content: 'Merhaba Ayşe. O soruda sin(2x) açılımını yaptıktan sonra paydadaki 1-cos(x) ifadesini eşlenikle çarpmayı dene.',
+          timestamp: 'Dün 18:05',
+        },
+        {
+          id: 'tm-3',
+          senderId: 'student-1',
+          senderName: 'Ayşe Kaya',
+          senderRole: 'student',
+          content: 'Çok teşekkürler hocam, eşlenikle çarpınca 0/0 belirsizliği sadeleşti!',
+          timestamp: 'Bugün 10:15',
+        },
+        {
+          id: 'tm-4',
+          senderId: 'teacher-1',
+          senderName: 'Kemal Bey',
+          senderRole: 'teacher',
+          content: 'Harika. Yarın dersten sonra 10 dakika tahtada benzer bir soruyu birlikte pekiştirelim.',
+          timestamp: 'Bugün 11:20',
+        },
+      ],
+    },
+    {
+      id: 'tconv-2',
+      studentId: 'student-3',
+      studentName: 'Zeynep Demir',
+      studentInitials: 'ZD',
+      studentGrade: '12-B Sayısal',
+      subject: 'Matematik',
+      lastMessage: 'Hocam türev alma kuralları testini tamamladım.',
+      lastMessageTime: 'Dün',
+      unreadCount: 1,
+      messages: [
+        {
+          id: 'tm-5',
+          senderId: 'student-3',
+          senderName: 'Zeynep Demir',
+          senderRole: 'student',
+          content: 'Hocam türev alma kuralları testini tamamladım, zincir kuralında 2 sorum kaldı.',
+          timestamp: 'Dün 19:30',
+        },
+      ],
+    },
+    {
+      id: 'tconv-3',
+      studentId: 'student-5',
+      studentName: 'Burak Arslan',
+      studentInitials: 'BA',
+      studentGrade: '9. Sınıf',
+      subject: 'Fizik',
+      lastMessage: 'Kuvvet etüt çalışması ne zaman hocam?',
+      lastMessageTime: '3 gün önce',
+      unreadCount: 0,
+      messages: [
+        {
+          id: 'tm-6',
+          senderId: 'student-5',
+          senderName: 'Burak Arslan',
+          senderRole: 'student',
+          content: 'Kuvvet etüt çalışması ne zaman hocam?',
+          timestamp: '3 gün önce',
+        },
+      ],
+    },
+  ],
+};
