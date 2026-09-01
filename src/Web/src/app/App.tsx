@@ -10,9 +10,12 @@ import {
 import {
   LayoutDashboard,
   CalendarDays,
+  Calendar,
   FileText,
   MessageSquare,
   User,
+  Users,
+  BarChart3,
 } from 'lucide-react';
 import { AppShell } from '@/components/layout/AppShell';
 import { NavItem } from '@/components/layout/BottomNav';
@@ -21,12 +24,18 @@ import { StudentPlansView } from '@/features/student/plans';
 import { StudentExamsView } from '@/features/student/exams';
 import { StudentMessagesView } from '@/features/student/messages';
 import { StudentProfileView } from '@/features/student/profile';
+import { CoachDashboardView } from '@/features/coach/dashboard';
+import { CoachStudentsView, CoachStudentDetailView } from '@/features/coach/students';
+import { CoachMeetingsView } from '@/features/coach/meetings';
+import { CoachMessagesView } from '@/features/coach/messages';
+import { CoachReportsView } from '@/features/coach/reports';
 
-interface StudentNavItem extends NavItem {
+interface PortalNavItem extends NavItem {
   path: string;
 }
 
-const STUDENT_NAV_ITEMS: StudentNavItem[] = [
+// 1. Student Navigation Items
+const STUDENT_NAV_ITEMS: PortalNavItem[] = [
   {
     id: 'today',
     path: '/student/today',
@@ -60,11 +69,45 @@ const STUDENT_NAV_ITEMS: StudentNavItem[] = [
   },
 ];
 
+// 2. Coach Navigation Items (Desktop Dark Navy Sidebar & Mobile Drawer)
+const COACH_NAV_ITEMS: PortalNavItem[] = [
+  {
+    id: 'today',
+    path: '/coach/today',
+    label: 'Genel Bakış',
+    icon: <LayoutDashboard className="h-5 w-5" />,
+  },
+  {
+    id: 'students',
+    path: '/coach/students',
+    label: 'Öğrenciler',
+    icon: <Users className="h-5 w-5" />,
+  },
+  {
+    id: 'meetings',
+    path: '/coach/meetings',
+    label: 'Görüşmeler',
+    icon: <Calendar className="h-5 w-5" />,
+  },
+  {
+    id: 'messages',
+    path: '/coach/messages',
+    label: 'Mesajlar',
+    icon: <MessageSquare className="h-5 w-5" />,
+  },
+  {
+    id: 'reports',
+    path: '/coach/reports',
+    label: 'Raporlar',
+    icon: <BarChart3 className="h-5 w-5" />,
+  },
+];
+
+// Student Portal Layout Component
 const StudentPortalLayout: React.FC = () => {
   const location = useLocation();
   const navigate = useNavigate();
 
-  // Find active nav item based on URL path
   const currentNav =
     STUDENT_NAV_ITEMS.find((item) => location.pathname.startsWith(item.path)) ||
     STUDENT_NAV_ITEMS[0];
@@ -104,11 +147,56 @@ const StudentPortalLayout: React.FC = () => {
   );
 };
 
+// Coach Portal Layout Component
+const CoachPortalLayout: React.FC = () => {
+  const location = useLocation();
+  const navigate = useNavigate();
+
+  const currentNav =
+    COACH_NAV_ITEMS.find((item) => location.pathname.startsWith(item.path)) ||
+    COACH_NAV_ITEMS[0];
+
+  const handleNavChange = (id: string) => {
+    const target = COACH_NAV_ITEMS.find((item) => item.id === id);
+    if (target) {
+      navigate(target.path);
+    }
+  };
+
+  return (
+    <AppShell
+      role="coach"
+      navItems={COACH_NAV_ITEMS}
+      activeNavId={currentNav.id}
+      onNavChange={handleNavChange}
+      headerProps={{
+        pageTitle: currentNav.label,
+        brandTitle: 'Bilim Akademi',
+        brandSubtitle: 'Koçluk Portalı',
+        institutionName: 'Kadıköy Şubesi',
+        userName: 'Hasan Yılmaz',
+        userRole: 'Kıdemli YKS Koçu',
+      }}
+    >
+      <Routes>
+        <Route path="/today" element={<CoachDashboardView />} />
+        <Route path="/students" element={<CoachStudentsView />} />
+        <Route path="/students/:studentId" element={<CoachStudentDetailView />} />
+        <Route path="/meetings" element={<CoachMeetingsView />} />
+        <Route path="/messages" element={<CoachMessagesView />} />
+        <Route path="/reports" element={<CoachReportsView />} />
+        <Route path="*" element={<Navigate to="/coach/today" replace />} />
+      </Routes>
+    </AppShell>
+  );
+};
+
 export const App: React.FC = () => {
   return (
     <BrowserRouter>
       <Routes>
         <Route path="/student/*" element={<StudentPortalLayout />} />
+        <Route path="/coach/*" element={<CoachPortalLayout />} />
         <Route path="/" element={<Navigate to="/student/today" replace />} />
         <Route path="*" element={<Navigate to="/student/today" replace />} />
       </Routes>
