@@ -1,11 +1,11 @@
 import React from 'react';
 import { Bell, Menu } from 'lucide-react';
 import { Avatar } from '@/components/ui/Avatar';
-import { IconButton } from '@/components/ui/IconButton';
 
 export interface HeaderProps {
-  title?: string;
-  subtitle?: string;
+  pageTitle?: string;
+  brandTitle?: string;
+  brandSubtitle?: string;
   institutionName?: string;
   userName?: string;
   userRole?: string;
@@ -16,10 +16,11 @@ export interface HeaderProps {
 }
 
 export const Header: React.FC<HeaderProps> = ({
-  title = 'Bilim Akademi',
-  subtitle,
+  pageTitle = 'Bugün',
+  brandTitle = 'Bilim Akademi',
+  brandSubtitle,
   institutionName,
-  userName = 'Kullanıcı',
+  userName = 'Ayşe Kaya',
   userRole,
   onMenuToggle,
   onNotificationClick,
@@ -27,56 +28,59 @@ export const Header: React.FC<HeaderProps> = ({
   actions,
 }) => {
   return (
-    <header className="sticky top-0 z-30 flex h-14 md:h-16 w-full items-center justify-between border-b border-neutral-100 bg-white/95 px-4 backdrop-blur md:px-6">
-      <div className="flex items-center gap-3 min-w-0">
-        {onMenuToggle && (
-          <button
-            type="button"
-            onClick={onMenuToggle}
-            className="md:hidden p-2 rounded-lg text-neutral-600 hover:bg-neutral-100 min-h-[44px] min-w-[44px] flex items-center justify-center -ml-2"
-            aria-label="Menüyü Aç"
-          >
-            <Menu className="h-5 w-5" />
-          </button>
-        )}
+    <header className="sticky top-0 z-30 bg-white/95 backdrop-blur-sm border-b border-neutral-200 h-14 flex items-center px-4 gap-3 flex-shrink-0 select-none">
+      {/* Mobile Hamburger */}
+      {onMenuToggle && (
+        <button
+          type="button"
+          onClick={onMenuToggle}
+          className="md:hidden p-2 -ml-1 rounded-lg text-neutral-600 hover:bg-neutral-100 transition-colors min-h-[44px] min-w-[44px] flex items-center justify-center"
+          aria-label="Menüyü Aç"
+        >
+          <Menu className="h-5 w-5" />
+        </button>
+      )}
 
-        <div className="min-w-0">
-          <div className="flex items-center gap-2">
-            <h1 className="text-sm md:text-base font-semibold text-neutral-900 truncate">
-              {title}
-            </h1>
-            {institutionName && (
-              <span className="hidden sm:inline-block rounded-md bg-navy-50 px-2 py-0.5 text-[10px] font-semibold text-navy-700 border border-navy-100">
-                {institutionName}
-              </span>
-            )}
-          </div>
-          {subtitle && (
-            <p className="text-[11px] text-neutral-400 truncate hidden sm:block">
-              {subtitle}
-            </p>
-          )}
-        </div>
+      {/* Page Title on Mobile / Desktop */}
+      <span className="md:hidden font-semibold text-neutral-800 text-sm truncate">
+        {pageTitle}
+      </span>
+
+      {/* Desktop Brand Info */}
+      <div className="hidden md:flex items-center gap-2 min-w-0">
+        <h1 className="text-sm font-semibold text-neutral-900 truncate">
+          {brandTitle}
+        </h1>
+        {institutionName && (
+          <span className="rounded-md bg-navy-50 px-2 py-0.5 text-[10px] font-semibold text-navy-700 border border-navy-100 truncate">
+            {institutionName}
+          </span>
+        )}
+        {brandSubtitle && (
+          <span className="text-[11px] text-neutral-400 truncate hidden lg:inline">
+            • {brandSubtitle}
+          </span>
+        )}
       </div>
 
-      <div className="flex items-center gap-2 md:gap-3">
+      {/* Right Controls: Notifications & Avatar */}
+      <div className="ml-auto flex items-center gap-2">
         {actions}
 
-        <IconButton
-          variant="ghost"
-          size="sm"
-          ariaLabel="Bildirimler"
+        <button
+          type="button"
           onClick={onNotificationClick}
-          className="relative text-neutral-500 hover:text-neutral-900"
+          className="relative p-2 rounded-full text-neutral-500 hover:bg-neutral-100 transition-colors min-h-[44px] min-w-[44px] flex items-center justify-center"
+          aria-label="Bildirimler"
         >
-          <Bell className="h-4 w-4" />
-          <span className="absolute top-2 right-2 h-2 w-2 rounded-full bg-danger border-2 border-white" />
-        </IconButton>
+          <Bell className="h-[18px] w-[18px]" />
+          <span className="absolute top-2.5 right-2.5 w-2 h-2 bg-danger rounded-full border-2 border-white" />
+        </button>
 
         <button
           type="button"
           onClick={onProfileClick}
-          className="flex items-center gap-2 pl-2 border-l border-neutral-100 cursor-pointer group focus:outline-none"
+          className="flex items-center gap-2 cursor-pointer group focus:outline-none"
           aria-label="Profil"
         >
           <Avatar name={userName} size="sm" variant="primary" />

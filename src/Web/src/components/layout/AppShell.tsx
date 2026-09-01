@@ -47,7 +47,7 @@ export const AppShell: React.FC<AppShellProps> = ({
           onChange={onNavChange}
           isOpen={isDrawerOpen}
           onClose={() => setIsDrawerOpen(false)}
-          brandTitle={headerProps?.title || 'Bilim Akademi'}
+          brandTitle={headerProps?.brandTitle || 'Bilim Akademi'}
           brandSubtitle={headerProps?.institutionName || 'Eğitim Platformu'}
           footerContent={sidebarFooter}
         />
@@ -69,8 +69,8 @@ export const AppShell: React.FC<AppShellProps> = ({
         {/* Page Content */}
         <main
           className={cn(
-            'flex-1 w-full max-w-6xl mx-auto px-4 sm:px-6 py-6',
-            isMobileBottomNavRole && showBottomNav && hasNav && 'pb-24 md:pb-6',
+            'flex-1 w-full max-w-5xl mx-auto px-4 sm:px-6 py-3.5 sm:py-6',
+            isMobileBottomNavRole && showBottomNav && hasNav && 'pb-16 md:pb-6',
             className
           )}
         >
