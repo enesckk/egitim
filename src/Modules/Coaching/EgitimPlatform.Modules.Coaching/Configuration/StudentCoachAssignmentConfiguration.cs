@@ -10,12 +10,13 @@ public class StudentCoachAssignmentConfiguration : IEntityTypeConfiguration<Stud
     {
         builder.ToTable("StudentCoachAssignments");
 
-        builder.HasIndex(a => new { a.StudentId, a.CoachId, a.AssignedAt }).IsUnique();
+        // Useful indexes (the filtered unique for active primary is applied in ApplicationDbContext)
         builder.HasIndex(a => a.InstitutionId);
         builder.HasIndex(a => new { a.StudentId, a.IsActive });
         builder.HasIndex(a => new { a.CoachId, a.IsActive });
+        builder.HasIndex(a => a.AssignedAt);
 
-        // Student and Coach are external references — no FK navigation here
-        // Cross-institution constraints enforced at application level
+        // Note: FK constraints are applied in ApplicationDbContext via reflection
+        // to avoid circular module references.
     }
 }

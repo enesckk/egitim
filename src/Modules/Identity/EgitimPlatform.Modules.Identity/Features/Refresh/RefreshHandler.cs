@@ -1,9 +1,10 @@
-using EgitimPlatform.BuildingBlocks.Interfaces;
 using EgitimPlatform.Modules.Identity.Auth;
 using EgitimPlatform.Modules.Identity.Entities;
 using EgitimPlatform.Modules.Identity.Features.Login;
 using EgitimPlatform.Modules.Identity.Infrastructure;
 using Microsoft.AspNetCore.Identity;
+using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Options;
 
 namespace EgitimPlatform.Modules.Identity.Features.Refresh;
 
@@ -12,37 +13,51 @@ public class RefreshHandler
     private readonly IRefreshTokenService _refreshTokenService;
     private readonly IJwtTokenService _jwtTokenService;
     private readonly UserManager<ApplicationUser> _userManager;
-    private readonly ApplicationDbContext _dbContext;
+    private readonly JwtSettings _jwtSettings;
+    private readonly ILogger<RefreshHandler> _logger;
 
     public RefreshHandler(
         IRefreshTokenService refreshTokenService,
         IJwtTokenService jwtTokenService,
         UserManager<ApplicationUser> userManager,
-        ApplicationDbContext dbContext)
+        IOptions<JwtSettings> jwtSettings,
+        ILogger<RefreshHandler> logger)
     {
         _refreshTokenService = refreshTokenService;
         _jwtTokenService = jwtTokenService;
         _userManager = userManager;
-        _dbContext = dbContext;
+        _jwtSettings = jwtSettings.Value;
+        _logger = logger;
     }
 
     public async Task<LoginResponseDto?> HandleAsync(RefreshCommand command, string? ipAddress, CancellationToken ct = default)
     {
-        var existingToken = await _refreshTokenService.ValidateRefreshTokenAsync(command.RefreshToken, ct);
-        if (existingToken is null) return null;
+        var rotationResult = await _refreshTokenService.TryRotateAsync(command.RefreshToken, ipAddress, ct);
 
-        // Revoke old refresh token (rotation)
-        await _refreshTokenService.RevokeRefreshTokenAsync(existingToken, "Rotated", ipAddress, ct);
+        if (rotationResult.Status != RotationStatus.Success)
+        {
+            _logger.LogInformation("Refresh rotation failed: {Status}", rotationResult.Status);
+            return null;
+        }
 
-        // Generate new tokens
-        var roles = await _userManager.GetRolesAsync(existingToken.User);
-        var (newAccessToken, newJwtId) = _jwtTokenService.GenerateAccessToken(existingToken.User, roles);
-        var newRefreshToken = _refreshTokenService.CreateRefreshToken(existingToken.UserId, newJwtId, ipAddress);
+        if (rotationResult.NewStoredToken is null || rotationResult.NewRawToken is null)
+            return null;
 
-        existingToken.ReplacedByTokenId = newRefreshToken.Id;
-        await _dbContext.SaveChangesAsync(ct);
+        // Generate new access token
+        var user = await _userManager.FindByIdAsync(rotationResult.NewStoredToken.UserId.ToString());
+        if (user is null || !user.IsActive || user.IsDeleted) return null;
 
-        var expiresAt = DateTimeOffset.UtcNow.AddMinutes(30);
-        return new LoginResponseDto(newAccessToken, newRefreshToken.Token, expiresAt);
+        // P2-07: Check lockout status
+        if (await _userManager.IsLockedOutAsync(user))
+        {
+            _logger.LogInformation("Refresh denied: user {UserId} is locked out", user.Id);
+            return null;
+        }
+
+        var roles = await _userManager.GetRolesAsync(user);
+        var (newAccessToken, _) = _jwtTokenService.GenerateAccessToken(user, roles);
+
+        var expiresAt = DateTimeOffset.UtcNow.AddMinutes(_jwtSettings.AccessTokenExpirationMinutes);
+        return new LoginResponseDto(newAccessToken, rotationResult.NewRawToken, expiresAt);
     }
 }

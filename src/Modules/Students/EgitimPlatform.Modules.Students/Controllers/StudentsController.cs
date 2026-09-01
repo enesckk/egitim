@@ -8,6 +8,7 @@ using FluentValidation;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.Mvc.ModelBinding;
 
 namespace EgitimPlatform.Modules.Students.Controllers;
 
@@ -36,14 +37,19 @@ public class StudentsController : ControllerBase
     [HttpPost]
     [Authorize(Policy = Policies.CanManageStudents)]
     [ProducesResponseType(typeof(StudentDto), StatusCodes.Status201Created)]
-    [ProducesResponseType(StatusCodes.Status400BadRequest)]
-    [ProducesResponseType(StatusCodes.Status403Forbidden)]
-    [ProducesResponseType(StatusCodes.Status409Conflict)]
+    [ProducesResponseType(typeof(ValidationProblemDetails), StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status403Forbidden)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status409Conflict)]
     public async Task<IActionResult> Create([FromBody] CreateStudentCommand command, CancellationToken ct)
     {
         var validationResult = await _createValidator.ValidateAsync(command, ct);
         if (!validationResult.IsValid)
-            return BadRequest(validationResult.ToDictionary());
+        {
+            return ValidationProblem(
+                title: "Validation failed",
+                type: "https://tools.ietf.org/html/rfc7231#section-6.5.1",
+                modelStateDictionary: CreateModelState(validationResult));
+        }
 
         var result = await _createHandler.HandleAsync(command, ct);
         return CreatedAtAction(nameof(Get), new { id = result.Id }, result);
@@ -52,8 +58,8 @@ public class StudentsController : ControllerBase
     [HttpGet("{id:guid}")]
     [Authorize(Policy = Policies.CanViewStudents)]
     [ProducesResponseType(typeof(StudentDto), StatusCodes.Status200OK)]
-    [ProducesResponseType(StatusCodes.Status403Forbidden)]
-    [ProducesResponseType(StatusCodes.Status404NotFound)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status403Forbidden)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status404NotFound)]
     public async Task<IActionResult> Get(Guid id, CancellationToken ct)
     {
         var result = await _getHandler.HandleAsync(id, ct);
@@ -67,5 +73,15 @@ public class StudentsController : ControllerBase
     {
         var result = await _listHandler.HandleAsync(query, ct);
         return Ok(result);
+    }
+
+    private static ModelStateDictionary CreateModelState(FluentValidation.Results.ValidationResult validationResult)
+    {
+        var modelState = new ModelStateDictionary();
+        foreach (var error in validationResult.Errors)
+        {
+            modelState.AddModelError(error.PropertyName, error.ErrorMessage);
+        }
+        return modelState;
     }
 }

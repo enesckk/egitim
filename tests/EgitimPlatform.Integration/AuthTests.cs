@@ -30,7 +30,9 @@ public class AuthTests
         var result = await response.Content.ReadFromJsonAsync<LoginResponseDto>();
         result.Should().NotBeNull();
         result!.AccessToken.Should().NotBeEmpty();
-        result.RefreshToken.Should().NotBeEmpty();
+
+        // P2-08: Refresh token is now in HttpOnly cookie, not in body
+        response.Headers.Should().ContainKey("Set-Cookie");
     }
 
     [Fact]

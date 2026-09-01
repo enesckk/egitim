@@ -1,3 +1,4 @@
+using EgitimPlatform.BuildingBlocks.Constants;
 using EgitimPlatform.BuildingBlocks.Exceptions;
 using EgitimPlatform.BuildingBlocks.Interfaces;
 using EgitimPlatform.Modules.Coaching.Entities;
@@ -25,10 +26,30 @@ public class AssignCoachHandler
 
     public async Task HandleAsync(AssignCoachCommand command, CancellationToken ct = default)
     {
-        var institutionId = await _currentUser.GetInstitutionIdAsync()
-            ?? throw new ForbiddenException("User has no institution context.");
+        // P1-02: Only SuperAdmin and InstitutionAdmin can use this endpoint.
+        // Coach is not allowed — they get auto-assignment when creating students.
+        if (!_currentUser.IsSuperAdmin && !_currentUser.IsInRole(Roles.InstitutionAdmin))
+            throw new ForbiddenException("Only administrators can assign coaches.");
 
-        // Verify student exists in the same institution
+        // SuperAdmin bypasses institution check but must have a target institution
+        Guid institutionId;
+        if (_currentUser.IsSuperAdmin)
+        {
+            // For SuperAdmin: derive institution from the student being assigned
+            var studentInst = await _dbContext.Set<Student>()
+                .Where(s => s.Id == command.StudentId && !s.IsDeleted)
+                .Select(s => (Guid?)s.InstitutionId)
+                .FirstOrDefaultAsync(ct);
+
+            institutionId = studentInst ?? throw new NotFoundException("Student", command.StudentId);
+        }
+        else
+        {
+            institutionId = await _currentUser.GetInstitutionIdAsync()
+                ?? throw new ForbiddenException("User has no institution context.");
+        }
+
+        // Verify student exists in the target institution
         var student = await _dbContext.Set<Student>()
             .Where(s => s.Id == command.StudentId && !s.IsDeleted)
             .Select(s => new { s.InstitutionId })
@@ -37,10 +58,10 @@ public class AssignCoachHandler
         if (student is null)
             throw new NotFoundException("Student", command.StudentId);
 
-        if (student.InstitutionId != institutionId && !_currentUser.IsSuperAdmin)
+        if (student.InstitutionId != institutionId)
             throw new ForbiddenException("Cross-institution student assignment is not allowed.");
 
-        // Verify coach exists in the same institution
+        // Verify coach exists in the target institution
         var coach = await _dbContext.Set<Coach>()
             .Where(c => c.Id == command.CoachId && !c.IsDeleted)
             .Select(c => new { c.InstitutionId })
@@ -49,7 +70,7 @@ public class AssignCoachHandler
         if (coach is null)
             throw new NotFoundException("Coach", command.CoachId);
 
-        if (coach.InstitutionId != institutionId && !_currentUser.IsSuperAdmin)
+        if (coach.InstitutionId != institutionId)
             throw new ForbiddenException("Cross-institution coach assignment is not allowed.");
 
         // Check for duplicate active assignment
@@ -90,18 +111,20 @@ public class AssignCoachHandler
         };
 
         _dbContext.Set<StudentCoachAssignment>().Add(assignment);
-        await _dbContext.SaveChangesAsync(ct);
 
+        // P2-02: Atomic audit — add to context, save together
         if (_currentUser.UserId.HasValue)
         {
-            await _auditService.LogAsync(
+            await _auditService.AddPendingLogAsync(
                 userId: _currentUser.UserId.Value,
                 action: "StudentCoach.Assigned",
                 entityType: "StudentCoachAssignment",
                 entityId: assignment.Id.ToString(),
                 institutionId: institutionId,
-                metadataJson: $"{{\"studentId\":\"{command.StudentId}\",\"coachId\":\"{command.CoachId}\",\"isPrimary\":{command.IsPrimary.ToString().ToLower()}}}",
-                cancellationToken: ct);
+                metadataJson: $"{{\"studentId\":\"{command.StudentId}\",\"coachId\":\"{command.CoachId}\",\"isPrimary\":{command.IsPrimary.ToString().ToLower()}}}");
         }
+
+        // Single atomic save: assignment + audit log
+        await _dbContext.SaveChangesAsync(ct);
     }
 }

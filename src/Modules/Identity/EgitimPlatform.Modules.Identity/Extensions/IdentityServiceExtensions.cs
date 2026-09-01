@@ -1,7 +1,6 @@
 using EgitimPlatform.BuildingBlocks.Constants;
 using EgitimPlatform.BuildingBlocks.Interfaces;
 using EgitimPlatform.Modules.Identity.Auth;
-using EgitimPlatform.Modules.Identity.Configuration;
 using EgitimPlatform.Modules.Identity.Entities;
 using EgitimPlatform.Modules.Identity.Features.Login;
 using EgitimPlatform.Modules.Identity.Features.Logout;
@@ -46,10 +45,14 @@ public static class IdentityServiceExtensions
         .AddEntityFrameworkStores<ApplicationDbContext>()
         .AddDefaultTokenProviders();
 
-        // JWT settings
+        // JWT settings — FAIL FAST on invalid/placeholder configuration
         var jwtSettings = configuration.GetSection(JwtSettings.SectionName).Get<JwtSettings>()
             ?? throw new InvalidOperationException("JwtSettings section is missing from configuration.");
+        jwtSettings.Validate(); // Throws if key is missing, too short, or placeholder
         services.Configure<JwtSettings>(configuration.GetSection(JwtSettings.SectionName));
+
+        // Bootstrap settings (SuperAdmin creation) — disabled by default
+        services.Configure<BootstrapSettings>(configuration.GetSection(BootstrapSettings.SectionName));
 
         // Authentication
         services.AddAuthentication(options =>
@@ -79,7 +82,7 @@ public static class IdentityServiceExtensions
             .AddPolicy(Policies.CanViewStudents, policy =>
                 policy.RequireRole(Roles.SuperAdmin, Roles.InstitutionAdmin, Roles.Coach, Roles.Teacher, Roles.Parent))
             .AddPolicy(Policies.CanAssignCoach, policy =>
-                policy.RequireRole(Roles.SuperAdmin, Roles.InstitutionAdmin, Roles.Coach))
+                policy.RequireRole(Roles.SuperAdmin, Roles.InstitutionAdmin))
             .AddPolicy(Policies.CanManageInstitution, policy =>
                 policy.RequireRole(Roles.SuperAdmin, Roles.InstitutionAdmin))
             .AddPolicy(Policies.CanViewAuditLogs, policy =>
@@ -109,10 +112,27 @@ public static class IdentityServiceExtensions
         return services;
     }
 
-    public static async Task SeedIdentityAsync(this IServiceProvider services, CancellationToken ct = default)
+    /// <summary>
+    /// Seeds roles (deterministic, safe for all environments).
+    /// Does NOT migrate the database — call Migrate separately if needed.
+    /// Does NOT create SuperAdmin — bootstrap must be explicitly enabled.
+    /// </summary>
+    public static async Task SeedIdentityRolesAsync(this IServiceProvider services, CancellationToken ct = default)
     {
         using var scope = services.CreateScope();
         var seeder = scope.ServiceProvider.GetRequiredService<IdentitySeeder>();
-        await seeder.SeedAsync(ct);
+        await seeder.SeedRolesAsync(ct);
+    }
+
+    /// <summary>
+    /// Seeds the SuperAdmin bootstrap user ONLY if Bootstrap.Enabled = true
+    /// and credentials are provided via secure configuration.
+    /// Should only be called in Development/test environments.
+    /// </summary>
+    public static async Task SeedBootstrapSuperAdminAsync(this IServiceProvider services, CancellationToken ct = default)
+    {
+        using var scope = services.CreateScope();
+        var seeder = scope.ServiceProvider.GetRequiredService<IdentitySeeder>();
+        await seeder.SeedBootstrapSuperAdminAsync(ct);
     }
 }

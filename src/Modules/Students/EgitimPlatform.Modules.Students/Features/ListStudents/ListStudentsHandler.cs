@@ -1,3 +1,5 @@
+using EgitimPlatform.BuildingBlocks.Constants;
+using EgitimPlatform.BuildingBlocks.Exceptions;
 using EgitimPlatform.BuildingBlocks.Interfaces;
 using EgitimPlatform.BuildingBlocks.Pagination;
 using EgitimPlatform.Modules.Identity.Infrastructure;
@@ -10,23 +12,57 @@ public class ListStudentsHandler
 {
     private readonly ApplicationDbContext _dbContext;
     private readonly ICurrentUser _currentUser;
+    private readonly ICoachStudentQuery _coachStudentQuery;
 
-    public ListStudentsHandler(ApplicationDbContext dbContext, ICurrentUser currentUser)
+    public ListStudentsHandler(
+        ApplicationDbContext dbContext,
+        ICurrentUser currentUser,
+        ICoachStudentQuery coachStudentQuery)
     {
         _dbContext = dbContext;
         _currentUser = currentUser;
+        _coachStudentQuery = coachStudentQuery;
     }
 
     public async Task<PaginatedList<StudentDto>> HandleAsync(ListStudentsQuery query, CancellationToken ct = default)
     {
         var institutionId = await _currentUser.GetInstitutionIdAsync();
-
         var source = _dbContext.Set<Student>().AsNoTracking();
 
-        // Institution filter (defense-in-depth; authorization should already ensure this)
-        if (!_currentUser.IsSuperAdmin && institutionId.HasValue)
+        // P1-01: Role-based scoping
+        if (_currentUser.IsSuperAdmin)
         {
+            // SuperAdmin: no filter (privileged scope)
+        }
+        else if (_currentUser.IsInRole(Roles.Coach))
+        {
+            // Coach: only students they're actively assigned to
+            if (_currentUser.UserId is null) throw new ForbiddenException("User context required.");
+            var assignedIds = await _coachStudentQuery.GetActiveAssignedStudentIdsAsync(_currentUser.UserId.Value, ct);
+            source = source.Where(s => assignedIds.Contains(s.Id));
+        }
+        else if (_currentUser.IsInRole(Roles.Student))
+        {
+            // Student: only own record
+            if (_currentUser.UserId is null) throw new ForbiddenException("User context required.");
+            var userId = _currentUser.UserId.Value;
+            source = source.Where(s => s.UserId == userId);
+        }
+        else if (_currentUser.IsInRole(Roles.InstitutionAdmin))
+        {
+            // InstitutionAdmin: own institution
+            if (!institutionId.HasValue) throw new ForbiddenException("Institution context required.");
             source = source.Where(s => s.InstitutionId == institutionId.Value);
+        }
+        else if (_currentUser.IsInRole(Roles.Teacher) || _currentUser.IsInRole(Roles.Parent))
+        {
+            // Teacher/Parent: no relationship defined yet (Sprint 2) — default deny
+            throw new ForbiddenException("Access not yet available for this role.");
+        }
+        else
+        {
+            // Unknown role or no institution → fail closed
+            throw new ForbiddenException("Access denied.");
         }
 
         // Search filter
