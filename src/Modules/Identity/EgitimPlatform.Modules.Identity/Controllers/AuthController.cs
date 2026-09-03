@@ -62,7 +62,9 @@ public class AuthController : ControllerBase
         var ipAddress = HttpContext.Connection.RemoteIpAddress?.ToString();
         var result = await _loginHandler.HandleAsync(command, ipAddress, ct);
 
-        if (result.Status != LoginHandler.LoginStatus.Success)
+        if (result.Status != LoginHandler.LoginStatus.Success
+            || result.Tokens is null
+            || result.RawRefreshToken is null)
         {
             return Unauthorized(new ProblemDetails
             {
@@ -75,7 +77,7 @@ public class AuthController : ControllerBase
         }
 
         // P2-3: Refresh token goes into HttpOnly Secure cookie ONLY (not JSON body).
-        SetRefreshTokenCookie(result.RawRefreshToken!);
+        SetRefreshTokenCookie(result.RawRefreshToken);
 
         // P2-3: Response DTO no longer contains RefreshToken field.
         return Ok(new LoginResponseDto(

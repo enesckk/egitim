@@ -118,6 +118,19 @@ public class ApplicationDbContext : IdentityDbContext<ApplicationUser, Applicati
                 .OnDelete(DeleteBehavior.Restrict);
         }
 
+        // P1-01 CLOSURE: Coach.UserId → ApplicationUser.Id FK.
+        // Real DB-level reference ensures every coach profile maps to a real user.
+        // Combined with the filtered unique index on (UserId, InstitutionId),
+        // this prevents orphaned or ambiguous coach profiles.
+        if (coachType is not null)
+        {
+            builder.Entity(coachType.ClrType)
+                .HasOne(typeof(ApplicationUser))
+                .WithMany()
+                .HasForeignKey("UserId")
+                .OnDelete(DeleteBehavior.Restrict);
+        }
+
         // Parent → Institution FK
         if (parentType is not null && institutionType is not null)
         {

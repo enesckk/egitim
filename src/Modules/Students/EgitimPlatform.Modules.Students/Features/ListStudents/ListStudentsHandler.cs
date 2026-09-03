@@ -29,16 +29,19 @@ public class ListStudentsHandler
         var institutionId = await _currentUser.GetInstitutionIdAsync();
         var source = _dbContext.Set<Student>().AsNoTracking();
 
-        // P1-01: Role-based scoping
+        // P1-01 CLOSURE: Role-based scoping with mandatory institution context
         if (_currentUser.IsSuperAdmin)
         {
             // SuperAdmin: no filter (privileged scope)
         }
         else if (_currentUser.IsInRole(Roles.Coach))
         {
-            // Coach: only students they're actively assigned to
-            if (_currentUser.UserId is null) throw new ForbiddenException("User context required.");
-            var assignedIds = await _coachStudentQuery.GetActiveAssignedStudentIdsByUserAsync(_currentUser.UserId.Value, ct);
+            // Coach: institution context MANDATORY — fail closed if missing
+            if (_currentUser.UserId is null || !institutionId.HasValue)
+                throw new ForbiddenException("Coach must have an institution context.");
+
+            var assignedIds = await _coachStudentQuery.GetActiveAssignedStudentIdsAsync(
+                _currentUser.UserId.Value, institutionId.Value, ct);
             source = source.Where(s => assignedIds.Contains(s.Id));
         }
         else if (_currentUser.IsInRole(Roles.Student))

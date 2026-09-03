@@ -32,22 +32,29 @@ public class GetStudentHandler
         if (student is null)
             throw new NotFoundException("Student", studentId);
 
-        // P1-01: Role-based authorization
+        // P1-01 CLOSURE: Role-based authorization with mandatory institution context
         if (_currentUser.IsSuperAdmin)
         {
             // SuperAdmin: privileged access
         }
         else if (_currentUser.IsInRole(Roles.Coach))
         {
-            // Coach: must have active assignment to this student
-            if (_currentUser.UserId is null) throw new ForbiddenException("Access denied.");
-            var hasAssignment = await _coachStudentQuery.HasActiveAssignmentByUserAsync(_currentUser.UserId.Value, studentId, ct);
-            if (!hasAssignment) throw new ForbiddenException("Access denied.");
-
-            // Same-institution check (defense-in-depth)
-            var institutionId = await _currentUser.GetInstitutionIdAsync();
-            if (institutionId.HasValue && student.InstitutionId != institutionId.Value)
+            // Coach: institution context MANDATORY — fail closed if missing
+            if (_currentUser.UserId is null)
                 throw new ForbiddenException("Access denied.");
+
+            var institutionId = await _currentUser.GetInstitutionIdAsync();
+            if (!institutionId.HasValue)
+                throw new ForbiddenException("Coach must have an institution context.");
+
+            // Same-institution check (required, not defense-in-depth)
+            if (student.InstitutionId != institutionId.Value)
+                throw new ForbiddenException("Access denied.");
+
+            // Coach must have active assignment to this student (institution-scoped)
+            var hasAssignment = await _coachStudentQuery.HasActiveAssignmentAsync(
+                _currentUser.UserId.Value, institutionId.Value, studentId, ct);
+            if (!hasAssignment) throw new ForbiddenException("Access denied.");
         }
         else if (_currentUser.IsInRole(Roles.Student))
         {

@@ -124,7 +124,40 @@ public class AssignCoachHandler
                 metadataJson: $"{{\"studentId\":\"{command.StudentId}\",\"coachId\":\"{command.CoachId}\",\"isPrimary\":{command.IsPrimary.ToString().ToLower()}}}");
         }
 
-        // Single atomic save: assignment + audit log
-        await _dbContext.SaveChangesAsync(ct);
+        // P2-05: Single atomic save with concurrent active-primary conflict handling.
+        // The DB has a filtered unique index [IsPrimary]=1 AND [IsActive]=1 on StudentId.
+        // If two concurrent requests try to create active primary assignments for the same
+        // student, the DB rejects the second — we catch this and return 409 Conflict.
+        // The ExceptionHandlingMiddleware also catches DbUpdateException globally as a fallback.
+        try
+        {
+            await _dbContext.SaveChangesAsync(ct);
+        }
+        catch (DbUpdateException ex) when (IsUniqueConstraintViolation(ex))
+        {
+            throw new ConflictException("Another active primary coach assignment for this student already exists. Please retry.");
+        }
+    }
+
+    /// <summary>
+    /// P2-05: Detects SQL Server unique constraint violation errors.
+    /// SQL Server error 2601 = unique index violation, 2627 = unique constraint violation.
+    /// Uses type name check to avoid requiring Microsoft.Data.SqlClient package reference.
+    /// </summary>
+    private static bool IsUniqueConstraintViolation(DbUpdateException ex)
+    {
+        var inner = ex.InnerException;
+        if (inner is null) return false;
+
+        // Check by type name to avoid assembly dependency on SqlClient
+        var typeName = inner.GetType().FullName ?? string.Empty;
+        if (!typeName.Contains("SqlException")) return false;
+
+        // SQL Server error numbers for unique constraint violations
+        var numberProperty = inner.GetType().GetProperty("Number");
+        if (numberProperty?.GetValue(inner) is int number)
+            return number is 2601 or 2627;
+
+        return false;
     }
 }
