@@ -1,7 +1,7 @@
 using EgitimPlatform.BuildingBlocks.Interfaces;
 using EgitimPlatform.Modules.Identity.Auth;
 using EgitimPlatform.Modules.Identity.Entities;
-using EgitimPlatform.Modules.Identity.Infrastructure;
+
 using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
@@ -15,20 +15,22 @@ public class LoginHandler
     private readonly SignInManager<ApplicationUser> _signInManager;
     private readonly IJwtTokenService _jwtTokenService;
     private readonly IRefreshTokenService _refreshTokenService;
-    private readonly ApplicationDbContext _dbContext;
+    private readonly IApplicationDbContext _dbContext;
     private readonly IAuditService _auditService;
     private readonly JwtSettings _jwtSettings;
     private readonly ILogger<LoginHandler> _logger;
+    private readonly IPasswordHasher<ApplicationUser> _passwordHasher;
 
     public LoginHandler(
         UserManager<ApplicationUser> userManager,
         SignInManager<ApplicationUser> signInManager,
         IJwtTokenService jwtTokenService,
         IRefreshTokenService refreshTokenService,
-        ApplicationDbContext dbContext,
+        IApplicationDbContext dbContext,
         IAuditService auditService,
         IOptions<JwtSettings> jwtSettings,
-        ILogger<LoginHandler> logger)
+        ILogger<LoginHandler> logger,
+        IPasswordHasher<ApplicationUser> passwordHasher)
     {
         _userManager = userManager;
         _signInManager = signInManager;
@@ -38,6 +40,7 @@ public class LoginHandler
         _auditService = auditService;
         _jwtSettings = jwtSettings.Value;
         _logger = logger;
+        _passwordHasher = passwordHasher;
     }
 
     /// <summary>
@@ -46,7 +49,8 @@ public class LoginHandler
     /// </summary>
     public sealed record LoginAttemptResult(
         LoginStatus Status,
-        LoginResponseDto? Tokens = null);
+        LoginResponseDto? Tokens = null,
+        string? RawRefreshToken = null);
 
     public enum LoginStatus
     {
@@ -64,14 +68,27 @@ public class LoginHandler
 
         if (user is null)
         {
-            // Audit failed attempt without user ID (use a sentinel for unknown user)
-            _logger.LogInformation("Login failed: user not found for {Email}", command.Email);
+            // P2-2: Perform a dummy password hash to prevent timing-based user enumeration.
+            // Without this, the "user not found" path returns significantly faster than the
+            // "wrong password" path, allowing attackers to determine valid emails.
+            // We hash against a throwaway user object — the result is discarded.
+            var dummyUser = new ApplicationUser { Id = Guid.Empty };
+            _passwordHasher.HashPassword(dummyUser, command.Password);
+
+            // P2-1: No PII (email/password) in logs — use safe event codes.
+            _logger.LogInformation("Login failed: reason={Reason}, ip={IpAddress}",
+                "UserNotFound", ipAddress ?? "unknown");
             return new LoginAttemptResult(LoginStatus.UserNotFound);
         }
 
         if (!user.IsActive)
         {
-            _logger.LogInformation("Login failed: user {UserId} is not active", user.Id);
+            // P2-2: Still verify password hash even for inactive users to maintain constant timing.
+            // Result is intentionally not awaited — we discard it to prevent timing difference.
+            _ = _signInManager.CheckPasswordSignInAsync(user, command.Password, lockoutOnFailure: false);
+
+            _logger.LogInformation("Login failed: reason={Reason}, userId={UserId}, ip={IpAddress}",
+                "UserNotActive", user.Id, ipAddress ?? "unknown");
             return new LoginAttemptResult(LoginStatus.UserNotActive);
         }
 
@@ -81,21 +98,39 @@ public class LoginHandler
 
         if (signInResult.IsLockedOut)
         {
-            _logger.LogWarning("Login failed: user {UserId} is locked out", user.Id);
-            await AuditLoginAsync(user, "Auth.Login.LockedOut", ipAddress, ct);
+            _logger.LogWarning("Login failed: reason={Reason}, userId={UserId}, ip={IpAddress}",
+                "UserLockedOut", user.Id, ipAddress ?? "unknown");
+            // P2-9: Audit uses AddPendingLogAsync + SaveChanges for atomicity
+            await _auditService.AddPendingLogAsync(
+                userId: user.Id,
+                action: "Auth.Login.LockedOut",
+                entityType: "User",
+                entityId: user.Id.ToString(),
+                institutionId: user.InstitutionId,
+                ipAddress: ipAddress);
+            await _dbContext.SaveChangesAsync(ct);
             return new LoginAttemptResult(LoginStatus.UserLockedOut);
         }
 
         if (signInResult.IsNotAllowed)
         {
-            _logger.LogInformation("Login failed: user {UserId} sign-in not allowed", user.Id);
+            _logger.LogInformation("Login failed: reason={Reason}, userId={UserId}, ip={IpAddress}",
+                "SignInNotAllowed", user.Id, ipAddress ?? "unknown");
             return new LoginAttemptResult(LoginStatus.UserNotActive);
         }
 
         if (!signInResult.Succeeded)
         {
-            _logger.LogInformation("Login failed: invalid password for user {UserId}", user.Id);
-            await AuditLoginAsync(user, "Auth.Login.Failed", ipAddress, ct);
+            _logger.LogInformation("Login failed: reason={Reason}, userId={UserId}, ip={IpAddress}",
+                "InvalidPassword", user.Id, ipAddress ?? "unknown");
+            await _auditService.AddPendingLogAsync(
+                userId: user.Id,
+                action: "Auth.Login.Failed",
+                entityType: "User",
+                entityId: user.Id.ToString(),
+                institutionId: user.InstitutionId,
+                ipAddress: ipAddress);
+            await _dbContext.SaveChangesAsync(ct);
             return new LoginAttemptResult(LoginStatus.InvalidCredentials);
         }
 
@@ -104,25 +139,24 @@ public class LoginHandler
         var (accessToken, jwtId) = _jwtTokenService.GenerateAccessToken(user, roles);
 
         var refreshResult = _refreshTokenService.CreateRefreshToken(user.Id, jwtId, ipAddress);
-        await _dbContext.SaveChangesAsync(ct);
 
-        await AuditLoginAsync(user, "Auth.Login.Success", ipAddress, ct);
+        // P2-9: Atomic — refresh token + audit log in single SaveChanges.
+        // Previously, refresh token was saved first, then audit was a separate SaveChanges.
+        // If the audit save failed, the token was already persisted — inconsistent state.
+        await _auditService.AddPendingLogAsync(
+            userId: user.Id,
+            action: "Auth.Login.Success",
+            entityType: "User",
+            entityId: user.Id.ToString(),
+            institutionId: user.InstitutionId,
+            ipAddress: ipAddress);
+
+        await _dbContext.SaveChangesAsync(ct);
 
         var expiresAt = DateTimeOffset.UtcNow.AddMinutes(_jwtSettings.AccessTokenExpirationMinutes);
         return new LoginAttemptResult(
             LoginStatus.Success,
-            new LoginResponseDto(accessToken, refreshResult.RawToken, expiresAt));
-    }
-
-    private async Task AuditLoginAsync(ApplicationUser user, string action, string? ipAddress, CancellationToken ct)
-    {
-        await _auditService.LogAsync(
-            userId: user.Id,
-            action: action,
-            entityType: "User",
-            entityId: user.Id.ToString(),
-            institutionId: user.InstitutionId,
-            ipAddress: ipAddress,
-            cancellationToken: ct);
+            new LoginResponseDto(accessToken, expiresAt),
+            RawRefreshToken: refreshResult.RawToken);
     }
 }

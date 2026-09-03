@@ -4,6 +4,7 @@ using FluentValidation;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.Mvc.ModelBinding;
 
 namespace EgitimPlatform.Modules.Coaching.Controllers;
 
@@ -26,7 +27,7 @@ public class CoachingController : ControllerBase
     [HttpPost("assign")]
     [Authorize(Policy = Policies.CanAssignCoach)]
     [ProducesResponseType(StatusCodes.Status204NoContent)]
-    [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(typeof(ValidationProblemDetails), StatusCodes.Status400BadRequest)]
     [ProducesResponseType(StatusCodes.Status403Forbidden)]
     [ProducesResponseType(StatusCodes.Status404NotFound)]
     [ProducesResponseType(StatusCodes.Status409Conflict)]
@@ -34,9 +35,24 @@ public class CoachingController : ControllerBase
     {
         var validationResult = await _assignValidator.ValidateAsync(command, ct);
         if (!validationResult.IsValid)
-            return BadRequest(validationResult.ToDictionary());
+        {
+            return ValidationProblem(
+                title: "Validation failed",
+                type: "https://tools.ietf.org/html/rfc7231#section-6.5.1",
+                modelStateDictionary: CreateModelState(validationResult));
+        }
 
         await _assignHandler.HandleAsync(command, ct);
         return NoContent();
+    }
+
+    private static ModelStateDictionary CreateModelState(FluentValidation.Results.ValidationResult validationResult)
+    {
+        var modelState = new ModelStateDictionary();
+        foreach (var error in validationResult.Errors)
+        {
+            modelState.AddModelError(error.PropertyName, error.ErrorMessage);
+        }
+        return modelState;
     }
 }

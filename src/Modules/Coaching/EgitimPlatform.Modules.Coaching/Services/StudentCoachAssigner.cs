@@ -1,15 +1,15 @@
 using EgitimPlatform.BuildingBlocks.Interfaces;
 using EgitimPlatform.Modules.Coaching.Entities;
-using EgitimPlatform.Modules.Identity.Infrastructure;
+
 using Microsoft.EntityFrameworkCore;
 
 namespace EgitimPlatform.Modules.Coaching.Services;
 
 public class StudentCoachAssigner : IStudentCoachAssigner
 {
-    private readonly ApplicationDbContext _dbContext;
+    private readonly IApplicationDbContext _dbContext;
 
-    public StudentCoachAssigner(ApplicationDbContext dbContext)
+    public StudentCoachAssigner(IApplicationDbContext dbContext)
     {
         _dbContext = dbContext;
     }

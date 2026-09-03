@@ -1,5 +1,6 @@
-using EgitimPlatform.Modules.Identity.Auth;
 using EgitimPlatform.Modules.Identity.Infrastructure;
+using EgitimPlatform.Modules.Identity.Auth;
+using EgitimPlatform.Infrastructure;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Mvc.Testing;

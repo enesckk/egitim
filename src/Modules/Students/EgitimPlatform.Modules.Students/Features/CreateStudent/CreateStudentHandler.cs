@@ -1,7 +1,7 @@
 using EgitimPlatform.BuildingBlocks.Constants;
 using EgitimPlatform.BuildingBlocks.Exceptions;
 using EgitimPlatform.BuildingBlocks.Interfaces;
-using EgitimPlatform.Modules.Identity.Infrastructure;
+
 using EgitimPlatform.Modules.Students.Entities;
 using Microsoft.EntityFrameworkCore;
 
@@ -9,13 +9,13 @@ namespace EgitimPlatform.Modules.Students.Features.CreateStudent;
 
 public class CreateStudentHandler
 {
-    private readonly ApplicationDbContext _dbContext;
+    private readonly IApplicationDbContext _dbContext;
     private readonly ICurrentUser _currentUser;
     private readonly IAuditService _auditService;
     private readonly IStudentCoachAssigner _studentCoachAssigner;
 
     public CreateStudentHandler(
-        ApplicationDbContext dbContext,
+        IApplicationDbContext dbContext,
         ICurrentUser currentUser,
         IAuditService auditService,
         IStudentCoachAssigner studentCoachAssigner)

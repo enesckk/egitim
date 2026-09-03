@@ -1,6 +1,7 @@
+using EgitimPlatform.Modules.Identity.Entities;
 using EgitimPlatform.BuildingBlocks.Interfaces;
 using EgitimPlatform.Modules.Identity.Auth;
-using EgitimPlatform.Modules.Identity.Infrastructure;
+
 using Microsoft.EntityFrameworkCore;
 
 namespace EgitimPlatform.Modules.Identity.Features.Logout;
@@ -9,12 +10,12 @@ public class LogoutHandler
 {
     private readonly IRefreshTokenService _refreshTokenService;
     private readonly ICurrentUser _currentUser;
-    private readonly ApplicationDbContext _dbContext;
+    private readonly IApplicationDbContext _dbContext;
 
     public LogoutHandler(
         IRefreshTokenService refreshTokenService,
         ICurrentUser currentUser,
-        ApplicationDbContext dbContext)
+        IApplicationDbContext dbContext)
     {
         _refreshTokenService = refreshTokenService;
         _currentUser = currentUser;
@@ -30,7 +31,7 @@ public class LogoutHandler
             // P2-01: Ownership check — only revoke own tokens.
             // Hash the incoming token to find it, verify UserId matches.
             var tokenHash = RefreshTokenService.HashToken(command.RefreshToken);
-            var token = await _dbContext.RefreshTokens
+            var token = await _dbContext.Set<RefreshToken>()
                 .AsNoTracking()
                 .FirstOrDefaultAsync(t => t.TokenHash == tokenHash, ct);
 

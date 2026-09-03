@@ -1,5 +1,6 @@
+using EgitimPlatform.BuildingBlocks.Interfaces;
 using EgitimPlatform.Modules.Identity.Entities;
-using EgitimPlatform.Modules.Identity.Infrastructure;
+
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
@@ -56,12 +57,12 @@ public enum RotationStatus
 
 public class RefreshTokenService : IRefreshTokenService
 {
-    private readonly ApplicationDbContext _context;
+    private readonly IApplicationDbContext _context;
     private readonly JwtSettings _settings;
     private readonly ILogger<RefreshTokenService> _logger;
 
     public RefreshTokenService(
-        ApplicationDbContext context,
+        IApplicationDbContext context,
         IOptions<JwtSettings> settings,
         ILogger<RefreshTokenService> logger)
     {
@@ -87,7 +88,7 @@ public class RefreshTokenService : IRefreshTokenService
             CreatedByIp = ipAddress,
         };
 
-        _context.RefreshTokens.Add(refreshToken);
+        _context.Set<RefreshToken>().Add(refreshToken);
         return new RefreshTokenCreationResult(refreshToken, rawToken);
     }
 
@@ -96,7 +97,7 @@ public class RefreshTokenService : IRefreshTokenService
         var hash = HashToken(rawToken);
 
         // Find the token by hash
-        var existingToken = await _context.RefreshTokens
+        var existingToken = await _context.Set<RefreshToken>()
             .Include(t => t.User)
             .FirstOrDefaultAsync(t => t.TokenHash == hash, ct);
 
@@ -166,7 +167,7 @@ public class RefreshTokenService : IRefreshTokenService
     public async Task<bool> TryRevokeByRawTokenAsync(string rawToken, string? reason, string? ipAddress, CancellationToken ct = default)
     {
         var hash = HashToken(rawToken);
-        var token = await _context.RefreshTokens.FirstOrDefaultAsync(t => t.TokenHash == hash, ct);
+        var token = await _context.Set<RefreshToken>().FirstOrDefaultAsync(t => t.TokenHash == hash, ct);
         if (token is null || token.IsRevoked) return false;
 
         token.RevokedAt = DateTimeOffset.UtcNow;
@@ -178,7 +179,7 @@ public class RefreshTokenService : IRefreshTokenService
 
     public async Task RevokeAllUserTokensAsync(Guid userId, string? reason, string? ipAddress, CancellationToken ct = default)
     {
-        var activeTokens = await _context.RefreshTokens
+        var activeTokens = await _context.Set<RefreshToken>()
             .Where(t => t.UserId == userId && t.RevokedAt == null && t.ExpiresAt > DateTimeOffset.UtcNow)
             .ToListAsync(ct);
 
@@ -194,7 +195,7 @@ public class RefreshTokenService : IRefreshTokenService
 
     private async Task RevokeFamilyAsync(Guid familyId, string reason, string? ipAddress, CancellationToken ct)
     {
-        var familyTokens = await _context.RefreshTokens
+        var familyTokens = await _context.Set<RefreshToken>()
             .Where(t => t.FamilyId == familyId && t.RevokedAt == null)
             .ToListAsync(ct);
 

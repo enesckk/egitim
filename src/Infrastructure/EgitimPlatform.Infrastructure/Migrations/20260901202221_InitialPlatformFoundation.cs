@@ -3,7 +3,7 @@ using Microsoft.EntityFrameworkCore.Migrations;
 
 #nullable disable
 
-namespace EgitimPlatform.Modules.Identity.Migrations
+namespace EgitimPlatform.Infrastructure.Migrations
 {
     /// <inheritdoc />
     public partial class InitialPlatformFoundation : Migration

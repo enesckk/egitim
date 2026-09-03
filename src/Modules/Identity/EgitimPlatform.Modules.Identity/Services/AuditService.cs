@@ -1,14 +1,14 @@
 using EgitimPlatform.BuildingBlocks.Interfaces;
 using EgitimPlatform.Modules.Identity.Entities;
-using EgitimPlatform.Modules.Identity.Infrastructure;
+
 
 namespace EgitimPlatform.Modules.Identity.Services;
 
 public class AuditService : IAuditService
 {
-    private readonly ApplicationDbContext _context;
+    private readonly IApplicationDbContext _context;
 
-    public AuditService(ApplicationDbContext context)
+    public AuditService(IApplicationDbContext context)
     {
         _context = context;
     }
@@ -42,7 +42,7 @@ public class AuditService : IAuditService
             Timestamp = DateTimeOffset.UtcNow,
         };
 
-        _context.AuditLogs.Add(auditLog);
+        _context.Set<AuditLog>().Add(auditLog);
         return Task.CompletedTask;
     }
 

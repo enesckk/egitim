@@ -1,9 +1,10 @@
 using EgitimPlatform.Api.Extensions;
 using EgitimPlatform.Api.Middleware;
+using EgitimPlatform.Infrastructure;
 using EgitimPlatform.Modules.Coaching.Extensions;
 using EgitimPlatform.Modules.Identity.Extensions;
-using EgitimPlatform.Modules.Identity.Infrastructure;
 using EgitimPlatform.Modules.Students.Extensions;
+using Microsoft.AspNetCore.HttpOverrides;
 using Microsoft.AspNetCore.RateLimiting;
 using Microsoft.EntityFrameworkCore;
 using Serilog;
@@ -25,7 +26,11 @@ try
         .Enrich.WithProperty("Application", "EgitimPlatform.Api")
         .WriteTo.Console());
 
-    // Identity module (includes DbContext, Auth, Identity services)
+    // P2-12: Platform persistence (DbContext, Identity EF stores) — neutral Infrastructure layer.
+    // Must be registered before Identity module (which configures JWT, policies, handlers).
+    builder.Services.AddPlatformInfrastructure(builder.Configuration);
+
+    // Identity module (JWT auth, authorization policies, feature handlers)
     builder.Services.AddIdentityModule(builder.Configuration);
 
     // Domain modules
@@ -41,15 +46,61 @@ try
     // Swagger with JWT auth support
     builder.Services.AddSwaggerWithAuth();
 
-    // CORS — configured per environment (not AllowAny in production)
+    // P2-3: CORS — configurable origins, NOT AllowAny in production.
+    // Reads "CorsSettings:AllowedOrigins" from configuration.
+    // Falls back to AllowAnyOrigin + AllowAnyHeader (no credentials) only in Development.
     builder.Services.AddCors(options =>
     {
         options.AddDefaultPolicy(policy =>
         {
-            policy.AllowAnyOrigin()
-                  .AllowAnyMethod()
-                  .AllowAnyHeader();
+            var allowedOrigins = builder.Configuration
+                .GetSection("CorsSettings:AllowedOrigins")
+                .Get<string[]>();
+
+            if (allowedOrigins is { Length: > 0 })
+            {
+                // P2-3: Credentialed browser requests (refresh cookie) require explicit origins.
+                // WithOrigins + AllowCredentials is the correct combination.
+                // Wildcard + credentials is forbidden by the CORS spec.
+                policy.WithOrigins(allowedOrigins)
+                      .AllowAnyMethod()
+                      .AllowAnyHeader()
+                      .AllowCredentials();
+            }
+            else if (builder.Environment.IsDevelopment())
+            {
+                // Development convenience: permissive but without credentials
+                policy.AllowAnyOrigin()
+                      .AllowAnyMethod()
+                      .AllowAnyHeader();
+            }
+            else
+            {
+                // Production fallback: deny all if no origins configured
+                // (fail-closed, not fail-open)
+                policy.SetIsOriginAllowed(_ => false)
+                      .AllowAnyMethod()
+                      .AllowAnyHeader();
+            }
         });
+    });
+
+    // P2-4: ForwardedHeaders — must be configured BEFORE other middleware
+    // so that Request.Scheme / Request.IsHttps reflect the original client values
+    // when behind a reverse proxy (Plesk, Nginx, TLS termination, etc.).
+    // Without this, Secure cookies would be dropped because Request.IsHttps = false behind proxy.
+    builder.Services.Configure<ForwardedHeadersOptions>(options =>
+    {
+        options.ForwardedHeaders = ForwardedHeaders.XForwardedFor
+                                 | ForwardedHeaders.XForwardedProto
+                                 | ForwardedHeaders.XForwardedHost;
+        options.ForwardLimit = null;
+
+        // P2-4: Clear default known networks/proxies to trust all forwarded headers.
+        // For production with specific proxy infrastructure, configure KnownProxies
+        // or KnownIPNetworks via ForwardedHeaders:KnownNetworks in appsettings.
+        options.KnownProxies.Clear();
+        options.KnownIPNetworks.Clear();
     });
 
     // OpenAPI
@@ -83,6 +134,11 @@ try
 
     var app = builder.Build();
 
+    // P2-4: ForwardedHeaders MUST run first in the pipeline.
+    // This ensures subsequent middleware (CORS, auth, cookies) see the original
+    // client scheme/host/IP when behind a reverse proxy.
+    app.UseForwardedHeaders();
+
     // Database migration — Development/Test only.
     // Production: migrations must be applied via CI/CD or explicit deployment step.
     if (app.Environment.IsDevelopment() || app.Environment.EnvironmentName == "IntegrationTest" || app.Environment.EnvironmentName == "SecurityTest")
@@ -92,8 +148,14 @@ try
         await dbContext.Database.MigrateAsync();
     }
 
-    // Seed roles (deterministic, safe for all environments)
-    await app.Services.SeedIdentityRolesAsync();
+    // P2-8: Role seeding — only in Development/test environments.
+    // Production deployments should use an explicit initialization/migration step,
+    // not rely on application startup to write seed data.
+    // This prevents schema/deployment ownership blur in production.
+    if (app.Environment.IsDevelopment() || app.Environment.EnvironmentName == "IntegrationTest" || app.Environment.EnvironmentName == "SecurityTest")
+    {
+        await app.Services.SeedIdentityRolesAsync();
+    }
 
     // Bootstrap SuperAdmin — ONLY if explicitly enabled via config
     // and only in non-Production environments
