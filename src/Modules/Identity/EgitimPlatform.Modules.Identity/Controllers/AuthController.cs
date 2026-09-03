@@ -1,3 +1,4 @@
+using Microsoft.AspNetCore.Hosting;
 using EgitimPlatform.Modules.Identity.Auth;
 using EgitimPlatform.Modules.Identity.Features.Login;
 using EgitimPlatform.Modules.Identity.Features.Logout;
@@ -22,19 +23,22 @@ public class AuthController : ControllerBase
     private readonly LogoutHandler _logoutHandler;
     private readonly IValidator<LoginCommand> _loginValidator;
     private readonly JwtSettings _jwtSettings;
+    private readonly IWebHostEnvironment _environment;
 
     public AuthController(
         LoginHandler loginHandler,
         RefreshHandler refreshHandler,
         LogoutHandler logoutHandler,
         IValidator<LoginCommand> loginValidator,
-        IOptions<JwtSettings> jwtSettings)
+        IOptions<JwtSettings> jwtSettings,
+        IWebHostEnvironment environment)
     {
         _loginHandler = loginHandler;
         _refreshHandler = refreshHandler;
         _logoutHandler = logoutHandler;
         _loginValidator = loginValidator;
         _jwtSettings = jwtSettings.Value;
+        _environment = environment;
     }
 
     [HttpPost("login")]
@@ -70,14 +74,12 @@ public class AuthController : ControllerBase
             });
         }
 
-        // P2-08: Refresh token goes into HttpOnly Secure cookie (not JSON body).
-        // Access token stays in JSON response (frontend holds in memory).
-        SetRefreshTokenCookie(result.Tokens!.RefreshToken);
+        // P2-3: Refresh token goes into HttpOnly Secure cookie ONLY (not JSON body).
+        SetRefreshTokenCookie(result.RawRefreshToken!);
 
-        // Return response WITHOUT refresh token in body
+        // P2-3: Response DTO no longer contains RefreshToken field.
         return Ok(new LoginResponseDto(
             result.Tokens.AccessToken,
-            RefreshToken: string.Empty, // Client reads refresh from cookie
             result.Tokens.AccessTokenExpiresAt));
     }
 
@@ -88,7 +90,7 @@ public class AuthController : ControllerBase
     [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status401Unauthorized)]
     public async Task<IActionResult> Refresh(CancellationToken ct)
     {
-        // P2-08: Read refresh token from cookie
+        // P2-3: Read refresh token from cookie only
         if (!Request.Cookies.TryGetValue(RefreshTokenCookieName, out var rawToken) ||
             string.IsNullOrWhiteSpace(rawToken))
         {
@@ -108,7 +110,6 @@ public class AuthController : ControllerBase
 
         if (result is null)
         {
-            // Clear the cookie on any failure to prevent reuse
             ClearRefreshTokenCookie();
             return Unauthorized(new ProblemDetails
             {
@@ -121,11 +122,11 @@ public class AuthController : ControllerBase
         }
 
         // Set new refresh token cookie (rotation)
-        SetRefreshTokenCookie(result.RefreshToken);
+        SetRefreshTokenCookie(result.NewRawRefreshToken);
 
+        // P2-3: No refresh token in JSON body
         return Ok(new LoginResponseDto(
             result.AccessToken,
-            RefreshToken: string.Empty, // Client reads from cookie
             result.AccessTokenExpiresAt));
     }
 
@@ -134,7 +135,6 @@ public class AuthController : ControllerBase
     [ProducesResponseType(StatusCodes.Status204NoContent)]
     public async Task<IActionResult> Logout(CancellationToken ct)
     {
-        // P2-08: Read refresh token from cookie for revocation
         Request.Cookies.TryGetValue(RefreshTokenCookieName, out var rawToken);
 
         var ipAddress = HttpContext.Connection.RemoteIpAddress?.ToString();
@@ -145,15 +145,26 @@ public class AuthController : ControllerBase
         return NoContent();
     }
 
+    /// <summary>
+    /// P2-3/P2-4: Cookie attributes hardened.
+    /// Secure flag: always true in Production/Staging; in Development follows Request.IsHttps.
+    /// Behind a reverse proxy, ForwardedHeaders middleware must be configured so
+    /// Request.IsHttps reflects the original client scheme (see Program.cs).
+    /// </summary>
     private void SetRefreshTokenCookie(string refreshToken)
     {
-        var isSecure = HttpContext.Request.IsHttps;
+        // P2-4: In Production, Secure is always true regardless of Request.IsHttps
+        // (the proxy terminates TLS and forwards via ForwardedHeaders).
+        var isSecure = _environment.EnvironmentName == "Production"
+                       || _environment.EnvironmentName == "Staging"
+                       || HttpContext.Request.IsHttps;
+
         var cookieOptions = new CookieOptions
         {
             HttpOnly = true,
-            Secure = isSecure, // Secure in production (HTTPS), relaxed in dev/test
+            Secure = isSecure,
             SameSite = SameSiteMode.Strict,
-            Path = "/api/v1/auth", // Only sent to auth endpoints
+            Path = "/api/v1/auth",
             MaxAge = TimeSpan.FromDays(_jwtSettings.RefreshTokenExpirationDays),
         };
         Response.Cookies.Append(RefreshTokenCookieName, refreshToken, cookieOptions);

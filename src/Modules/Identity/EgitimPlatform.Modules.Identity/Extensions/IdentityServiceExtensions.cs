@@ -9,8 +9,6 @@ using EgitimPlatform.Modules.Identity.Infrastructure;
 using EgitimPlatform.Modules.Identity.Services;
 using FluentValidation;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
-using Microsoft.AspNetCore.Identity;
-using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.IdentityModel.Tokens;
@@ -19,32 +17,15 @@ using System.Text;
 
 namespace EgitimPlatform.Modules.Identity.Extensions;
 
+/// <summary>
+/// P2-12: Identity module service registration — no longer owns DbContext.
+/// DbContext and Identity EF stores are registered by Infrastructure.AddPlatformInfrastructure().
+/// This method registers: JWT auth, authorization policies, feature handlers, and Identity services.
+/// </summary>
 public static class IdentityServiceExtensions
 {
     public static IServiceCollection AddIdentityModule(this IServiceCollection services, IConfiguration configuration)
     {
-        // Database context
-        services.AddDbContext<ApplicationDbContext>(options =>
-            options.UseSqlServer(
-                configuration.GetConnectionString("DefaultConnection"),
-                sql => sql.MigrationsAssembly(typeof(ApplicationDbContext).Assembly.FullName)));
-
-        // ASP.NET Core Identity
-        services.AddIdentity<ApplicationUser, ApplicationRole>(options =>
-        {
-            options.Password.RequireDigit = true;
-            options.Password.RequiredLength = 8;
-            options.Password.RequireNonAlphanumeric = false;
-            options.Password.RequireUppercase = true;
-            options.Password.RequireLowercase = true;
-            options.User.RequireUniqueEmail = true;
-            options.SignIn.RequireConfirmedEmail = false;
-            options.Lockout.DefaultLockoutTimeSpan = TimeSpan.FromMinutes(5);
-            options.Lockout.MaxFailedAccessAttempts = 5;
-        })
-        .AddEntityFrameworkStores<ApplicationDbContext>()
-        .AddDefaultTokenProviders();
-
         // JWT settings — FAIL FAST on invalid/placeholder configuration
         var jwtSettings = configuration.GetSection(JwtSettings.SectionName).Get<JwtSettings>()
             ?? throw new InvalidOperationException("JwtSettings section is missing from configuration.");
@@ -54,7 +35,7 @@ public static class IdentityServiceExtensions
         // Bootstrap settings (SuperAdmin creation) — disabled by default
         services.Configure<BootstrapSettings>(configuration.GetSection(BootstrapSettings.SectionName));
 
-        // Authentication
+        // Authentication (JWT Bearer)
         services.AddAuthentication(options =>
         {
             options.DefaultAuthenticateScheme = JwtBearerDefaults.AuthenticationScheme;
@@ -75,7 +56,7 @@ public static class IdentityServiceExtensions
             };
         });
 
-        // Authorization
+        // Authorization policies
         services.AddAuthorizationBuilder()
             .AddPolicy(Policies.CanManageStudents, policy =>
                 policy.RequireRole(Roles.SuperAdmin, Roles.InstitutionAdmin, Roles.Coach))
@@ -88,7 +69,7 @@ public static class IdentityServiceExtensions
             .AddPolicy(Policies.CanViewAuditLogs, policy =>
                 policy.RequireRole(Roles.SuperAdmin));
 
-        // Auth services
+        // Auth services — all use IApplicationDbContext (not concrete ApplicationDbContext)
         services.AddScoped<IJwtTokenService, JwtTokenService>();
         services.AddScoped<IRefreshTokenService, RefreshTokenService>();
         services.AddScoped<ICurrentUser, CurrentUser>();

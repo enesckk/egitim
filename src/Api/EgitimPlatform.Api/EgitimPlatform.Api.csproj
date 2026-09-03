@@ -21,6 +21,7 @@
 
   <ItemGroup>
     <ProjectReference Include="..\..\BuildingBlocks\EgitimPlatform.BuildingBlocks\EgitimPlatform.BuildingBlocks.csproj" />
+    <ProjectReference Include="..\..\Infrastructure\EgitimPlatform.Infrastructure\EgitimPlatform.Infrastructure.csproj" />
     <ProjectReference Include="..\..\Modules\Identity\EgitimPlatform.Modules.Identity\EgitimPlatform.Modules.Identity.csproj" />
     <ProjectReference Include="..\..\Modules\Institutions\EgitimPlatform.Modules.Institutions\EgitimPlatform.Modules.Institutions.csproj" />
     <ProjectReference Include="..\..\Modules\Students\EgitimPlatform.Modules.Students\EgitimPlatform.Modules.Students.csproj" />

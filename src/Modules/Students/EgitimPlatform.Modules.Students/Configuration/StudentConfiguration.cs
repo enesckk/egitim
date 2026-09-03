@@ -17,5 +17,10 @@ public class StudentConfiguration : IEntityTypeConfiguration<Student>
         builder.HasIndex(s => new { s.LastName, s.FirstName });
         builder.HasIndex(s => s.IsDeleted);
         builder.HasIndex(s => new { s.InstitutionId, s.IsDeleted });
+
+        // P2-6: Alternate key for cross-tenant FK integrity.
+        // StudentCoachAssignment references Student via (StudentId, InstitutionId) composite FK,
+        // ensuring at DB level that an assignment's InstitutionId matches the Student's InstitutionId.
+        builder.HasAlternateKey(s => new { s.Id, s.InstitutionId });
     }
 }

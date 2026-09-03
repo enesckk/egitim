@@ -7,8 +7,16 @@ using Microsoft.EntityFrameworkCore.Metadata;
 using System.Linq.Expressions;
 using System.Reflection;
 
-namespace EgitimPlatform.Modules.Identity.Infrastructure;
+namespace EgitimPlatform.Infrastructure;
 
+/// <summary>
+/// P2-12: Shared platform persistence — moved out of Identity module into neutral Infrastructure layer.
+/// Domain modules access the database through IApplicationDbContext (BuildingBlocks interface),
+/// NOT through this concrete type. This decouples module boundaries from persistence ownership.
+///
+/// Module entity configurations are discovered at runtime via Assembly.Load —
+/// modules don't need compile-time references to this project.
+/// </summary>
 public class ApplicationDbContext : IdentityDbContext<ApplicationUser, ApplicationRole, Guid>, IApplicationDbContext
 {
     public ApplicationDbContext(DbContextOptions<ApplicationDbContext> options)
@@ -25,9 +33,14 @@ public class ApplicationDbContext : IdentityDbContext<ApplicationUser, Applicati
     {
         base.OnModelCreating(builder);
 
+        // Identity module configurations (this assembly's parent reference)
         builder.ApplyConfigurationsFromAssembly(typeof(ApplicationDbContext).Assembly);
 
-        // Load all module assemblies explicitly (AppDomain scanning doesn't work at design time)
+        // Load Identity module configurations
+        TryApplyConfigurationsFromAssembly(builder, "EgitimPlatform.Modules.Identity");
+
+        // Load domain module configurations via runtime assembly discovery.
+        // This avoids compile-time project references (no circular dependencies).
         var moduleNames = new[]
         {
             "EgitimPlatform.Modules.Institutions",
@@ -37,15 +50,7 @@ public class ApplicationDbContext : IdentityDbContext<ApplicationUser, Applicati
 
         foreach (var moduleName in moduleNames)
         {
-            try
-            {
-                var assembly = Assembly.Load(moduleName);
-                builder.ApplyConfigurationsFromAssembly(assembly);
-            }
-            catch (Exception)
-            {
-                // Module assembly not available — skip
-            }
+            TryApplyConfigurationsFromAssembly(builder, moduleName);
         }
 
         // Explicit query filters for Identity entities
@@ -54,14 +59,10 @@ public class ApplicationDbContext : IdentityDbContext<ApplicationUser, Applicati
         builder.Entity<Permission>().HasQueryFilter(p => !p.IsDeleted);
 
         // Auto-apply soft-delete filter to ALL entities implementing ISoftDeletable
-        // This covers Student, Coach, Parent, Institution from other modules
-        // without requiring direct type references (avoids circular dependencies).
         foreach (var entityType in builder.Model.GetEntityTypes())
         {
             if (entityType.IsOwned()) continue;
             if (!typeof(ISoftDeletable).IsAssignableFrom(entityType.ClrType)) continue;
-
-            // Skip if filter already applied (Identity entities above)
             if (entityType.GetDeclaredQueryFilters().Any()) continue;
 
             var parameter = Expression.Parameter(entityType.ClrType, "e");
@@ -73,8 +74,20 @@ public class ApplicationDbContext : IdentityDbContext<ApplicationUser, Applicati
         }
 
         // Cross-module FK constraints via reflection
-        // (modules don't reference each other directly, so we configure here)
         ApplyCrossModuleForeignKeys(builder);
+    }
+
+    private static void TryApplyConfigurationsFromAssembly(ModelBuilder builder, string assemblyName)
+    {
+        try
+        {
+            var assembly = Assembly.Load(assemblyName);
+            builder.ApplyConfigurationsFromAssembly(assembly);
+        }
+        catch (Exception)
+        {
+            // Module assembly not available — skip
+        }
     }
 
     private static void ApplyCrossModuleForeignKeys(ModelBuilder builder)
@@ -115,33 +128,26 @@ public class ApplicationDbContext : IdentityDbContext<ApplicationUser, Applicati
                 .OnDelete(DeleteBehavior.Restrict);
         }
 
-        // StudentCoachAssignment → Student FK
+        // P2-6: Cross-tenant composite FKs for StudentCoachAssignment.
+        // StudentCoachAssignment → Student (composite: StudentId + InstitutionId)
         if (assignmentType is not null && studentType is not null)
         {
             builder.Entity(assignmentType.ClrType)
                 .HasOne(studentType.ClrType)
                 .WithMany()
-                .HasForeignKey("StudentId")
+                .HasForeignKey("StudentId", "InstitutionId")
+                .HasPrincipalKey("Id", "InstitutionId")
                 .OnDelete(DeleteBehavior.Restrict);
         }
 
-        // StudentCoachAssignment → Coach FK
+        // StudentCoachAssignment → Coach (composite: CoachId + InstitutionId)
         if (assignmentType is not null && coachType is not null)
         {
             builder.Entity(assignmentType.ClrType)
                 .HasOne(coachType.ClrType)
                 .WithMany()
-                .HasForeignKey("CoachId")
-                .OnDelete(DeleteBehavior.Restrict);
-        }
-
-        // StudentCoachAssignment → Institution FK
-        if (assignmentType is not null && institutionType is not null)
-        {
-            builder.Entity(assignmentType.ClrType)
-                .HasOne(institutionType.ClrType)
-                .WithMany()
-                .HasForeignKey("InstitutionId")
+                .HasForeignKey("CoachId", "InstitutionId")
+                .HasPrincipalKey("Id", "InstitutionId")
                 .OnDelete(DeleteBehavior.Restrict);
         }
 

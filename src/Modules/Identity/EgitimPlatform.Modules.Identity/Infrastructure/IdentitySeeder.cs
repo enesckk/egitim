@@ -1,8 +1,11 @@
+using EgitimPlatform.BuildingBlocks.Interfaces;
 using EgitimPlatform.BuildingBlocks.Constants;
 using EgitimPlatform.Modules.Identity.Auth;
 using EgitimPlatform.Modules.Identity.Entities;
+using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 
@@ -10,24 +13,27 @@ namespace EgitimPlatform.Modules.Identity.Infrastructure;
 
 public class IdentitySeeder
 {
-    private readonly ApplicationDbContext _context;
+    private readonly IApplicationDbContext _context;
     private readonly UserManager<ApplicationUser> _userManager;
     private readonly RoleManager<ApplicationRole> _roleManager;
     private readonly ILogger<IdentitySeeder> _logger;
     private readonly BootstrapSettings _bootstrapSettings;
+    private readonly IWebHostEnvironment? _environment;
 
     public IdentitySeeder(
-        ApplicationDbContext context,
+        IApplicationDbContext context,
         UserManager<ApplicationUser> userManager,
         RoleManager<ApplicationRole> roleManager,
         ILogger<IdentitySeeder> logger,
-        IOptions<BootstrapSettings> bootstrapSettings)
+        IOptions<BootstrapSettings> bootstrapSettings,
+        IWebHostEnvironment? environment = null)
     {
         _context = context;
         _userManager = userManager;
         _roleManager = roleManager;
         _logger = logger;
         _bootstrapSettings = bootstrapSettings.Value;
+        _environment = environment;
     }
 
     /// <summary>
@@ -102,6 +108,23 @@ public class IdentitySeeder
         if (result.Succeeded)
         {
             await _userManager.AddToRoleAsync(user, Roles.SuperAdmin);
+
+            // P2-7: Create an immutable AuditLog entry for bootstrap.
+            // Serilog message alone is insufficient — audit must be in the database.
+            // Password/secret is NEVER included in audit metadata.
+            var auditLog = new AuditLog
+            {
+                UserId = user.Id,
+                Action = "Auth.Bootstrap.SuperAdmin.Created",
+                EntityType = "ApplicationUser",
+                EntityId = user.Id.ToString(),
+                InstitutionId = null, // SuperAdmin has no institution
+                MetadataJson = $"{{\"email\":\"{email}\",\"environment\":\"{_environment?.EnvironmentName ?? "unknown"}\"}}",
+                Timestamp = DateTimeOffset.UtcNow,
+            };
+            _context.Set<AuditLog>().Add(auditLog);
+            await _context.SaveChangesAsync();
+
             _logger.LogCritical(
                 "SuperAdmin bootstrap completed for {Email}. " +
                 "This is a privileged operation — ensure the password is changed immediately.",

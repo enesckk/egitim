@@ -24,18 +24,30 @@ public class CorrelationIdMiddleware
     {
         string correlationId;
 
-        var clientValue = context.Request.Headers[CorrelationIdHeader].FirstOrDefault();
+        // P2-10: Reject multiple X-Correlation-Id values — ambiguous input.
+        // If the header has more than one value, treat it as invalid and generate server-side.
+        var headerValues = context.Request.Headers[CorrelationIdHeader];
+        var headerCount = headerValues.Count;
 
-        if (!string.IsNullOrWhiteSpace(clientValue) && IsValidCorrelationId(clientValue))
+        if (headerCount == 1)
         {
-            correlationId = clientValue;
+            var clientValue = headerValues.FirstOrDefault();
+            if (!string.IsNullOrWhiteSpace(clientValue) && IsValidCorrelationId(clientValue))
+            {
+                correlationId = clientValue;
+            }
+            else
+            {
+                correlationId = Guid.CreateVersion7().ToString();
+            }
         }
         else
         {
-            // Invalid or missing → generate server-side
+            // 0 values (missing) or >1 values (ambiguous) → server-generated
             correlationId = Guid.CreateVersion7().ToString();
         }
 
+        // Replace all values with exactly one canonical value
         context.Request.Headers[CorrelationIdHeader] = correlationId;
         context.Response.OnStarting(() =>
         {

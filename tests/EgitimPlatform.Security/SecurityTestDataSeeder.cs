@@ -1,7 +1,8 @@
+using EgitimPlatform.Modules.Identity.Infrastructure;
 using EgitimPlatform.BuildingBlocks.Constants;
 using EgitimPlatform.Modules.Coaching.Entities;
 using EgitimPlatform.Modules.Identity.Entities;
-using EgitimPlatform.Modules.Identity.Infrastructure;
+using EgitimPlatform.Infrastructure;
 using EgitimPlatform.Modules.Institutions.Entities;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;

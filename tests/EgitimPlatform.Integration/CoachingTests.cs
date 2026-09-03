@@ -45,7 +45,7 @@ public class CoachingTests
 
         // Get coach entity ID from the database
         using var scope = _factory.Services.CreateScope();
-        var dbContext = scope.ServiceProvider.GetRequiredService<EgitimPlatform.Modules.Identity.Infrastructure.ApplicationDbContext>();
+        var dbContext = scope.ServiceProvider.GetRequiredService<EgitimPlatform.Infrastructure.ApplicationDbContext>();
         var coach = await dbContext.Set<EgitimPlatform.Modules.Coaching.Entities.Coach>()
             .FirstAsync(c => c.FirstName == "Coach" && c.LastName == "A");
 

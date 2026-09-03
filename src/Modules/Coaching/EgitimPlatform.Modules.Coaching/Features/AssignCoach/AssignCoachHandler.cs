@@ -2,7 +2,7 @@ using EgitimPlatform.BuildingBlocks.Constants;
 using EgitimPlatform.BuildingBlocks.Exceptions;
 using EgitimPlatform.BuildingBlocks.Interfaces;
 using EgitimPlatform.Modules.Coaching.Entities;
-using EgitimPlatform.Modules.Identity.Infrastructure;
+
 using EgitimPlatform.Modules.Students.Entities;
 using Microsoft.EntityFrameworkCore;
 
@@ -10,12 +10,12 @@ namespace EgitimPlatform.Modules.Coaching.Features.AssignCoach;
 
 public class AssignCoachHandler
 {
-    private readonly ApplicationDbContext _dbContext;
+    private readonly IApplicationDbContext _dbContext;
     private readonly ICurrentUser _currentUser;
     private readonly IAuditService _auditService;
 
     public AssignCoachHandler(
-        ApplicationDbContext dbContext,
+        IApplicationDbContext dbContext,
         ICurrentUser currentUser,
         IAuditService auditService)
     {

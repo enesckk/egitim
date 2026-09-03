@@ -1,7 +1,6 @@
 using EgitimPlatform.BuildingBlocks.Constants;
 using EgitimPlatform.BuildingBlocks.Interfaces;
 using EgitimPlatform.Modules.Identity.Entities;
-using EgitimPlatform.Modules.Identity.Infrastructure;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
@@ -12,14 +11,14 @@ public class CurrentUser : ICurrentUser
 {
     private readonly IHttpContextAccessor _httpContextAccessor;
     private readonly UserManager<ApplicationUser> _userManager;
-    private readonly ApplicationDbContext _dbContext;
+    private readonly IApplicationDbContext _dbContext;
     private Guid? _cachedInstitutionId;
     private bool _institutionResolved;
 
     public CurrentUser(
         IHttpContextAccessor httpContextAccessor,
         UserManager<ApplicationUser> userManager,
-        ApplicationDbContext dbContext)
+        IApplicationDbContext dbContext)
     {
         _httpContextAccessor = httpContextAccessor;
         _userManager = userManager;
@@ -59,7 +58,7 @@ public class CurrentUser : ICurrentUser
 
         if (UserId is null) return null;
 
-        var user = await _dbContext.Users
+        var user = await _dbContext.Set<ApplicationUser>()
             .AsNoTracking()
             .Where(u => u.Id == UserId.Value)
             .Select(u => new { u.InstitutionId })

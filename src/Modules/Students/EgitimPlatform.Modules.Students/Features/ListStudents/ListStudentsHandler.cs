@@ -2,7 +2,7 @@ using EgitimPlatform.BuildingBlocks.Constants;
 using EgitimPlatform.BuildingBlocks.Exceptions;
 using EgitimPlatform.BuildingBlocks.Interfaces;
 using EgitimPlatform.BuildingBlocks.Pagination;
-using EgitimPlatform.Modules.Identity.Infrastructure;
+
 using EgitimPlatform.Modules.Students.Entities;
 using Microsoft.EntityFrameworkCore;
 
@@ -10,12 +10,12 @@ namespace EgitimPlatform.Modules.Students.Features.ListStudents;
 
 public class ListStudentsHandler
 {
-    private readonly ApplicationDbContext _dbContext;
+    private readonly IApplicationDbContext _dbContext;
     private readonly ICurrentUser _currentUser;
     private readonly ICoachStudentQuery _coachStudentQuery;
 
     public ListStudentsHandler(
-        ApplicationDbContext dbContext,
+        IApplicationDbContext dbContext,
         ICurrentUser currentUser,
         ICoachStudentQuery coachStudentQuery)
     {
@@ -38,7 +38,7 @@ public class ListStudentsHandler
         {
             // Coach: only students they're actively assigned to
             if (_currentUser.UserId is null) throw new ForbiddenException("User context required.");
-            var assignedIds = await _coachStudentQuery.GetActiveAssignedStudentIdsAsync(_currentUser.UserId.Value, ct);
+            var assignedIds = await _coachStudentQuery.GetActiveAssignedStudentIdsByUserAsync(_currentUser.UserId.Value, ct);
             source = source.Where(s => assignedIds.Contains(s.Id));
         }
         else if (_currentUser.IsInRole(Roles.Student))

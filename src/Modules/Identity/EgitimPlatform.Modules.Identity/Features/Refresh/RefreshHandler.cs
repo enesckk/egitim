@@ -30,7 +30,7 @@ public class RefreshHandler
         _logger = logger;
     }
 
-    public async Task<LoginResponseDto?> HandleAsync(RefreshCommand command, string? ipAddress, CancellationToken ct = default)
+    public async Task<RefreshResult?> HandleAsync(RefreshCommand command, string? ipAddress, CancellationToken ct = default)
     {
         var rotationResult = await _refreshTokenService.TryRotateAsync(command.RefreshToken, ipAddress, ct);
 
@@ -58,6 +58,8 @@ public class RefreshHandler
         var (newAccessToken, _) = _jwtTokenService.GenerateAccessToken(user, roles);
 
         var expiresAt = DateTimeOffset.UtcNow.AddMinutes(_jwtSettings.AccessTokenExpirationMinutes);
-        return new LoginResponseDto(newAccessToken, rotationResult.NewRawToken, expiresAt);
+        // P2-3: NewRawToken is returned only for cookie setting by the controller.
+        // It is NOT included in the JSON response body.
+        return new RefreshResult(newAccessToken, rotationResult.NewRawToken, expiresAt);
     }
 }

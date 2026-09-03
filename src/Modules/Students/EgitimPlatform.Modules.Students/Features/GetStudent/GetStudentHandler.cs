@@ -1,7 +1,7 @@
 using EgitimPlatform.BuildingBlocks.Constants;
 using EgitimPlatform.BuildingBlocks.Exceptions;
 using EgitimPlatform.BuildingBlocks.Interfaces;
-using EgitimPlatform.Modules.Identity.Infrastructure;
+
 using EgitimPlatform.Modules.Students.Entities;
 using Microsoft.EntityFrameworkCore;
 
@@ -9,12 +9,12 @@ namespace EgitimPlatform.Modules.Students.Features.GetStudent;
 
 public class GetStudentHandler
 {
-    private readonly ApplicationDbContext _dbContext;
+    private readonly IApplicationDbContext _dbContext;
     private readonly ICurrentUser _currentUser;
     private readonly ICoachStudentQuery _coachStudentQuery;
 
     public GetStudentHandler(
-        ApplicationDbContext dbContext,
+        IApplicationDbContext dbContext,
         ICurrentUser currentUser,
         ICoachStudentQuery coachStudentQuery)
     {
@@ -41,7 +41,7 @@ public class GetStudentHandler
         {
             // Coach: must have active assignment to this student
             if (_currentUser.UserId is null) throw new ForbiddenException("Access denied.");
-            var hasAssignment = await _coachStudentQuery.HasActiveAssignmentAsync(_currentUser.UserId.Value, studentId, ct);
+            var hasAssignment = await _coachStudentQuery.HasActiveAssignmentByUserAsync(_currentUser.UserId.Value, studentId, ct);
             if (!hasAssignment) throw new ForbiddenException("Access denied.");
 
             // Same-institution check (defense-in-depth)
