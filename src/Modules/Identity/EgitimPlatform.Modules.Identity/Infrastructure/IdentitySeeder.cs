@@ -68,7 +68,8 @@ public class IdentitySeeder
     /// <summary>
     /// Seeds the initial SuperAdmin user ONLY if bootstrap is explicitly enabled
     /// with valid credentials. Never creates a user with hardcoded/default credentials.
-    /// Logs a critical audit entry on success. Never logs the password.
+    /// P2-03: All operations (user create + role assign + audit) are atomic within
+    /// a single DB transaction. No PII in logs.
     /// </summary>
     public async Task SeedBootstrapSuperAdminAsync(CancellationToken ct = default)
     {
@@ -94,24 +95,48 @@ public class IdentitySeeder
             return;
         }
 
-        var user = new ApplicationUser
-        {
-            UserName = email,
-            Email = email,
-            FirstName = "Bootstrap",
-            LastName = "Admin",
-            IsActive = true,
-            EmailConfirmed = true,
-        };
+        // P2-03: Use explicit DB transaction for atomicity.
+        // UserManager uses the same scoped ApplicationDbContext, so all operations
+        // (CreateAsync, AddToRoleAsync) participate in this transaction.
+        // If any step fails, everything rolls back — no partial state.
+        // We need the concrete DbContext for BeginTransaction.
+        var concreteContext = _context as Microsoft.EntityFrameworkCore.DbContext
+            ?? throw new InvalidOperationException("Cannot begin transaction: unexpected DbContext type.");
 
-        var result = await _userManager.CreateAsync(user, _bootstrapSettings.SuperAdminPassword);
-        if (result.Succeeded)
+        using var transaction = await concreteContext.Database.BeginTransactionAsync(ct);
+        try
         {
-            await _userManager.AddToRoleAsync(user, Roles.SuperAdmin);
+            var user = new ApplicationUser
+            {
+                UserName = email,
+                Email = email,
+                FirstName = "Bootstrap",
+                LastName = "Admin",
+                IsActive = true,
+                EmailConfirmed = true,
+            };
 
-            // P2-7: Create an immutable AuditLog entry for bootstrap.
-            // Serilog message alone is insufficient — audit must be in the database.
-            // Password/secret is NEVER included in audit metadata.
+            var result = await _userManager.CreateAsync(user, _bootstrapSettings.SuperAdminPassword);
+            if (!result.Succeeded)
+            {
+                _logger.LogError("Failed to bootstrap SuperAdmin: {Errors}",
+                    string.Join(", ", result.Errors.Select(e => e.Description)));
+                await transaction.RollbackAsync(ct);
+                return;
+            }
+
+            var roleResult = await _userManager.AddToRoleAsync(user, Roles.SuperAdmin);
+            if (!roleResult.Succeeded)
+            {
+                _logger.LogError("Failed to assign SuperAdmin role: {Errors}",
+                    string.Join(", ", roleResult.Errors.Select(e => e.Description)));
+                await transaction.RollbackAsync(ct);
+                return;
+            }
+
+            // P2-03: Audit log entry — no password/secret. Email used as actor identifier
+            // (configured credential, not PII in the traditional sense — it's the system
+            // bootstrap account specified in configuration).
             var auditLog = new AuditLog
             {
                 UserId = user.Id,
@@ -119,21 +144,24 @@ public class IdentitySeeder
                 EntityType = "ApplicationUser",
                 EntityId = user.Id.ToString(),
                 InstitutionId = null, // SuperAdmin has no institution
-                MetadataJson = $"{{\"email\":\"{email}\",\"environment\":\"{_environment?.EnvironmentName ?? "unknown"}\"}}",
+                MetadataJson = $"{{\"environment\":\"{_environment?.EnvironmentName ?? "unknown"}\"}}",
                 Timestamp = DateTimeOffset.UtcNow,
             };
             _context.Set<AuditLog>().Add(auditLog);
-            await _context.SaveChangesAsync();
 
+            await concreteContext.SaveChangesAsync(ct);
+            await transaction.CommitAsync(ct);
+
+            // P2-03: No PII in log — use userId only (email is a configured credential, not logged)
             _logger.LogCritical(
-                "SuperAdmin bootstrap completed for {Email}. " +
+                "SuperAdmin bootstrap completed for userId={UserId}. " +
                 "This is a privileged operation — ensure the password is changed immediately.",
-                email);
+                user.Id);
         }
-        else
+        catch
         {
-            _logger.LogError("Failed to bootstrap SuperAdmin: {Errors}",
-                string.Join(", ", result.Errors.Select(e => e.Description)));
+            await transaction.RollbackAsync(ct);
+            throw;
         }
     }
 }

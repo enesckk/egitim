@@ -83,9 +83,10 @@ public class LoginHandler
 
         if (!user.IsActive)
         {
-            // P2-2: Still verify password hash even for inactive users to maintain constant timing.
-            // Result is intentionally not awaited — we discard it to prevent timing difference.
-            _ = _signInManager.CheckPasswordSignInAsync(user, command.Password, lockoutOnFailure: false);
+            // P2-04: Perform a real password hash verification (BCrypt) to equalize timing.
+            // Uses VerifyHashedPassword directly — no DB writes, no fire-and-forget, no scoped DbContext leak.
+            // We discard the result; this is purely for timing constantness.
+            _passwordHasher.VerifyHashedPassword(user, user.PasswordHash ?? string.Empty, command.Password);
 
             _logger.LogInformation("Login failed: reason={Reason}, userId={UserId}, ip={IpAddress}",
                 "UserNotActive", user.Id, ipAddress ?? "unknown");

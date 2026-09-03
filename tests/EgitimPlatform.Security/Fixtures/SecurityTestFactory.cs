@@ -40,6 +40,9 @@ public class SecurityTestFactory : WebApplicationFactory<Program>, IAsyncLifetim
                 ["Bootstrap:Enabled"] = "true",
                 ["Bootstrap:SuperAdminEmail"] = "superadmin@egitimplatform.local",
                 ["Bootstrap:SuperAdminPassword"] = "SuperAdmin@123!",
+                // P2-01: High rate limits for test determinism
+                ["RateLimiting:LoginLimit"] = "100000",
+                ["RateLimiting:RefreshLimit"] = "100000",
             });
         });
 

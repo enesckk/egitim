@@ -49,19 +49,16 @@ try
     // P2-3: CORS — configurable origins, NOT AllowAny in production.
     // Reads "CorsSettings:AllowedOrigins" from configuration.
     // Falls back to AllowAnyOrigin + AllowAnyHeader (no credentials) only in Development.
+    var allowedOrigins = builder.Configuration
+        .GetSection("CorsSettings:AllowedOrigins")
+        .Get<string[]>() ?? [];
+
     builder.Services.AddCors(options =>
     {
         options.AddDefaultPolicy(policy =>
         {
-            var allowedOrigins = builder.Configuration
-                .GetSection("CorsSettings:AllowedOrigins")
-                .Get<string[]>();
-
-            if (allowedOrigins is { Length: > 0 })
+            if (allowedOrigins.Length > 0)
             {
-                // P2-3: Credentialed browser requests (refresh cookie) require explicit origins.
-                // WithOrigins + AllowCredentials is the correct combination.
-                // Wildcard + credentials is forbidden by the CORS spec.
                 policy.WithOrigins(allowedOrigins)
                       .AllowAnyMethod()
                       .AllowAnyHeader()
@@ -69,15 +66,12 @@ try
             }
             else if (builder.Environment.IsDevelopment())
             {
-                // Development convenience: permissive but without credentials
                 policy.AllowAnyOrigin()
                       .AllowAnyMethod()
                       .AllowAnyHeader();
             }
             else
             {
-                // Production fallback: deny all if no origins configured
-                // (fail-closed, not fail-open)
                 policy.SetIsOriginAllowed(_ => false)
                       .AllowAnyMethod()
                       .AllowAnyHeader();
@@ -85,54 +79,147 @@ try
         });
     });
 
-    // P2-4: ForwardedHeaders — must be configured BEFORE other middleware
-    // so that Request.Scheme / Request.IsHttps reflect the original client values
-    // when behind a reverse proxy (Plesk, Nginx, TLS termination, etc.).
-    // Without this, Secure cookies would be dropped because Request.IsHttps = false behind proxy.
+    // P2-02 CLOSURE: CSRF origin validation for state-changing auth endpoints.
+    // Uses the same allowed origins as CORS for consistency.
+    builder.Services.Configure<CsrfOriginOptions>(options =>
+    {
+        options.AllowedOrigins = allowedOrigins;
+        options.AllowAllInDevelopment = builder.Environment.IsDevelopment();
+    });
+
+    // P1-02 CLOSURE: ForwardedHeaders — configuration-driven trust model.
+    // Reverse proxy must be explicitly enabled with known proxy configuration.
+    // Never trust forwarded headers from the entire internet.
+    // Without this, attackers can spoof X-Forwarded-For to bypass rate limiting.
+    var reverseProxySection = builder.Configuration.GetSection("ReverseProxy");
+    var proxyEnabled = reverseProxySection.GetValue<bool>("Enabled", false);
+
     builder.Services.Configure<ForwardedHeadersOptions>(options =>
     {
         options.ForwardedHeaders = ForwardedHeaders.XForwardedFor
                                  | ForwardedHeaders.XForwardedProto
                                  | ForwardedHeaders.XForwardedHost;
-        options.ForwardLimit = null;
 
-        // P2-4: Clear default known networks/proxies to trust all forwarded headers.
-        // For production with specific proxy infrastructure, configure KnownProxies
-        // or KnownIPNetworks via ForwardedHeaders:KnownNetworks in appsettings.
-        options.KnownProxies.Clear();
-        options.KnownIPNetworks.Clear();
+        if (proxyEnabled)
+        {
+            // P1-02: Bounded forward limit (default 1 for single reverse proxy).
+            // Prevents unbounded header chain traversal.
+            options.ForwardLimit = reverseProxySection.GetValue<int>("ForwardLimit", 1);
+
+            // Configure trusted proxies from configuration
+            var knownProxies = reverseProxySection.GetSection("KnownProxies").Get<string[]>();
+
+            if (knownProxies is { Length: > 0 })
+            {
+                options.KnownProxies.Clear();
+                foreach (var proxyIp in knownProxies)
+                {
+                    if (System.Net.IPAddress.TryParse(proxyIp, out var address))
+                        options.KnownProxies.Add(address);
+                }
+            }
+
+            // P1-02: Configure trusted proxies from configuration.
+            // KnownProxies uses IPAddress — simple and sufficient for most deployments.
+            if (knownProxies is { Length: > 0 })
+            {
+                options.KnownProxies.Clear();
+                foreach (var proxyIp in knownProxies)
+                {
+                    if (System.Net.IPAddress.TryParse(proxyIp, out var address))
+                        options.KnownProxies.Add(address);
+                }
+            }
+
+            // P1-02: If proxy is enabled but no trusted proxies configured,
+            // fail safely — only trust localhost loopback (development scenario).
+            if (knownProxies is null || knownProxies.Length == 0)
+            {
+                options.KnownProxies.Clear();
+                options.KnownProxies.Add(System.Net.IPAddress.Loopback);
+                options.KnownProxies.Add(System.Net.IPAddress.IPv6Loopback);
+            }
+        }
+        else
+        {
+            // No reverse proxy — do NOT process any forwarded headers.
+            // Direct connections: use actual connection info only.
+            options.ForwardedHeaders = ForwardedHeaders.None;
+        }
     });
 
     // OpenAPI
     builder.Services.AddEndpointsApiExplorer();
 
-    // Rate limiting for auth endpoints
+    // P2-01 CLOSURE: Rate limiting for auth endpoints.
+    // Configurable via RateLimiting:LoginLimit and RateLimiting:RefreshLimit.
+    // Config is read at REQUEST TIME (not registration time) so test overrides work.
     builder.Services.AddRateLimiter(options =>
     {
         options.AddPolicy("login", httpContext =>
-            RateLimitPartition.GetFixedWindowLimiter(
+        {
+            var config = httpContext.RequestServices.GetRequiredService<IConfiguration>();
+            var limit = config.GetValue<int>("RateLimiting:LoginLimit", 10);
+            return RateLimitPartition.GetFixedWindowLimiter(
                 partitionKey: httpContext.Connection.RemoteIpAddress?.ToString() ?? "unknown",
                 factory: _ => new FixedWindowRateLimiterOptions
                 {
-                    PermitLimit = 10,
+                    PermitLimit = limit,
                     Window = TimeSpan.FromMinutes(1),
                     QueueLimit = 0,
-                }));
+                });
+        });
 
         options.AddPolicy("refresh", httpContext =>
-            RateLimitPartition.GetFixedWindowLimiter(
+        {
+            var config = httpContext.RequestServices.GetRequiredService<IConfiguration>();
+            var limit = config.GetValue<int>("RateLimiting:RefreshLimit", 30);
+            return RateLimitPartition.GetFixedWindowLimiter(
                 partitionKey: httpContext.Connection.RemoteIpAddress?.ToString() ?? "unknown",
                 factory: _ => new FixedWindowRateLimiterOptions
                 {
-                    PermitLimit = 30,
+                    PermitLimit = limit,
                     Window = TimeSpan.FromMinutes(1),
                     QueueLimit = 0,
-                }));
+                });
+        });
 
         options.RejectionStatusCode = StatusCodes.Status429TooManyRequests;
     });
 
     var app = builder.Build();
+
+    // P2-06 CLOSURE: Explicit production initialization mode.
+    // Usage: dotnet EgitimPlatform.Api.dll --initialize-platform
+    // This runs migration + role seed + optional bootstrap, then exits.
+    // Does NOT start the web server. Idempotent — safe to run multiple times.
+    // Only triggered by explicit command-line argument — never by config or test harness.
+    if (args.Length > 0 && args.Contains("--initialize-platform"))
+    {
+        Log.Information("Running platform initialization...");
+
+        using var scope = app.Services.CreateScope();
+        var dbContext = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
+
+        // Step 1: Apply pending migrations
+        await dbContext.Database.MigrateAsync();
+        Log.Information("Database migrations applied.");
+
+        // Step 2: Seed required system roles
+        var seeder = scope.ServiceProvider.GetRequiredService<EgitimPlatform.Modules.Identity.Infrastructure.IdentitySeeder>();
+        await seeder.SeedRolesAsync();
+        Log.Information("System roles seeded.");
+
+        // Step 3: Optional bootstrap SuperAdmin (only if explicitly enabled in config)
+        if (!app.Environment.IsProduction() || app.Configuration.GetSection("Bootstrap").GetValue<bool>("Enabled"))
+        {
+            await seeder.SeedBootstrapSuperAdminAsync();
+            Log.Information("Bootstrap SuperAdmin processed (if enabled).");
+        }
+
+        Log.Information("Platform initialization complete. Exiting.");
+        return; // Exit without starting web server
+    }
 
     // P2-4: ForwardedHeaders MUST run first in the pipeline.
     // This ensures subsequent middleware (CORS, auth, cookies) see the original
@@ -177,6 +264,8 @@ try
 
     app.UseHttpsRedirection();
     app.UseCors();
+    // P2-02: CSRF origin validation — runs after CORS, before auth.
+    app.UseMiddleware<CsrfOriginMiddleware>();
     app.UseSerilogRequestLogging();
     app.UseAuthentication();
     app.UseAuthorization();

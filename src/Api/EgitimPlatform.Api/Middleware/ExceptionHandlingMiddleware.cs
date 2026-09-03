@@ -28,6 +28,25 @@ public class ExceptionHandlingMiddleware
 
     private async Task HandleExceptionAsync(HttpContext context, Exception exception)
     {
+        // P2-05: Handle DbUpdateException (unique constraint violations) globally.
+        // If a handler didn't catch it specifically, we still return 409 not 500.
+        if (exception is Microsoft.EntityFrameworkCore.DbUpdateException dbEx)
+        {
+            _logger.LogError(dbEx, "Database update error: {Message}", dbEx.Message);
+
+            if (IsUniqueConstraintViolation(dbEx))
+            {
+                await WriteProblemResponse(context, StatusCodes.Status409Conflict, "Conflict",
+                    "A conflicting record already exists. Please check and retry.");
+                return;
+            }
+
+            // Other DB update errors → 500 with sanitized message
+            await WriteProblemResponse(context, StatusCodes.Status500InternalServerError,
+                "Database error", "An unexpected database error occurred.");
+            return;
+        }
+
         var (statusCode, title) = exception switch
         {
             NotFoundException => (StatusCodes.Status404NotFound, "Resource not found"),
@@ -40,6 +59,14 @@ public class ExceptionHandlingMiddleware
 
         _logger.LogError(exception, "Request error: {Title} — {Message}", title, exception.Message);
 
+        await WriteProblemResponse(context, statusCode, title,
+            statusCode == StatusCodes.Status500InternalServerError
+                ? "An unexpected error occurred."
+                : exception.Message);
+    }
+
+    private async Task WriteProblemResponse(HttpContext context, int statusCode, string title, string detail)
+    {
         context.Response.ContentType = "application/problem+json";
         context.Response.StatusCode = statusCode;
 
@@ -48,9 +75,7 @@ public class ExceptionHandlingMiddleware
             type = GetProblemType(statusCode),
             title,
             status = statusCode,
-            detail = statusCode == StatusCodes.Status500InternalServerError
-                ? "An unexpected error occurred."
-                : exception.Message,
+            detail,
             instance = context.Request.Path.Value,
         };
 
@@ -60,6 +85,21 @@ public class ExceptionHandlingMiddleware
         });
 
         await context.Response.WriteAsync(json);
+    }
+
+    /// <summary>
+    /// Detects SQL Server unique constraint violation (error 2601 or 2627).
+    /// </summary>
+    private static bool IsUniqueConstraintViolation(Microsoft.EntityFrameworkCore.DbUpdateException ex)
+    {
+        var inner = ex.InnerException;
+        if (inner is null) return false;
+        var typeName = inner.GetType().FullName ?? string.Empty;
+        if (!typeName.Contains("SqlException")) return false;
+        var numberProperty = inner.GetType().GetProperty("Number");
+        if (numberProperty?.GetValue(inner) is int number)
+            return number is 2601 or 2627;
+        return false;
     }
 
     private static string GetProblemType(int statusCode) => statusCode switch
