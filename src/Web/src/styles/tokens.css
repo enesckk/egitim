@@ -4,6 +4,16 @@
   --font-serif: 'DM Serif Display', Georgia, serif;
   --font-mono: 'JetBrains Mono', 'Courier New', monospace;
 
+  /* Calm Academic Premium Semantic Tokens */
+  --bg-canvas: #F7F9FC;
+  --bg-surface: #FFFFFF;
+  --text-primary: #17212B;
+  --text-secondary: #66788A;
+  --brand-primary: #17324D;
+  --brand-accent: #2A7F7B;
+  --brand-secondary: #4F6F8F;
+  --border-subtle: #D9E1E8;
+
   /* Navy Scale */
   --color-navy-950: #060E1B;
   --color-navy-900: #0F1B2D;
@@ -27,16 +37,16 @@
   --color-primary-50:  #EBF2FD;
 
   /* Semantic Colors */
-  --color-success:       #059669;
-  --color-success-dark:  #047857;
+  --color-success:       #2F7D5A;
+  --color-success-dark:  #246347;
   --color-success-light: #ECFDF5;
 
-  --color-warning:       #D97706;
-  --color-warning-dark:  #B45309;
+  --color-warning:       #9A6A1A;
+  --color-warning-dark:  #7D5413;
   --color-warning-light: #FFFBEB;
 
-  --color-danger:        #DC2626;
-  --color-danger-dark:   #B91C1C;
+  --color-danger:        #B44A4A;
+  --color-danger-dark:   #923636;
   --color-danger-light:  #FEF2F2;
 
   --color-attention:       #7C3AED;
@@ -44,7 +54,7 @@
   --color-attention-light: #F5F3FF;
 
   /* Surfaces */
-  --color-surface:     #F7F8FB;
+  --color-surface:     #F7F9FC;
   --color-surface-alt: #EEF0F6;
   --color-card:        #FFFFFF;
 
@@ -55,3 +65,4 @@
   --radius-xl:  12px;
   --radius-2xl: 16px;
 }
+

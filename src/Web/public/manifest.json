@@ -1,0 +1,17 @@
+﻿{
+  "name": "Bilim Akademi Eğitim Platformu",
+  "short_name": "BilimAkademi",
+  "description": "Öğrenci, koç, öğretmen ve kurum için bütünleşik eğitim yönetim platformu",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#F7F9FC",
+  "theme_color": "#17324D",
+  "icons": [
+    {
+      "src": "/favicon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ]
+}
