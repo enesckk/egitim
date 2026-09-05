@@ -26,6 +26,9 @@ import { AppShell } from '@/components/layout/AppShell';
 import { NavItem } from '@/components/layout/BottomNav';
 import { AuthProvider, useAuth, ProtectedRoute, getRoleDefaultRoute } from '@/auth';
 
+import { Suspense, lazy } from 'react';
+import { LoadingState } from '@/components/ui/LoadingState';
+
 // Auth Features
 import { LoginView, ForgotPasswordView, ResetPasswordView } from '@/features/auth';
 
@@ -33,38 +36,41 @@ import { LoginView, ForgotPasswordView, ResetPasswordView } from '@/features/aut
 import { ForbiddenView } from '@/features/common/ForbiddenView';
 import { NotFoundView } from '@/features/common/NotFoundView';
 
-// Student Portal Features
-import { StudentTodayView } from '@/features/student/today';
-import { StudentPlansView } from '@/features/student/plans';
-import { StudentExamsView } from '@/features/student/exams';
-import { StudentMessagesView } from '@/features/student/messages';
-import { StudentProfileView } from '@/features/student/profile';
+// Student Portal Features (Lazy Loaded)
+const StudentTodayView = lazy(() => import('@/features/student/today').then((m) => ({ default: m.StudentTodayView })));
+const StudentPlansView = lazy(() => import('@/features/student/plans').then((m) => ({ default: m.StudentPlansView })));
+const StudentExamsView = lazy(() => import('@/features/student/exams').then((m) => ({ default: m.StudentExamsView })));
+const StudentMessagesView = lazy(() => import('@/features/student/messages').then((m) => ({ default: m.StudentMessagesView })));
+const StudentProfileView = lazy(() => import('@/features/student/profile').then((m) => ({ default: m.StudentProfileView })));
 
-// Coach Portal Features
-import { CoachDashboardView } from '@/features/coach/dashboard';
-import { CoachStudentsView, CoachStudentDetailView } from '@/features/coach/students';
-import { CoachMeetingsView } from '@/features/coach/meetings';
-import { CoachMessagesView } from '@/features/coach/messages';
-import { CoachReportsView } from '@/features/coach/reports';
+// Coach Portal Features (Lazy Loaded)
+const CoachDashboardView = lazy(() => import('@/features/coach/dashboard').then((m) => ({ default: m.CoachDashboardView })));
+const CoachStudentsView = lazy(() => import('@/features/coach/students').then((m) => ({ default: m.CoachStudentsView })));
+const CoachStudentDetailView = lazy(() => import('@/features/coach/students').then((m) => ({ default: m.CoachStudentDetailView })));
+const CoachMeetingsView = lazy(() => import('@/features/coach/meetings').then((m) => ({ default: m.CoachMeetingsView })));
+const CoachMessagesView = lazy(() => import('@/features/coach/messages').then((m) => ({ default: m.CoachMessagesView })));
+const CoachReportsView = lazy(() => import('@/features/coach/reports').then((m) => ({ default: m.CoachReportsView })));
 
-// Teacher Portal Features
-import { TeacherDashboardView } from '@/features/teacher/dashboard';
-import { TeacherClassesView, TeacherClassDetailView } from '@/features/teacher/classes';
-import { TeacherStudentDetailView } from '@/features/teacher/students';
-import { TeacherAcademicView } from '@/features/teacher/academic';
-import { TeacherContentView } from '@/features/teacher/content';
-import { TeacherMessagesView } from '@/features/teacher/messages';
+// Teacher Portal Features (Lazy Loaded)
+const TeacherDashboardView = lazy(() => import('@/features/teacher/dashboard').then((m) => ({ default: m.TeacherDashboardView })));
+const TeacherClassesView = lazy(() => import('@/features/teacher/classes').then((m) => ({ default: m.TeacherClassesView })));
+const TeacherClassDetailView = lazy(() => import('@/features/teacher/classes').then((m) => ({ default: m.TeacherClassDetailView })));
+const TeacherStudentDetailView = lazy(() => import('@/features/teacher/students').then((m) => ({ default: m.TeacherStudentDetailView })));
+const TeacherAcademicView = lazy(() => import('@/features/teacher/academic').then((m) => ({ default: m.TeacherAcademicView })));
+const TeacherContentView = lazy(() => import('@/features/teacher/content').then((m) => ({ default: m.TeacherContentView })));
+const TeacherMessagesView = lazy(() => import('@/features/teacher/messages').then((m) => ({ default: m.TeacherMessagesView })));
 
-// Parent Portal Features
-import { ParentSummaryView } from '@/features/parent/summary';
+// Parent Portal Features (Lazy Loaded)
+const ParentSummaryView = lazy(() => import('@/features/parent/summary').then((m) => ({ default: m.ParentSummaryView })));
 
-// Admin Portal Features
-import { InstitutionDashboardView } from '@/features/admin/overview';
-import { StudentDirectoryView } from '@/features/admin/students';
-import { AdminCoachesView } from '@/features/admin/coaches';
-import { AdminTeachersView } from '@/features/admin/teachers';
-import { AdminClassesView } from '@/features/admin/classes';
-import { AdminReportsView } from '@/features/admin/reports';
+// Admin Portal Features (Lazy Loaded)
+const InstitutionDashboardView = lazy(() => import('@/features/admin/overview').then((m) => ({ default: m.InstitutionDashboardView })));
+const StudentDirectoryView = lazy(() => import('@/features/admin/students').then((m) => ({ default: m.StudentDirectoryView })));
+const AdminCoachesView = lazy(() => import('@/features/admin/coaches').then((m) => ({ default: m.AdminCoachesView })));
+const AdminTeachersView = lazy(() => import('@/features/admin/teachers').then((m) => ({ default: m.AdminTeachersView })));
+const AdminClassesView = lazy(() => import('@/features/admin/classes').then((m) => ({ default: m.AdminClassesView })));
+const AdminReportsView = lazy(() => import('@/features/admin/reports').then((m) => ({ default: m.AdminReportsView })));
+
 
 interface PortalNavItem extends NavItem {
   path: string;
@@ -259,15 +265,18 @@ const StudentPortalLayout: React.FC = () => {
         </button>
       }
     >
-      <Routes>
-        <Route path="/today" element={<StudentTodayView />} />
-        <Route path="/plans" element={<StudentPlansView />} />
-        <Route path="/exams" element={<StudentExamsView />} />
-        <Route path="/messages" element={<StudentMessagesView />} />
-        <Route path="/profile" element={<StudentProfileView />} />
-        <Route path="*" element={<Navigate to="/student/today" replace />} />
-      </Routes>
+      <Suspense fallback={<LoadingState message="Sayfa yükleniyor..." />}>
+        <Routes>
+          <Route path="/today" element={<StudentTodayView />} />
+          <Route path="/plans" element={<StudentPlansView />} />
+          <Route path="/exams" element={<StudentExamsView />} />
+          <Route path="/messages" element={<StudentMessagesView />} />
+          <Route path="/profile" element={<StudentProfileView />} />
+          <Route path="*" element={<Navigate to="/student/today" replace />} />
+        </Routes>
+      </Suspense>
     </AppShell>
+
   );
 };
 
@@ -326,16 +335,19 @@ const CoachPortalLayout: React.FC = () => {
         </button>
       }
     >
-      <Routes>
-        <Route path="/today" element={<CoachDashboardView />} />
-        <Route path="/students" element={<CoachStudentsView />} />
-        <Route path="/students/:studentId" element={<CoachStudentDetailView />} />
-        <Route path="/meetings" element={<CoachMeetingsView />} />
-        <Route path="/messages" element={<CoachMessagesView />} />
-        <Route path="/reports" element={<CoachReportsView />} />
-        <Route path="*" element={<Navigate to="/coach/today" replace />} />
-      </Routes>
+      <Suspense fallback={<LoadingState message="Sayfa yükleniyor..." />}>
+        <Routes>
+          <Route path="/today" element={<CoachDashboardView />} />
+          <Route path="/students" element={<CoachStudentsView />} />
+          <Route path="/students/:studentId" element={<CoachStudentDetailView />} />
+          <Route path="/meetings" element={<CoachMeetingsView />} />
+          <Route path="/messages" element={<CoachMessagesView />} />
+          <Route path="/reports" element={<CoachReportsView />} />
+          <Route path="*" element={<Navigate to="/coach/today" replace />} />
+        </Routes>
+      </Suspense>
     </AppShell>
+
   );
 };
 
@@ -397,16 +409,18 @@ const TeacherPortalLayout: React.FC = () => {
         </button>
       }
     >
-      <Routes>
-        <Route path="/today" element={<TeacherDashboardView />} />
-        <Route path="/classes" element={<TeacherClassesView />} />
-        <Route path="/classes/:classId" element={<TeacherClassDetailView />} />
-        <Route path="/students/:studentId" element={<TeacherStudentDetailView />} />
-        <Route path="/academic" element={<TeacherAcademicView />} />
-        <Route path="/content" element={<TeacherContentView />} />
-        <Route path="/messages" element={<TeacherMessagesView />} />
-        <Route path="*" element={<Navigate to="/teacher/today" replace />} />
-      </Routes>
+      <Suspense fallback={<LoadingState message="Sayfa yükleniyor..." />}>
+        <Routes>
+          <Route path="/today" element={<TeacherDashboardView />} />
+          <Route path="/classes" element={<TeacherClassesView />} />
+          <Route path="/classes/:classId" element={<TeacherClassDetailView />} />
+          <Route path="/students/:studentId" element={<TeacherStudentDetailView />} />
+          <Route path="/academic" element={<TeacherAcademicView />} />
+          <Route path="/content" element={<TeacherContentView />} />
+          <Route path="/messages" element={<TeacherMessagesView />} />
+          <Route path="*" element={<Navigate to="/teacher/today" replace />} />
+        </Routes>
+      </Suspense>
     </AppShell>
   );
 };
@@ -434,10 +448,12 @@ const ParentPortalLayout: React.FC = () => {
         },
       }}
     >
-      <Routes>
-        <Route path="/summary" element={<ParentSummaryView />} />
-        <Route path="*" element={<Navigate to="/parent/summary" replace />} />
-      </Routes>
+      <Suspense fallback={<LoadingState message="Sayfa yükleniyor..." />}>
+        <Routes>
+          <Route path="/summary" element={<ParentSummaryView />} />
+          <Route path="*" element={<Navigate to="/parent/summary" replace />} />
+        </Routes>
+      </Suspense>
     </AppShell>
   );
 };
@@ -487,16 +503,19 @@ const AdminPortalLayout: React.FC = () => {
         </button>
       }
     >
-      <Routes>
-        <Route path="/overview" element={<InstitutionDashboardView />} />
-        <Route path="/students" element={<StudentDirectoryView />} />
-        <Route path="/coaches" element={<AdminCoachesView />} />
-        <Route path="/teachers" element={<AdminTeachersView />} />
-        <Route path="/classes" element={<AdminClassesView />} />
-        <Route path="/reports" element={<AdminReportsView />} />
-        <Route path="*" element={<Navigate to="/admin/overview" replace />} />
-      </Routes>
+      <Suspense fallback={<LoadingState message="Sayfa yükleniyor..." />}>
+        <Routes>
+          <Route path="/overview" element={<InstitutionDashboardView />} />
+          <Route path="/students" element={<StudentDirectoryView />} />
+          <Route path="/coaches" element={<AdminCoachesView />} />
+          <Route path="/teachers" element={<AdminTeachersView />} />
+          <Route path="/classes" element={<AdminClassesView />} />
+          <Route path="/reports" element={<AdminReportsView />} />
+          <Route path="*" element={<Navigate to="/admin/overview" replace />} />
+        </Routes>
+      </Suspense>
     </AppShell>
+
   );
 };
 

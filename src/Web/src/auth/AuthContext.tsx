@@ -44,7 +44,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   }, []);
 
   const login = useCallback(
-    async (credentials: LoginCredentials): Promise<void> => {
+    async (credentials: LoginCredentials): Promise<AuthUser> => {
       setIsLoading(true);
       try {
         const session = await authService.login({
@@ -52,12 +52,14 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           password: credentials.password,
         });
         setUser(session.user);
+        return session.user;
       } finally {
         setIsLoading(false);
       }
     },
     []
   );
+
 
   const loginAsRole = useCallback((selectedRole: UserRole) => {
     // Kept for interface compatibility; in production auth is backend-governed

@@ -38,9 +38,16 @@ export const decodeJwtPayload = (token: string): JwtPayload | null => {
   }
 };
 
-export const mapBackendRoleToUserRole = (backendRole?: string | string[]): UserRole => {
-  const roles = Array.isArray(backendRole) ? backendRole : [backendRole || ''];
-  const normalized = roles.map((r) => r.toLowerCase().trim());
+/**
+ * Strict role mapping: only explicitly supported backend roles are accepted.
+ * Missing, malformed, or unrecognized roles FAIL CLOSED by returning null.
+ */
+export const mapBackendRoleToUserRole = (backendRole?: string | string[]): UserRole | null => {
+  if (!backendRole) return null;
+  const roles = Array.isArray(backendRole) ? backendRole : [backendRole];
+  const normalized = roles.map((r) => (typeof r === 'string' ? r.toLowerCase().trim() : '')).filter(Boolean);
+
+  if (normalized.length === 0) return null;
 
   if (normalized.includes('superadmin') || normalized.includes('institutionadmin') || normalized.includes('admin')) {
     return 'admin';
@@ -54,7 +61,12 @@ export const mapBackendRoleToUserRole = (backendRole?: string | string[]): UserR
   if (normalized.includes('parent')) {
     return 'parent';
   }
-  return 'student';
+  if (normalized.includes('student')) {
+    return 'student';
+  }
+
+  // Fail closed: Unknown role must NEVER fall back to student or any default role
+  return null;
 };
 
 export const getRoleDisplayName = (role: UserRole): string => {
@@ -76,11 +88,32 @@ export const parseUserFromToken = (token: string): AuthUser | null => {
   const payload = decodeJwtPayload(token);
   if (!payload) return null;
 
+  // P2: Reject expired JWT tokens immediately
+  if (typeof payload.exp === 'number') {
+    const expiresAtMs = payload.exp * 1000;
+    if (expiresAtMs <= Date.now()) {
+      return null;
+    }
+  }
+
+  const rawRole =
+    payload.role ||
+    payload['http://schemas.microsoft.com/ws/2008/06/identity/claims/role'];
+
+  const role = mapBackendRoleToUserRole(rawRole);
+  if (!role) {
+    // Fail closed if role is invalid, unknown or missing
+    return null;
+  }
+
   const id =
     payload.sub ||
     payload.nameid ||
-    payload['http://schemas.xmlsoap.org/ws/2005/05/identity/claims/nameidentifier'] ||
-    'usr-authenticated';
+    payload['http://schemas.xmlsoap.org/ws/2005/05/identity/claims/nameidentifier'];
+
+  if (!id) {
+    return null;
+  }
 
   const email =
     payload.email ||
@@ -97,11 +130,6 @@ export const parseUserFromToken = (token: string): AuthUser | null => {
     payload['http://schemas.xmlsoap.org/ws/2005/05/identity/claims/surname'] ||
     '';
 
-  const rawRole =
-    payload.role ||
-    payload['http://schemas.microsoft.com/ws/2008/06/identity/claims/role'];
-
-  const role = mapBackendRoleToUserRole(rawRole);
   const fullName = firstName && lastName ? `${firstName} ${lastName}` : email.split('@')[0] || 'Kullanıcı';
 
   const initials = fullName
@@ -124,3 +152,4 @@ export const parseUserFromToken = (token: string): AuthUser | null => {
     institutionName: institutionId ? 'Bağlı Kurum' : 'Bilim Akademi',
   };
 };
+

@@ -9,9 +9,9 @@ import { ApiError } from '@/services/api';
 export const LoginView: React.FC = () => {
   const navigate = useNavigate();
   const location = useLocation();
-  const { login, user, isLoading } = useAuth();
+  const { login, isLoading } = useAuth();
 
-  const [emailOrUsername, setEmailOrUsername] = useState('');
+  const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
@@ -23,7 +23,7 @@ export const LoginView: React.FC = () => {
     e.preventDefault();
     if (isLoading) return;
 
-    const trimmedEmail = emailOrUsername.trim();
+    const trimmedEmail = email.trim();
     if (!trimmedEmail || !password) {
       setErrorType('validation');
       setErrorMessage('Lütfen e-posta adresinizi ve şifrenizi giriniz.');
@@ -34,15 +34,14 @@ export const LoginView: React.FC = () => {
     setErrorMessage(null);
 
     try {
-      await login({ emailOrUsername: trimmedEmail, password });
-      
-      // Determine target destination
+      // P1-1 Closure: Use returned authenticated user directly to avoid React state race/stale closures
+      const authenticatedUser = await login({ emailOrUsername: trimmedEmail, password });
+
+      // Determine target destination strictly from returned authenticated session
       if (fromLocation && fromLocation !== '/login' && fromLocation !== '/403') {
         navigate(fromLocation, { replace: true });
-      } else if (user?.role) {
-        navigate(getRoleDefaultRoute(user.role), { replace: true });
       } else {
-        navigate('/student/today', { replace: true });
+        navigate(getRoleDefaultRoute(authenticatedUser.role), { replace: true });
       }
     } catch (err: unknown) {
       if (err instanceof ApiError) {
@@ -59,6 +58,9 @@ export const LoginView: React.FC = () => {
           setErrorType('auth');
           setErrorMessage(err.getUserMessage());
         }
+      } else if (err instanceof Error && err.message) {
+        setErrorType('auth');
+        setErrorMessage(err.message);
       } else {
         setErrorType('auth');
         setErrorMessage('Giriş yapılırken beklenmeyen bir hata oluştu. Lütfen tekrar deneyiniz.');
@@ -67,28 +69,28 @@ export const LoginView: React.FC = () => {
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-[#F7F9FC] px-4 py-8 sm:px-6 lg:px-8 select-none">
+    <div className="min-h-screen flex items-center justify-center bg-surface px-4 py-8 sm:px-6 lg:px-8 select-none">
       <div className="w-full max-w-md">
         {/* Institutional Brand Header */}
         <div className="text-center mb-8">
-          <div className="inline-flex items-center justify-center w-12 h-12 rounded-2xl bg-[#17324D] text-white shadow-sm mb-4">
-            <Layers className="h-6 w-6 text-[#2A7F7B]" />
+          <div className="inline-flex items-center justify-center w-12 h-12 rounded-2xl bg-navy-900 text-white shadow-soft-sm mb-4">
+            <Layers className="h-6 w-6 text-primary-400" />
           </div>
-          <h1 className="text-2xl font-bold tracking-tight text-[#17212B] font-sans">
+          <h1 className="text-2xl font-bold tracking-tight text-navy-900 font-sans">
             Bilim Akademi
           </h1>
-          <p className="text-sm text-[#66788A] mt-1">
+          <p className="text-sm text-neutral-500 mt-1">
             Eğitim Yönetim ve Takip Platformu
           </p>
         </div>
 
         {/* Login Card */}
-        <div className="bg-white rounded-2xl border border-[#D9E1E8] shadow-sm p-6 sm:p-8">
+        <div className="bg-white rounded-2xl border border-neutral-200 shadow-soft-sm p-6 sm:p-8">
           <div className="mb-6">
-            <h2 className="text-lg font-semibold text-[#17212B]">
+            <h2 className="text-lg font-semibold text-navy-900">
               Giriş Yap
             </h2>
-            <p className="text-xs text-[#66788A] mt-0.5">
+            <p className="text-xs text-neutral-500 mt-0.5">
               Devam etmek için kurumsal hesabınızla oturum açın
             </p>
           </div>
@@ -100,18 +102,18 @@ export const LoginView: React.FC = () => {
               className={cn(
                 'flex items-start gap-3 p-3.5 rounded-xl border text-xs leading-relaxed mb-5',
                 errorType === 'rate-limit'
-                  ? 'bg-amber-50 border-amber-200 text-amber-900'
+                  ? 'bg-warning-light border-amber-200 text-warning-dark'
                   : errorType === 'network'
-                  ? 'bg-slate-50 border-slate-200 text-slate-800'
-                  : 'bg-red-50 border-red-200 text-red-900'
+                  ? 'bg-neutral-50 border-neutral-200 text-neutral-800'
+                  : 'bg-danger-light border-red-200 text-danger-dark'
               )}
             >
               {errorType === 'rate-limit' ? (
-                <AlertTriangle className="h-4 w-4 text-amber-600 flex-shrink-0 mt-0.5" />
+                <AlertTriangle className="h-4 w-4 text-warning flex-shrink-0 mt-0.5" />
               ) : errorType === 'network' ? (
-                <WifiOff className="h-4 w-4 text-slate-600 flex-shrink-0 mt-0.5" />
+                <WifiOff className="h-4 w-4 text-neutral-600 flex-shrink-0 mt-0.5" />
               ) : (
-                <AlertCircle className="h-4 w-4 text-red-600 flex-shrink-0 mt-0.5" />
+                <AlertCircle className="h-4 w-4 text-danger flex-shrink-0 mt-0.5" />
               )}
               <div className="flex-1">
                 <span className="font-semibold block mb-0.5">
@@ -127,35 +129,35 @@ export const LoginView: React.FC = () => {
           )}
 
           <form onSubmit={handleSubmit} noValidate className="space-y-4">
-            {/* Email / Username Field */}
+            {/* Email Field */}
             <div>
               <label
                 htmlFor="login-email"
-                className="block text-xs font-semibold text-[#17212B] mb-1.5"
+                className="block text-xs font-semibold text-neutral-700 mb-1.5"
               >
-                E-posta veya Kullanıcı Adı
+                E-posta
               </label>
               <div className="relative">
-                <Mail className="h-4 w-4 absolute left-3.5 top-1/2 -translate-y-1/2 text-[#66788A] pointer-events-none" />
+                <Mail className="h-4 w-4 absolute left-3.5 top-1/2 -translate-y-1/2 text-neutral-400 pointer-events-none" />
                 <input
                   id="login-email"
-                  type="text"
+                  type="email"
                   required
-                  autoComplete="username"
+                  autoComplete="email"
                   disabled={isLoading}
-                  value={emailOrUsername}
+                  value={email}
                   onChange={(e) => {
-                    setEmailOrUsername(e.target.value);
+                    setEmail(e.target.value);
                     if (errorMessage) setErrorMessage(null);
                   }}
                   placeholder="ad.soyad@kurum.k12.tr"
                   className={cn(
                     'w-full pl-10 pr-4 py-2.5 rounded-xl border text-sm',
-                    'bg-white text-[#17212B] placeholder:text-[#66788A]/60',
-                    'transition-colors focus:outline-none focus:ring-2 focus:ring-[#17324D] focus:border-transparent',
+                    'bg-white text-neutral-900 placeholder:text-neutral-400',
+                    'transition-colors focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent',
                     errorMessage && errorType === 'auth'
-                      ? 'border-red-400 ring-1 ring-red-400'
-                      : 'border-[#D9E1E8] hover:border-[#66788A]'
+                      ? 'border-danger ring-1 ring-danger'
+                      : 'border-neutral-300 hover:border-neutral-400'
                   )}
                 />
               </div>
@@ -166,19 +168,19 @@ export const LoginView: React.FC = () => {
               <div className="flex items-center justify-between mb-1.5">
                 <label
                   htmlFor="login-password"
-                  className="block text-xs font-semibold text-[#17212B]"
+                  className="block text-xs font-semibold text-neutral-700"
                 >
                   Şifre
                 </label>
                 <Link
                   to="/forgot-password"
-                  className="text-xs text-[#2A7F7B] hover:text-[#17324D] font-medium transition-colors"
+                  className="text-xs text-primary-600 hover:text-primary-700 font-medium transition-colors"
                 >
                   Şifremi Unuttum
                 </Link>
               </div>
               <div className="relative">
-                <Lock className="h-4 w-4 absolute left-3.5 top-1/2 -translate-y-1/2 text-[#66788A] pointer-events-none" />
+                <Lock className="h-4 w-4 absolute left-3.5 top-1/2 -translate-y-1/2 text-neutral-400 pointer-events-none" />
                 <input
                   id="login-password"
                   type={showPassword ? 'text' : 'password'}
@@ -193,17 +195,17 @@ export const LoginView: React.FC = () => {
                   placeholder="••••••••"
                   className={cn(
                     'w-full pl-10 pr-11 py-2.5 rounded-xl border text-sm',
-                    'bg-white text-[#17212B] placeholder:text-[#66788A]/60',
-                    'transition-colors focus:outline-none focus:ring-2 focus:ring-[#17324D] focus:border-transparent',
+                    'bg-white text-neutral-900 placeholder:text-neutral-400',
+                    'transition-colors focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent',
                     errorMessage && errorType === 'auth'
-                      ? 'border-red-400 ring-1 ring-red-400'
-                      : 'border-[#D9E1E8] hover:border-[#66788A]'
+                      ? 'border-danger ring-1 ring-danger'
+                      : 'border-neutral-300 hover:border-neutral-400'
                   )}
                 />
                 <button
                   type="button"
                   onClick={() => setShowPassword(!showPassword)}
-                  className="absolute right-3 top-1/2 -translate-y-1/2 text-[#66788A] hover:text-[#17212B] transition-colors p-1 rounded-md focus:outline-none focus:ring-1 focus:ring-[#17324D]"
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-neutral-400 hover:text-neutral-700 transition-colors p-1 rounded-md focus:outline-none focus:ring-1 focus:ring-primary-500"
                   aria-label={showPassword ? 'Şifreyi gizle' : 'Şifreyi göster'}
                 >
                   {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
@@ -218,9 +220,9 @@ export const LoginView: React.FC = () => {
                 disabled={isLoading}
                 className={cn(
                   'w-full py-2.5 px-4 rounded-xl font-semibold text-sm text-white',
-                  'bg-[#17324D] hover:bg-[#1f4060] active:bg-[#12263a]',
-                  'transition-all duration-150 focus:outline-none focus:ring-2 focus:ring-[#17324D] focus:ring-offset-2',
-                  'min-h-[44px] flex items-center justify-center gap-2 cursor-pointer shadow-sm',
+                  'bg-primary-600 hover:bg-primary-700 active:bg-primary-800',
+                  'transition-all duration-150 focus:outline-none focus:ring-2 focus:ring-primary-500 focus:ring-offset-2',
+                  'min-h-[44px] flex items-center justify-center gap-2 cursor-pointer shadow-soft-xs',
                   isLoading && 'opacity-70 cursor-wait'
                 )}
               >
@@ -241,11 +243,12 @@ export const LoginView: React.FC = () => {
         </div>
 
         {/* Institutional Footer Note */}
-        <p className="text-center text-xs text-[#66788A] mt-6">
-          Bilim Akademi Platform Güvenliği • 256-bit SSL Korumalı
+        <p className="text-center text-xs text-neutral-400 mt-6">
+          Bilim Akademi Platform Güvenliği
         </p>
       </div>
     </div>
   );
 };
+
 

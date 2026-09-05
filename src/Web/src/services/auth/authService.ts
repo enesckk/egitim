@@ -24,6 +24,7 @@ class AuthService {
   private activeSession: AuthSession | null = null;
   private listeners: Set<AuthStateListener> = new Set();
   private isInitialized = false;
+  private initializePromise: Promise<AuthUser | null> | null = null;
 
   constructor() {
     apiClient.setTokenProvider(() => this.getAccessToken());
@@ -73,7 +74,7 @@ class AuthService {
   public setSession(response: LoginResponse): AuthSession {
     const user = parseUserFromToken(response.accessToken);
     if (!user) {
-      throw new Error('Geçersiz kimlik doğrulama belirteci.');
+      throw new Error('Geçersiz veya yetkisiz kimlik doğrulama belirteci.');
     }
 
     const session: AuthSession = {
@@ -100,16 +101,26 @@ class AuthService {
       return this.activeSession.user;
     }
 
-    try {
-      // Attempt silent refresh via HttpOnly cookie
-      const session = await this.refresh();
-      this.isInitialized = true;
-      return session?.user || null;
-    } catch {
-      this.clearSession();
-      this.isInitialized = true;
-      return null;
+    if (this.initializePromise) {
+      return this.initializePromise;
     }
+
+    this.initializePromise = (async () => {
+      try {
+        // Attempt silent refresh via HttpOnly cookie
+        const session = await this.refresh();
+        this.isInitialized = true;
+        return session?.user || null;
+      } catch {
+        this.clearSession();
+        this.isInitialized = true;
+        return null;
+      } finally {
+        this.initializePromise = null;
+      }
+    })();
+
+    return this.initializePromise;
   }
 
   public async login(credentials: LoginRequest): Promise<AuthSession> {
@@ -141,6 +152,7 @@ class AuthService {
     }
   }
 }
+
 
 export const authService = new AuthService();
 
