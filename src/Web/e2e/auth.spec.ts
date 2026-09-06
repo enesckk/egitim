@@ -314,6 +314,11 @@ test.describe('Frontend Authentication Quality Gate Tests', () => {
     });
 
     let refreshCallCount = 0;
+    let refreshStartedResolver: (() => void) | null = null;
+    const refreshStartedPromise = new Promise<void>((resolve) => {
+      refreshStartedResolver = resolve;
+    });
+
     let resolveSecondRefresh: (() => void) | null = null;
     const secondRefreshDeferred = new Promise<void>((resolve) => {
       resolveSecondRefresh = resolve;
@@ -333,6 +338,9 @@ test.describe('Frontend Authentication Quality Gate Tests', () => {
           }),
         });
       } else {
+        // Positively observe and signal that the in-flight HTTP request has started
+        if (refreshStartedResolver) refreshStartedResolver();
+
         // Subsequent in-flight refresh is held
         await secondRefreshDeferred;
         await route.fulfill({
@@ -354,7 +362,15 @@ test.describe('Frontend Authentication Quality Gate Tests', () => {
     await page.goto('/student/today');
     await expect(page).toHaveURL(/\/student\/today/);
 
-    // 2. Click logout button
+    // 2. Trigger an explicit background refresh
+    void page.evaluate(() => {
+      fetch('/api/v1/auth/refresh', { method: 'POST', credentials: 'include' });
+    });
+
+    // 3. Positively wait until the in-flight refresh HTTP request is observed on the network
+    await refreshStartedPromise;
+
+    // 4. While refresh is in-flight, click logout button
     const logoutBtn = page.locator('aside button:has-text("Çıkış Yap")').first();
     await logoutBtn.click();
 
@@ -362,10 +378,10 @@ test.describe('Frontend Authentication Quality Gate Tests', () => {
     await expect(page).toHaveURL(/\/login/);
     await expect(page.locator('input#login-email')).toBeVisible();
 
-    // 3. Unblock stale in-flight refresh response
+    // 5. Release stale in-flight refresh response
     if (resolveSecondRefresh) resolveSecondRefresh();
 
-    // 4. Ensure user remains logged out on /login and is NOT re-authenticated
+    // 6. Ensure user remains logged out on /login and is NOT re-authenticated
     await expect(page.locator('input#login-email')).toBeVisible();
     await expect(page).toHaveURL(/\/login/);
   });

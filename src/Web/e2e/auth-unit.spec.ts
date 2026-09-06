@@ -2,6 +2,7 @@ import { test, expect } from '@playwright/test';
 import { validateAndNormalizeApiBaseUrl } from '../src/config/env';
 import { mapBackendRoleToUserRole, parseUserFromToken } from '../src/services/auth/jwtUtils';
 import { AuthService } from '../src/services/auth/authService';
+import { apiClient } from '../src/services/api/apiClient';
 
 function createMockJwt(payload: Record<string, unknown>, expSeconds = 3600): string {
   const header = Buffer.from(JSON.stringify({ alg: 'HS256', typ: 'JWT' })).toString('base64url');
@@ -113,71 +114,200 @@ test.describe('P2-03: Strict Role Claim Validation Tests (Fail Closed)', () => {
   });
 });
 
-test.describe('P1-01: Session Lifecycle & Generation Invalidation Deterministic Tests', () => {
-  test('1. Logout occurs while refresh is in-flight -> refresh resolution must NOT re-authenticate user', async () => {
+test.describe('P1-01 & P2-01: Session Lifecycle & Race Condition Public Flow Tests', () => {
+  test('Scenario 1: Old API request -> 401 -> refresh starts -> new login succeeds -> old refresh resolves -> new user remains authenticated', async () => {
     const auth = new AuthService();
-    const token = createMockJwt({ sub: 'usr-refresh', email: 'refresh@example.com', role: 'Student' });
+    const newUserToken = createMockJwt({ sub: 'usr-new', email: 'teacher@example.com', role: 'Teacher' });
+    const staleRefreshToken = createMockJwt({ sub: 'usr-stale', email: 'student@example.com', role: 'Student' });
 
-    // Simulate in-flight refresh with captured generation
-    const refreshGen = auth.getSessionGeneration();
+    // Step 1: User is logged in as Student
+    auth.setSession({
+      accessToken: createMockJwt({ sub: 'usr-stale', email: 'student@example.com', role: 'Student' }),
+      accessTokenExpiresAt: new Date(Date.now() + 3600000).toISOString(),
+    });
+    expect(auth.getUser()?.role).toBe('student');
 
-    // User logs out before refresh completes
+    // Step 2: Refresh starts, holding response
+    let resolveRefresh: ((res: { accessToken: string; accessTokenExpiresAt: string }) => void) | null = null;
+    const refreshPromise = new Promise<{ accessToken: string; accessTokenExpiresAt: string }>((resolve) => {
+      resolveRefresh = resolve;
+    });
+
+    // Mock apiClient post for refresh
+    const origPost = apiClient.post.bind(apiClient);
+    let refreshTriggered = false;
+    apiClient.post = async <T>(path: string, body?: unknown, options?: import('../src/services/api/apiClient').RequestOptions): Promise<T> => {
+      if (path === '/api/v1/auth/refresh') {
+        refreshTriggered = true;
+        const res = await refreshPromise;
+        return res as T;
+      }
+      if (path === '/api/v1/auth/login') {
+        return {
+          accessToken: newUserToken,
+          accessTokenExpiresAt: new Date(Date.now() + 3600000).toISOString(),
+        } as T;
+      }
+      return origPost(path, body, options);
+    };
+
+    // Start background refresh
+    const inFlightRefresh = auth.refresh();
+    expect(refreshTriggered).toBe(true);
+
+    // Step 3: While refresh is in-flight, user performs a new login
+    await auth.login({ email: 'teacher@example.com', password: 'Password123!' });
+    expect(auth.getUser()?.role).toBe('teacher');
+
+    // Step 4: Old refresh finally resolves
+    if (resolveRefresh) {
+      (resolveRefresh as (res: { accessToken: string; accessTokenExpiresAt: string }) => void)({
+        accessToken: staleRefreshToken,
+        accessTokenExpiresAt: new Date(Date.now() + 3600000).toISOString(),
+      });
+    }
+    const refreshResult = await inFlightRefresh;
+
+    // Step 5: Refresh outcome MUST be stale, and new user MUST remain authenticated as Teacher
+    expect(refreshResult.status).toBe('stale');
+    expect(auth.getUser()?.role).toBe('teacher');
+    expect(auth.isAuthenticated()).toBe(true);
+
+    apiClient.post = origPost;
+  });
+
+  test('Scenario 2: Old API request -> 401 -> refresh starts -> new login succeeds -> old refresh FAILS -> new user remains authenticated', async () => {
+    const auth = new AuthService();
+    const newUserToken = createMockJwt({ sub: 'usr-coach', email: 'coach@example.com', role: 'Coach' });
+
+    // Step 1: User is logged in as Student
+    auth.setSession({
+      accessToken: createMockJwt({ sub: 'usr-student', email: 'student@example.com', role: 'Student' }),
+      accessTokenExpiresAt: new Date(Date.now() + 3600000).toISOString(),
+    });
+
+    // Step 2: Refresh starts, holding failure
+    let rejectRefresh: ((err: Error) => void) | null = null;
+    const refreshPromise = new Promise<{ accessToken: string; accessTokenExpiresAt: string }>((_, reject) => {
+      rejectRefresh = reject;
+    });
+
+    const origPost = apiClient.post.bind(apiClient);
+    let refreshTriggered = false;
+    apiClient.post = async <T>(path: string, body?: unknown, options?: import('../src/services/api/apiClient').RequestOptions): Promise<T> => {
+      if (path === '/api/v1/auth/refresh') {
+        refreshTriggered = true;
+        await refreshPromise;
+        return undefined as T;
+      }
+      if (path === '/api/v1/auth/login') {
+        return {
+          accessToken: newUserToken,
+          accessTokenExpiresAt: new Date(Date.now() + 3600000).toISOString(),
+        } as T;
+      }
+      return origPost(path, body, options);
+    };
+
+    const inFlightRefresh = auth.refresh();
+    expect(refreshTriggered).toBe(true);
+
+    // Step 3: New login succeeds
+    await auth.login({ email: 'coach@example.com', password: 'Password123!' });
+    expect(auth.getUser()?.role).toBe('coach');
+
+    // Step 4: Old refresh fails (e.g. 401 / network error)
+    if (rejectRefresh) {
+      (rejectRefresh as (err: Error) => void)(new Error('Network error / 401 Unauthorized'));
+    }
+    const refreshResult = await inFlightRefresh;
+
+    // Step 5: Refresh failure is recognized as stale, and Coach session is NOT cleared
+    expect(refreshResult.status).toBe('stale');
+    expect(auth.getUser()?.role).toBe('coach');
+    expect(auth.isAuthenticated()).toBe(true);
+
+    apiClient.post = origPost;
+  });
+
+  test('Scenario 3: Refresh starts -> logout occurs -> old refresh succeeds -> user remains logged out', async () => {
+    const auth = new AuthService();
+    const token = createMockJwt({ sub: 'usr-student', email: 'student@example.com', role: 'Student' });
+
+    let resolveRefresh: ((res: { accessToken: string; accessTokenExpiresAt: string }) => void) | null = null;
+    const refreshPromise = new Promise<{ accessToken: string; accessTokenExpiresAt: string }>((resolve) => {
+      resolveRefresh = resolve;
+    });
+
+    const origPost = apiClient.post.bind(apiClient);
+    let refreshTriggered = false;
+    apiClient.post = async <T>(path: string, body?: unknown, options?: import('../src/services/api/apiClient').RequestOptions): Promise<T> => {
+      if (path === '/api/v1/auth/refresh') {
+        refreshTriggered = true;
+        const res = await refreshPromise;
+        return res as T;
+      }
+      if (path === '/api/v1/auth/logout') {
+        return undefined as T;
+      }
+      return origPost(path, body, options);
+    };
+
+    // Refresh starts
+    const inFlightRefresh = auth.refresh();
+    expect(refreshTriggered).toBe(true);
+
+    // User logs out before refresh finishes
     await auth.logout();
     expect(auth.getUser()).toBeNull();
     expect(auth.isAuthenticated()).toBe(false);
 
-    // Stale refresh response arrives afterward
-    const staleResult = auth.setSession(
-      { accessToken: token, accessTokenExpiresAt: new Date(Date.now() + 3600000).toISOString() },
-      refreshGen // stale generation
-    );
+    // Refresh resolves afterward
+    if (resolveRefresh) {
+      (resolveRefresh as (res: { accessToken: string; accessTokenExpiresAt: string }) => void)({
+        accessToken: token,
+        accessTokenExpiresAt: new Date(Date.now() + 3600000).toISOString(),
+      });
+    }
+    const refreshResult = await inFlightRefresh;
 
-    expect(staleResult).toBeNull();
+    // User MUST remain logged out
+    expect(refreshResult.status).toBe('stale');
     expect(auth.getUser()).toBeNull();
     expect(auth.isAuthenticated()).toBe(false);
+
+    apiClient.post = origPost;
   });
 
-  test('2. Normal valid refresh establishes active session', () => {
+  test('Scenario 4: Concurrent initialize calls trigger exactly one refresh request', async () => {
     const auth = new AuthService();
-    const token = createMockJwt({ sub: 'usr-valid', email: 'valid@example.com', role: 'Coach' });
-    const currentGen = auth.getSessionGeneration();
+    const token = createMockJwt({ sub: 'usr-init', email: 'init@example.com', role: 'Student' });
 
-    const session = auth.setSession(
-      { accessToken: token, accessTokenExpiresAt: new Date(Date.now() + 3600000).toISOString() },
-      currentGen
-    );
+    let refreshCount = 0;
+    const origPost = apiClient.post.bind(apiClient);
+    apiClient.post = async <T>(path: string, body?: unknown, options?: import('../src/services/api/apiClient').RequestOptions): Promise<T> => {
+      if (path === '/api/v1/auth/refresh') {
+        refreshCount++;
+        return {
+          accessToken: token,
+          accessTokenExpiresAt: new Date(Date.now() + 3600000).toISOString(),
+        } as T;
+      }
+      return origPost(path, body, options);
+    };
 
-    expect(session).not.toBeNull();
-    expect(auth.isAuthenticated()).toBe(true);
-    expect(auth.getUser()?.role).toBe('coach');
-  });
+    // Concurrent initialize calls
+    const [user1, user2, user3] = await Promise.all([
+      auth.initialize(),
+      auth.initialize(),
+      auth.initialize(),
+    ]);
 
-  test('3. Stale refresh does not overwrite a newer session', () => {
-    const auth = new AuthService();
-    const user1Token = createMockJwt({ sub: 'usr-1', email: 'u1@example.com', role: 'Student' });
-    const user2Token = createMockJwt({ sub: 'usr-2', email: 'u2@example.com', role: 'Teacher' });
+    expect(refreshCount).toBe(1);
+    expect(user1?.role).toBe('student');
+    expect(user2?.role).toBe('student');
+    expect(user3?.role).toBe('student');
 
-    // Refresh was started during generation 0
-    const gen1 = auth.getSessionGeneration();
-
-    // User performs login with new credentials (login advances generation to 1)
-    (auth as unknown as { sessionGeneration: number }).sessionGeneration++;
-    const gen2 = auth.getSessionGeneration();
-
-    auth.setSession(
-      { accessToken: user2Token, accessTokenExpiresAt: new Date(Date.now() + 3600000).toISOString() },
-      gen2
-    );
-    expect(auth.getUser()?.role).toBe('teacher');
-
-    // Stale gen1 refresh response arrives afterward
-    const staleResult = auth.setSession(
-      { accessToken: user1Token, accessTokenExpiresAt: new Date(Date.now() + 3600000).toISOString() },
-      gen1
-    );
-
-    expect(staleResult).toBeNull();
-    // User remains Teacher, not overwritten by Student
-    expect(auth.getUser()?.role).toBe('teacher');
+    apiClient.post = origPost;
   });
 });

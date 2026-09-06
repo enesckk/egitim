@@ -8,8 +8,13 @@ export interface RequestOptions extends Omit<RequestInit, 'body'> {
   _retry?: boolean;
 }
 
+export type RefreshResult =
+  | { status: 'refreshed'; accessToken: string }
+  | { status: 'stale' }
+  | { status: 'unauthenticated' };
+
 export type TokenProvider = () => string | null;
-export type RefreshHandler = () => Promise<string | null>;
+export type RefreshHandler = () => Promise<RefreshResult>;
 export type SessionExpiredHandler = () => void;
 
 class ApiClient {
@@ -17,7 +22,7 @@ class ApiClient {
   private tokenProvider: TokenProvider = () => null;
   private refreshHandler: RefreshHandler | null = null;
   private sessionExpiredHandler: SessionExpiredHandler | null = null;
-  private refreshPromise: Promise<string | null> | null = null;
+  private refreshPromise: Promise<RefreshResult> | null = null;
 
   constructor(baseUrl: string) {
     this.baseUrl = baseUrl;
@@ -55,8 +60,8 @@ class ApiClient {
     return clean.includes('/auth/login') || clean.includes('/auth/refresh') || clean.includes('/auth/logout');
   }
 
-  private async executeSingleFlightRefresh(): Promise<string | null> {
-    if (!this.refreshHandler) return null;
+  private async executeSingleFlightRefresh(): Promise<RefreshResult> {
+    if (!this.refreshHandler) return { status: 'unauthenticated' };
 
     if (!this.refreshPromise) {
       this.refreshPromise = this.refreshHandler().finally(() => {
@@ -113,22 +118,31 @@ class ApiClient {
     // Handle 401 Unauthorized with single-flight refresh and controlled retry
     if (response.status === 401 && !_retry && !this.isAuthPath(path) && this.refreshHandler) {
       try {
-        const newToken = await this.executeSingleFlightRefresh();
-        if (newToken) {
+        const refreshResult = await this.executeSingleFlightRefresh();
+        if (refreshResult.status === 'refreshed') {
           // Retry original request once with new token
           return this.request<TResponse>(path, {
             ...options,
-            token: newToken,
+            token: refreshResult.accessToken,
             _retry: true,
           });
+        } else if (refreshResult.status === 'stale') {
+          // Stale refresh result from an older session generation:
+          // NEVER clear the new session, NEVER call sessionExpiredHandler.
+          throw new ApiError(401, 'Eski oturum yenileme isteği geçersiz kılındı.');
+        } else if (refreshResult.status === 'unauthenticated') {
+          // Real refresh failure belonging to current session
+          if (this.sessionExpiredHandler) {
+            this.sessionExpiredHandler();
+          }
         }
-      } catch {
-        // Refresh failed
-      }
-
-      // If refresh returned null or failed, trigger session expired
-      if (this.sessionExpiredHandler) {
-        this.sessionExpiredHandler();
+      } catch (err) {
+        if (err instanceof ApiError) {
+          throw err;
+        }
+        if (this.sessionExpiredHandler) {
+          this.sessionExpiredHandler();
+        }
       }
     }
 

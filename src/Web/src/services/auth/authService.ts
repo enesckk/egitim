@@ -1,4 +1,4 @@
-import { apiClient } from '../api/apiClient';
+import { apiClient, RefreshResult } from '../api/apiClient';
 import { parseUserFromToken } from './jwtUtils';
 import { AuthUser } from '@/features/auth/types';
 
@@ -30,8 +30,7 @@ export class AuthService {
   constructor() {
     apiClient.setTokenProvider(() => this.getAccessToken());
     apiClient.setRefreshHandler(async () => {
-      const session = await this.refresh();
-      return session?.accessToken || null;
+      return this.refresh();
     });
     apiClient.setSessionExpiredHandler(() => {
       this.sessionGeneration++;
@@ -125,13 +124,17 @@ export class AuthService {
     this.initializePromise = (async () => {
       try {
         // Attempt silent refresh via HttpOnly cookie
-        const session = await this.refresh();
-        if (initGen !== this.sessionGeneration) {
+        const refreshResult = await this.refresh();
+        if (initGen !== this.sessionGeneration || refreshResult.status === 'stale') {
           // Logged out or session generation advanced while initialize was in-flight
           return null;
         }
+        if (refreshResult.status === 'refreshed' && this.activeSession?.user) {
+          this.isInitialized = true;
+          return this.activeSession.user;
+        }
         this.isInitialized = true;
-        return session?.user || null;
+        return null;
       } catch {
         if (initGen === this.sessionGeneration) {
           this.clearSession();
@@ -164,21 +167,27 @@ export class AuthService {
     return session;
   }
 
-  public async refresh(): Promise<AuthSession | null> {
+  public async refresh(): Promise<RefreshResult> {
     const currentGen = this.sessionGeneration;
 
     try {
       const response = await apiClient.post<LoginResponse>('/api/v1/auth/refresh');
       if (currentGen !== this.sessionGeneration) {
         // Stale refresh response: user logged out or session invalidated while request was in-flight
-        return null;
+        return { status: 'stale' };
       }
-      return this.setSession(response, currentGen);
+      const session = this.setSession(response, currentGen);
+      if (!session) {
+        return { status: 'stale' };
+      }
+      return { status: 'refreshed', accessToken: session.accessToken };
     } catch {
-      if (currentGen === this.sessionGeneration) {
-        this.clearSession();
+      if (currentGen !== this.sessionGeneration) {
+        // An old-generation refresh failure must NOT clear newer session
+        return { status: 'stale' };
       }
-      return null;
+      this.clearSession();
+      return { status: 'unauthenticated' };
     }
   }
 

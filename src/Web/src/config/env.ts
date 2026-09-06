@@ -4,11 +4,17 @@ export interface AppConfig {
   isProduction: boolean;
 }
 
+export interface ResolveApiBaseUrlParams {
+  configuredValue?: string;
+  isProduction?: boolean;
+  isDevelopment?: boolean;
+}
+
 /**
  * Validates and normalizes the API base URL.
  * 
  * Rules:
- * - Production: VITE_API_BASE_URL is mandatory and cannot fall back to localhost.
+ * - Production: configuredValue is required and cannot fall back to localhost.
  * - Development: Falls back to http://localhost:5000 if not provided.
  * - If a URL is provided, it MUST:
  *   - Parse as a valid absolute URL using the standard URL constructor.
@@ -19,11 +25,11 @@ export interface AppConfig {
  *   - Have a non-empty, valid hostname with no whitespace.
  * - Trailing slashes are centrally stripped.
  */
-export const validateAndNormalizeApiBaseUrl = (
-  rawUrl?: string,
-  isProduction: boolean = false
-): string => {
-  const trimmed = rawUrl ? rawUrl.trim() : '';
+export const resolveApiBaseUrl = ({
+  configuredValue,
+  isProduction = false,
+}: ResolveApiBaseUrlParams): string => {
+  const trimmed = configuredValue ? configuredValue.trim() : '';
 
   if (!trimmed) {
     if (isProduction) {
@@ -39,14 +45,14 @@ export const validateAndNormalizeApiBaseUrl = (
     parsed = new URL(trimmed);
   } catch {
     throw new Error(
-      `CRITICAL CONFIGURATION ERROR: VITE_API_BASE_URL "${rawUrl}" is not a valid absolute URL.`
+      `CRITICAL CONFIGURATION ERROR: VITE_API_BASE_URL "${configuredValue}" is not a valid absolute URL.`
     );
   }
 
   // 1. Protocol check
   if (parsed.protocol !== 'http:' && parsed.protocol !== 'https:') {
     throw new Error(
-      `CRITICAL CONFIGURATION ERROR: VITE_API_BASE_URL "${rawUrl}" must use http or https protocol.`
+      `CRITICAL CONFIGURATION ERROR: VITE_API_BASE_URL "${configuredValue}" must use http or https protocol.`
     );
   }
 
@@ -74,7 +80,7 @@ export const validateAndNormalizeApiBaseUrl = (
   // 5. Host check
   if (!parsed.hostname || parsed.hostname.includes(' ')) {
     throw new Error(
-      `CRITICAL CONFIGURATION ERROR: VITE_API_BASE_URL "${rawUrl}" has an invalid host.`
+      `CRITICAL CONFIGURATION ERROR: VITE_API_BASE_URL "${configuredValue}" has an invalid host.`
     );
   }
 
@@ -83,18 +89,30 @@ export const validateAndNormalizeApiBaseUrl = (
   return `${parsed.origin}${normalizedPath}`;
 };
 
-// Safely access import.meta.env in both Vite bundler and Node test runners
-const metaEnv =
-  typeof import.meta !== 'undefined' && 'env' in import.meta
-    ? (import.meta as { env: Record<string, string | boolean | undefined> }).env
-    : {};
+// Export alias for helper testing
+export const validateAndNormalizeApiBaseUrl = (
+  rawUrl?: string,
+  isProduction: boolean = false
+): string => resolveApiBaseUrl({ configuredValue: rawUrl, isProduction });
 
+// Initialize import.meta.env for Node test environments if not defined by runtime
+if (typeof import.meta.env === 'undefined') {
+  (import.meta as unknown as { env: Record<string, unknown> }).env = {
+    DEV: true,
+    PROD: false,
+    VITE_API_BASE_URL: typeof process !== 'undefined' ? process.env.VITE_API_BASE_URL : undefined,
+  };
+}
+
+// Direct Vite compile-time environment access:
+// Vite replaces import.meta.env.* statically during production build.
 export const env: AppConfig = {
-  apiBaseUrl: validateAndNormalizeApiBaseUrl(
-    metaEnv.VITE_API_BASE_URL as string | undefined,
-    Boolean(metaEnv.PROD)
-  ),
-  isDevelopment: Boolean(metaEnv.DEV ?? true),
-  isProduction: Boolean(metaEnv.PROD),
+  apiBaseUrl: resolveApiBaseUrl({
+    configuredValue: import.meta.env.VITE_API_BASE_URL,
+    isProduction: import.meta.env.PROD,
+    isDevelopment: import.meta.env.DEV,
+  }),
+  isDevelopment: import.meta.env.DEV,
+  isProduction: import.meta.env.PROD,
 };
 
