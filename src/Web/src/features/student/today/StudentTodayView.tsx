@@ -8,7 +8,6 @@ import {
   AlertCircle,
   RefreshCw,
   BookOpen,
-  CheckCircle2,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useAuth } from '@/auth';
@@ -301,18 +300,10 @@ export const StudentTodayView: React.FC<StudentTodayViewProps> = ({
                   </span>
                 </div>
 
-                <div className="flex items-center justify-between py-1.5 border-b border-neutral-100">
+                <div className="flex items-center justify-between py-1.5">
                   <span className="text-xs text-neutral-500">Rol</span>
                   <span className="text-xs font-medium text-neutral-800">
                     {user?.roleLabel || 'Öğrenci'}
-                  </span>
-                </div>
-
-                <div className="flex items-center justify-between py-1.5">
-                  <span className="text-xs text-neutral-500">Sistem Durumu</span>
-                  <span className="inline-flex items-center gap-1 text-[11px] font-semibold text-success bg-success-light px-2 py-0.5 rounded-full">
-                    <CheckCircle2 className="h-3 w-3" />
-                    Aktif Takipte
                   </span>
                 </div>
               </div>

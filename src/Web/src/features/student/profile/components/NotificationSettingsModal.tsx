@@ -1,97 +1,83 @@
-import React, { useState } from 'react';
+import React from 'react';
+import { Bell, Mail, BookOpen, FileCheck } from 'lucide-react';
 import { Modal } from '@/components/ui/Modal';
 import { Button } from '@/components/ui/Button';
+import { Alert } from '@/components/ui/Alert';
 
 export interface NotificationSettingsModalProps {
   isOpen: boolean;
   onClose: () => void;
-  initialPreferences: {
-    emailNotifications: boolean;
-    smsNotifications: boolean;
-    studyReminders: boolean;
-    examResultsAlerts: boolean;
-  };
-  onSave: (prefs: {
-    emailNotifications: boolean;
-    smsNotifications: boolean;
-    studyReminders: boolean;
-    examResultsAlerts: boolean;
-  }) => void;
 }
 
 export const NotificationSettingsModal: React.FC<NotificationSettingsModalProps> = ({
   isOpen,
   onClose,
-  initialPreferences,
-  onSave,
 }) => {
-  const [prefs, setPrefs] = useState(initialPreferences);
-
-  const toggle = (key: keyof typeof initialPreferences) => {
-    setPrefs((prev) => ({ ...prev, [key]: !prev[key] }));
-  };
-
-  const handleSave = () => {
-    onSave(prefs);
-    onClose();
-  };
-
   return (
     <Modal
       isOpen={isOpen}
       onClose={onClose}
       title="Bildirim Tercihleri"
-      subtitle="Hangi durumlarda bildirim almak istediğinizi yönetin"
+      subtitle="Kurumsal Bildirim Yapılandırması"
       headerVariant="dark"
       footer={
         <div className="flex justify-end gap-2 w-full">
           <Button variant="secondary" size="sm" onClick={onClose}>
-            Vazgeç
-          </Button>
-          <Button variant="primary" size="sm" onClick={handleSave}>
-            Kaydet
+            Kapat
           </Button>
         </div>
       }
     >
-      <div className="space-y-3 divide-y divide-neutral-100 select-none">
-        <div className="flex items-center justify-between pt-2">
-          <div>
-            <p className="text-sm font-semibold text-neutral-800">E-posta Bildirimleri</p>
-            <p className="text-xs text-neutral-400">Haftalık özet raporları ve önemli duyurular</p>
-          </div>
-          <input
-            type="checkbox"
-            checked={prefs.emailNotifications}
-            onChange={() => toggle('emailNotifications')}
-            className="w-5 h-5 rounded text-primary-600 focus:ring-primary-500 cursor-pointer"
-          />
-        </div>
+      <div className="space-y-4 select-none">
+        <Alert variant="info" icon={<Bell className="h-5 w-5" />} title="Merkezi Bildirim Yönetimi">
+          Bildirim tercihleri henüz bu platform üzerinden değiştirilemiyor. Bildirim yapılandırması kurum yöneticiniz tarafından merkezi olarak yönetilmektedir.
+        </Alert>
 
-        <div className="flex items-center justify-between pt-3">
-          <div>
-            <p className="text-sm font-semibold text-neutral-800">Çalışma ve Plan Hatırlatıcıları</p>
-            <p className="text-xs text-neutral-400">Günün çalışma saatlerinde hatırlatma bildirimleri</p>
-          </div>
-          <input
-            type="checkbox"
-            checked={prefs.studyReminders}
-            onChange={() => toggle('studyReminders')}
-            className="w-5 h-5 rounded text-primary-600 focus:ring-primary-500 cursor-pointer"
-          />
-        </div>
+        <div className="space-y-2.5 pt-1">
+          <p className="text-xs font-semibold text-neutral-500 uppercase tracking-wide">
+            Kayıtlı Bildirim Kanalları
+          </p>
 
-        <div className="flex items-center justify-between pt-3">
-          <div>
-            <p className="text-sm font-semibold text-neutral-800">Deneme Sınavı Açıklanma Uyarıları</p>
-            <p className="text-xs text-neutral-400">Deneme analiziniz ve kurum dereceniz hazır olduğunda</p>
+          <div className="space-y-2">
+            <div className="flex items-center justify-between p-3 rounded-xl border border-neutral-100 bg-neutral-50/50 min-h-[52px]">
+              <div className="flex items-center gap-3">
+                <Mail className="h-4 w-4 text-neutral-400 flex-shrink-0" />
+                <div>
+                  <p className="text-xs font-semibold text-neutral-800">E-posta Bildirimleri</p>
+                  <p className="text-[11px] text-neutral-400">Haftalık özet raporları ve önemli duyurular</p>
+                </div>
+              </div>
+              <span className="text-[11px] font-medium text-neutral-500 bg-neutral-100 px-2.5 py-1 rounded-full border border-neutral-200">
+                Merkezi Yönetim
+              </span>
+            </div>
+
+            <div className="flex items-center justify-between p-3 rounded-xl border border-neutral-100 bg-neutral-50/50 min-h-[52px]">
+              <div className="flex items-center gap-3">
+                <BookOpen className="h-4 w-4 text-neutral-400 flex-shrink-0" />
+                <div>
+                  <p className="text-xs font-semibold text-neutral-800">Çalışma ve Plan Hatırlatıcıları</p>
+                  <p className="text-[11px] text-neutral-400">Günün çalışma saatlerinde hatırlatma bildirimleri</p>
+                </div>
+              </div>
+              <span className="text-[11px] font-medium text-neutral-500 bg-neutral-100 px-2.5 py-1 rounded-full border border-neutral-200">
+                Merkezi Yönetim
+              </span>
+            </div>
+
+            <div className="flex items-center justify-between p-3 rounded-xl border border-neutral-100 bg-neutral-50/50 min-h-[52px]">
+              <div className="flex items-center gap-3">
+                <FileCheck className="h-4 w-4 text-neutral-400 flex-shrink-0" />
+                <div>
+                  <p className="text-xs font-semibold text-neutral-800">Deneme Sınavı Uyarıları</p>
+                  <p className="text-[11px] text-neutral-400">Sınav analizleriniz ve kurum dereceniz hazır olduğunda</p>
+                </div>
+              </div>
+              <span className="text-[11px] font-medium text-neutral-500 bg-neutral-100 px-2.5 py-1 rounded-full border border-neutral-200">
+                Merkezi Yönetim
+              </span>
+            </div>
           </div>
-          <input
-            type="checkbox"
-            checked={prefs.examResultsAlerts}
-            onChange={() => toggle('examResultsAlerts')}
-            className="w-5 h-5 rounded text-primary-600 focus:ring-primary-500 cursor-pointer"
-          />
         </div>
       </div>
     </Modal>

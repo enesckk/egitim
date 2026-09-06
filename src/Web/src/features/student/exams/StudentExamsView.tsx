@@ -134,7 +134,7 @@ export const StudentExamsView: React.FC<StudentExamsViewProps> = ({
           <p className="font-mono text-lg sm:text-xl font-bold text-primary-700 mt-0.5">
             {initialData.exams.length} Adet
           </p>
-          <span className="text-[10px] text-success font-medium">Aktif takipte</span>
+          <span className="text-[10px] text-neutral-400 font-medium">Toplam kayıt</span>
         </div>
 
         <div className="bg-white rounded-2xl border border-neutral-100 p-3">

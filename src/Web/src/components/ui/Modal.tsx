@@ -1,4 +1,4 @@
-import React, { useEffect } from 'react';
+import React, { useEffect, useRef, useId } from 'react';
 import { X } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { IconButton } from './IconButton';
@@ -13,7 +13,17 @@ export interface ModalProps {
   headerVariant?: 'default' | 'dark';
   maxWidth?: 'sm' | 'md' | 'lg' | 'xl';
   className?: string;
+  initialFocusRef?: React.RefObject<HTMLElement | null>;
 }
+
+const FOCUSABLE_ELEMENTS = [
+  'a[href]',
+  'button:not([disabled])',
+  'textarea:not([disabled])',
+  'input:not([disabled])',
+  'select:not([disabled])',
+  '[tabindex]:not([tabindex="-1"])',
+].join(', ');
 
 export const Modal: React.FC<ModalProps> = ({
   isOpen,
@@ -25,20 +35,83 @@ export const Modal: React.FC<ModalProps> = ({
   headerVariant = 'default',
   maxWidth = 'md',
   className,
+  initialFocusRef,
 }) => {
+  const dialogRef = useRef<HTMLDivElement>(null);
+  const previouslyFocusedElementRef = useRef<HTMLElement | null>(null);
+  const titleId = useId();
+  const subtitleId = useId();
+
   useEffect(() => {
+    if (!isOpen) return;
+
+    // Save previous active element for restoration upon close
+    previouslyFocusedElementRef.current = document.activeElement as HTMLElement | null;
+
+    // Set initial focus
+    const timer = setTimeout(() => {
+      if (initialFocusRef?.current) {
+        initialFocusRef.current.focus();
+      } else if (dialogRef.current) {
+        const focusable = dialogRef.current.querySelectorAll<HTMLElement>(FOCUSABLE_ELEMENTS);
+        if (focusable.length > 0) {
+          focusable[0].focus();
+        } else {
+          dialogRef.current.focus();
+        }
+      }
+    }, 0);
+
     const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') onClose();
+      if (e.key === 'Escape') {
+        e.stopPropagation();
+        e.preventDefault();
+        onClose();
+        return;
+      }
+
+      if (e.key === 'Tab') {
+        if (!dialogRef.current) return;
+
+        const focusables = Array.from(
+          dialogRef.current.querySelectorAll<HTMLElement>(FOCUSABLE_ELEMENTS)
+        ).filter((el) => el.offsetParent !== null || el.offsetWidth > 0 || el.offsetHeight > 0);
+
+        if (focusables.length === 0) {
+          e.preventDefault();
+          dialogRef.current.focus();
+          return;
+        }
+
+        const firstElement = focusables[0];
+        const lastElement = focusables[focusables.length - 1];
+
+        if (e.shiftKey) {
+          if (document.activeElement === firstElement || document.activeElement === dialogRef.current) {
+            e.preventDefault();
+            lastElement.focus();
+          }
+        } else {
+          if (document.activeElement === lastElement) {
+            e.preventDefault();
+            firstElement.focus();
+          }
+        }
+      }
     };
-    if (isOpen) {
-      document.body.style.overflow = 'hidden';
-      window.addEventListener('keydown', handleKeyDown);
-    }
+
+    document.body.style.overflow = 'hidden';
+    window.addEventListener('keydown', handleKeyDown);
+
     return () => {
+      clearTimeout(timer);
       document.body.style.overflow = '';
       window.removeEventListener('keydown', handleKeyDown);
+      if (previouslyFocusedElementRef.current && typeof previouslyFocusedElementRef.current.focus === 'function') {
+        previouslyFocusedElementRef.current.focus();
+      }
     };
-  }, [isOpen, onClose]);
+  }, [isOpen, onClose, initialFocusRef]);
 
   if (!isOpen) return null;
 
@@ -60,10 +133,15 @@ export const Modal: React.FC<ModalProps> = ({
 
       {/* Dialog Container */}
       <div
+        ref={dialogRef}
+        tabIndex={-1}
         role="dialog"
         aria-modal="true"
+        aria-labelledby={title ? titleId : undefined}
+        aria-describedby={subtitle ? subtitleId : undefined}
+        aria-label={!title ? 'Pencere' : undefined}
         className={cn(
-          'relative w-full rounded-t-2xl sm:rounded-2xl bg-white shadow-2xl overflow-hidden transition-all max-h-[90vh] flex flex-col z-10',
+          'relative w-full rounded-t-2xl sm:rounded-2xl bg-white shadow-2xl overflow-hidden transition-all max-h-[90vh] flex flex-col z-10 focus:outline-none',
           maxWidths[maxWidth],
           className
         )}
@@ -80,12 +158,24 @@ export const Modal: React.FC<ModalProps> = ({
           >
             <div>
               {title && (
-                <h3 className={cn('font-semibold text-base leading-tight', headerVariant === 'dark' ? 'text-white' : 'text-neutral-900')}>
+                <h3
+                  id={titleId}
+                  className={cn(
+                    'font-semibold text-base leading-tight',
+                    headerVariant === 'dark' ? 'text-white' : 'text-neutral-900'
+                  )}
+                >
                   {title}
                 </h3>
               )}
               {subtitle && (
-                <p className={cn('text-xs mt-0.5', headerVariant === 'dark' ? 'text-navy-300' : 'text-neutral-400')}>
+                <p
+                  id={subtitleId}
+                  className={cn(
+                    'text-xs mt-0.5',
+                    headerVariant === 'dark' ? 'text-navy-300' : 'text-neutral-400'
+                  )}
+                >
                   {subtitle}
                 </p>
               )}
@@ -93,9 +183,13 @@ export const Modal: React.FC<ModalProps> = ({
             <IconButton
               variant="ghost"
               size="sm"
-              ariaLabel="Kapat"
+              ariaLabel="Pencereyi Kapat"
               onClick={onClose}
-              className={headerVariant === 'dark' ? 'text-navy-300 hover:text-white hover:bg-navy-800' : 'text-neutral-400 hover:text-neutral-600'}
+              className={
+                headerVariant === 'dark'
+                  ? 'text-navy-300 hover:text-white hover:bg-navy-800'
+                  : 'text-neutral-400 hover:text-neutral-600'
+              }
             >
               <X className="h-4 w-4" />
             </IconButton>
@@ -103,9 +197,7 @@ export const Modal: React.FC<ModalProps> = ({
         )}
 
         {/* Content Body */}
-        <div className="p-6 overflow-y-auto space-y-4 flex-1">
-          {children}
-        </div>
+        <div className="p-6 overflow-y-auto space-y-4 flex-1">{children}</div>
 
         {/* Footer */}
         {footer && (

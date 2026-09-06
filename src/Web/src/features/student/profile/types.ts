@@ -4,8 +4,8 @@ export interface StudentProfileData {
   initials: string;
   subtitle: string; // '11. Sınıf • Sayısal'
   email: string;
-  joined: string; // 'Eylül 2023'
-  notificationPreferences: {
+  joined?: string; // e.g. 'Eylül 2023' (omitted when not in backend contract)
+  notificationPreferences?: {
     emailNotifications: boolean;
     smsNotifications: boolean;
     studyReminders: boolean;

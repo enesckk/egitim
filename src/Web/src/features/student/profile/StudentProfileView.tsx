@@ -32,7 +32,6 @@ export const StudentProfileView: React.FC<StudentProfileViewProps> = ({
     name: user?.name || user?.email?.split('@')[0] || 'Öğrenci',
     subtitle: `${user?.institutionName || 'Kurumsal Öğrenci'} • ${user?.roleLabel || 'Öğrenci'}`,
     email: user?.email || '',
-    joined: '2026',
     initials: user?.name
       ? user.name
           .split(' ')
@@ -41,15 +40,9 @@ export const StudentProfileView: React.FC<StudentProfileViewProps> = ({
           .substring(0, 2)
           .toUpperCase()
       : 'ÖG',
-    notificationPreferences: {
-      emailNotifications: true,
-      smsNotifications: false,
-      studyReminders: true,
-      examResultsAlerts: true,
-    },
   };
 
-  const [profile, setProfile] = useState<StudentProfileData>(initialData || defaultProfile);
+  const [profile] = useState<StudentProfileData>(initialData || defaultProfile);
   const [isPasswordModalOpen, setIsPasswordModalOpen] = useState(false);
   const [isNotifModalOpen, setIsNotifModalOpen] = useState(false);
   const [isLogoutModalOpen, setIsLogoutModalOpen] = useState(false);
@@ -130,7 +123,7 @@ export const StudentProfileView: React.FC<StudentProfileViewProps> = ({
 
           <button
             type="button"
-            onClick={() => setInfoAlert('Hesap ve gizlilik ayarlarınız günceldir.')}
+            onClick={() => setInfoAlert('Hesap ve güvenlik ayarları kurum yöneticiniz tarafından yönetilmektedir.')}
             className="flex items-center gap-3 px-5 py-3.5 w-full hover:bg-neutral-50 transition-colors group text-left min-h-[52px]"
           >
             <Settings className="h-4 w-4 text-neutral-400 flex-shrink-0" />
@@ -161,11 +154,6 @@ export const StudentProfileView: React.FC<StudentProfileViewProps> = ({
       <NotificationSettingsModal
         isOpen={isNotifModalOpen}
         onClose={() => setIsNotifModalOpen(false)}
-        initialPreferences={profile.notificationPreferences}
-        onSave={(prefs) => {
-          setProfile((prev) => ({ ...prev, notificationPreferences: prefs }));
-          setInfoAlert('Bildirim tercihleriniz başarıyla kaydedildi.');
-        }}
       />
 
       <LogoutConfirmModal
