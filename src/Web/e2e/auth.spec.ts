@@ -1,4 +1,4 @@
-﻿import { test, expect } from '@playwright/test';
+import { test, expect } from '@playwright/test';
 
 function createMockJwt(payload: Record<string, unknown>): string {
   const header = Buffer.from(JSON.stringify({ alg: 'HS256', typ: 'JWT' })).toString('base64url');
@@ -124,12 +124,16 @@ test.describe('Frontend Authentication Quality Gate Tests', () => {
     await expect(page).toHaveURL(/\/student/);
   });
 
-  test('6. Startup initialize triggers single-flight refresh request', async ({ page }) => {
+  test('6. Startup initialize triggers single-flight refresh request deterministically', async ({ page }) => {
     let refreshCallCount = 0;
+    let fulfillRefresh: (() => void) | null = null;
+    const refreshTriggered = new Promise<void>((resolve) => {
+      fulfillRefresh = resolve;
+    });
+
     await page.route('**/api/v1/auth/refresh', async (route) => {
       refreshCallCount++;
-      // Return 401 after slight delay to simulate network latency
-      await new Promise((resolve) => setTimeout(resolve, 50));
+      if (fulfillRefresh) fulfillRefresh();
       await route.fulfill({
         status: 401,
         contentType: 'application/json',
@@ -138,8 +142,12 @@ test.describe('Frontend Authentication Quality Gate Tests', () => {
     });
 
     await page.goto('/login');
-    // Wait for network idle
-    await page.waitForLoadState('networkidle');
+
+    // Wait for the login form to be interactive and settled
+    await expect(page.locator('input#login-email')).toBeVisible();
+
+    // Ensure refresh request was triggered
+    await refreshTriggered;
 
     // Initial startup must make exactly 1 refresh request, not 2
     expect(refreshCallCount).toBe(1);
@@ -186,7 +194,7 @@ test.describe('Frontend Authentication Quality Gate Tests', () => {
 
     // Verify mobile navigation bar is hidden on desktop
     const mobileNav = page.locator('nav.md\\:hidden');
-    if (await mobileNav.count() > 0) {
+    if ((await mobileNav.count()) > 0) {
       await expect(mobileNav).not.toBeVisible();
     }
   });
@@ -208,5 +216,157 @@ test.describe('Frontend Authentication Quality Gate Tests', () => {
     await toggleButton.click();
     await expect(passwordInput).toHaveAttribute('type', 'password');
     await expect(toggleButton).toHaveAttribute('aria-label', 'Şifreyi göster');
+  });
+
+  test('10. Successful startup silent refresh establishes session and navigates directly to role route', async ({ page }) => {
+    const studentJwt = createMockJwt({
+      sub: 'usr-student-auto',
+      email: 'autologin@example.com',
+      name: 'Otomatik Giris',
+      role: 'Student',
+    });
+
+    await page.unroute('**/api/v1/auth/refresh');
+    await page.route('**/api/v1/auth/refresh', async (route) => {
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({
+          accessToken: studentJwt,
+          accessTokenExpiresAt: new Date(Date.now() + 3600000).toISOString(),
+        }),
+      });
+    });
+
+    await page.goto('/login');
+    await expect(page).toHaveURL(/\/student/);
+  });
+
+  test('11. Malformed role array ["Student", 42] fails closed during login', async ({ page }) => {
+    const malformedJwt = createMockJwt({
+      sub: 'usr-malformed-array',
+      email: 'malformed@example.com',
+      name: 'Malformed Array User',
+      role: ['Student', 42],
+    });
+
+    await page.route('**/api/v1/auth/login', async (route) => {
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({
+          accessToken: malformedJwt,
+          accessTokenExpiresAt: new Date(Date.now() + 3600000).toISOString(),
+        }),
+      });
+    });
+
+    await page.goto('/login');
+    await page.fill('input#login-email', 'malformed@example.com');
+    await page.fill('input#login-password', 'ValidPassword123!');
+    await page.click('button[type="submit"]');
+
+    const alert = page.locator('[role="alert"]');
+    await expect(alert).toBeVisible();
+    await expect(alert).toContainText('Geçersiz veya yetkisiz kimlik doğrulama belirteci');
+    await expect(page).toHaveURL(/\/login/);
+  });
+
+  test('12. Student profile password change modal shows unavailable notice and no fake success', async ({ page }) => {
+    const studentJwt = createMockJwt({
+      sub: 'usr-profile-student',
+      email: 'student@example.com',
+      name: 'Ayse Ogrenci',
+      role: 'Student',
+    });
+
+    await page.unroute('**/api/v1/auth/refresh');
+    await page.route('**/api/v1/auth/refresh', async (route) => {
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({
+          accessToken: studentJwt,
+          accessTokenExpiresAt: new Date(Date.now() + 3600000).toISOString(),
+        }),
+      });
+    });
+
+    await page.goto('/student/profile');
+    await expect(page.locator('h1.font-serif')).toContainText('Profil');
+
+    // Click "Şifre Değiştir"
+    await page.click('text="Şifre Değiştir"');
+
+    // Verify modal is open and shows clear unavailable warning
+    const modal = page.locator('[role="dialog"]');
+    await expect(modal).toBeVisible();
+    await expect(modal).toContainText('Şifre değiştirme işlemi henüz bu platform üzerinden kullanılamıyor');
+    await expect(modal).not.toContainText('Şifreniz başarıyla güncellendi');
+  });
+
+  test('13. In-flight refresh followed by logout maintains logged out state and ignores stale refresh', async ({ page }) => {
+    const studentJwt = createMockJwt({
+      sub: 'usr-student-race',
+      email: 'student-race@example.com',
+      name: 'Yaris Ogrenci',
+      role: 'Student',
+    });
+
+    let refreshCallCount = 0;
+    let resolveSecondRefresh: (() => void) | null = null;
+    const secondRefreshDeferred = new Promise<void>((resolve) => {
+      resolveSecondRefresh = resolve;
+    });
+
+    await page.unroute('**/api/v1/auth/refresh');
+    await page.route('**/api/v1/auth/refresh', async (route) => {
+      refreshCallCount++;
+      if (refreshCallCount === 1) {
+        // First call: successful initial login on startup
+        await route.fulfill({
+          status: 200,
+          contentType: 'application/json',
+          body: JSON.stringify({
+            accessToken: studentJwt,
+            accessTokenExpiresAt: new Date(Date.now() + 3600000).toISOString(),
+          }),
+        });
+      } else {
+        // Subsequent in-flight refresh is held
+        await secondRefreshDeferred;
+        await route.fulfill({
+          status: 200,
+          contentType: 'application/json',
+          body: JSON.stringify({
+            accessToken: studentJwt,
+            accessTokenExpiresAt: new Date(Date.now() + 3600000).toISOString(),
+          }),
+        });
+      }
+    });
+
+    await page.route('**/api/v1/auth/logout', async (route) => {
+      await route.fulfill({ status: 200, contentType: 'application/json', body: '{}' });
+    });
+
+    // 1. Establish initial authenticated session
+    await page.goto('/student/today');
+    await expect(page).toHaveURL(/\/student\/today/);
+
+    // 2. Click logout button
+    const logoutBtn = page.locator('aside button:has-text("Çıkış Yap")').first();
+    await logoutBtn.click();
+
+    // Confirm navigation to /login
+    await expect(page).toHaveURL(/\/login/);
+    await expect(page.locator('input#login-email')).toBeVisible();
+
+    // 3. Unblock stale in-flight refresh response
+    if (resolveSecondRefresh) resolveSecondRefresh();
+
+    // 4. Ensure user remains logged out on /login and is NOT re-authenticated
+    await expect(page.locator('input#login-email')).toBeVisible();
+    await expect(page).toHaveURL(/\/login/);
   });
 });

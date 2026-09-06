@@ -9,7 +9,7 @@ import { ApiError } from '@/services/api';
 export const LoginView: React.FC = () => {
   const navigate = useNavigate();
   const location = useLocation();
-  const { login, isLoading } = useAuth();
+  const { user, isAuthenticated, login, isLoading } = useAuth();
 
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -18,6 +18,16 @@ export const LoginView: React.FC = () => {
   const [errorType, setErrorType] = useState<'auth' | 'rate-limit' | 'network' | 'validation' | null>(null);
 
   const fromLocation = (location.state as { from?: { pathname: string } })?.from?.pathname;
+
+  // If user is already authenticated (e.g. from startup silent refresh), navigate to appropriate route
+  React.useEffect(() => {
+    if (isAuthenticated && user) {
+      const destination = fromLocation && fromLocation !== '/login' && fromLocation !== '/403'
+        ? fromLocation
+        : getRoleDefaultRoute(user.role);
+      navigate(destination, { replace: true });
+    }
+  }, [isAuthenticated, user, fromLocation, navigate]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();

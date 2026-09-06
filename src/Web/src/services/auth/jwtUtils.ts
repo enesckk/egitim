@@ -38,34 +38,71 @@ export const decodeJwtPayload = (token: string): JwtPayload | null => {
   }
 };
 
+const SUPPORTED_ROLES = ['superadmin', 'institutionadmin', 'admin', 'coach', 'teacher', 'parent', 'student'] as const;
+
 /**
  * Strict role mapping: only explicitly supported backend roles are accepted.
  * Missing, malformed, or unrecognized roles FAIL CLOSED by returning null.
+ * 
+ * Rules:
+ * - If role claim is an array, EVERY element must be a non-empty string and a valid supported role.
+ * - If ANY element in the array is invalid (e.g. number, null, empty string, unknown role), the ENTIRE claim is REJECTED (returns null).
+ * - Empty arrays return null.
+ * - Non-string / non-array claims return null.
  */
-export const mapBackendRoleToUserRole = (backendRole?: string | string[]): UserRole | null => {
-  if (!backendRole) return null;
-  const roles = Array.isArray(backendRole) ? backendRole : [backendRole];
-  const normalized = roles.map((r) => (typeof r === 'string' ? r.toLowerCase().trim() : '')).filter(Boolean);
+export const mapBackendRoleToUserRole = (backendRole?: unknown): UserRole | null => {
+  if (backendRole === undefined || backendRole === null) return null;
 
-  if (normalized.length === 0) return null;
+  let roleList: string[];
 
-  if (normalized.includes('superadmin') || normalized.includes('institutionadmin') || normalized.includes('admin')) {
+  if (Array.isArray(backendRole)) {
+    if (backendRole.length === 0) return null;
+
+    // Strict validation: EVERY item in array must be a valid non-empty string
+    for (const item of backendRole) {
+      if (typeof item !== 'string') {
+        return null; // Malformed element (e.g. number, boolean, null) -> fail closed
+      }
+      const trimmed = item.trim().toLowerCase();
+      if (trimmed.length === 0) {
+        return null; // Empty string item -> fail closed
+      }
+      if (!SUPPORTED_ROLES.includes(trimmed as (typeof SUPPORTED_ROLES)[number])) {
+        return null; // Unknown role element -> fail closed
+      }
+    }
+
+    roleList = backendRole.map((r: string) => r.trim().toLowerCase());
+  } else if (typeof backendRole === 'string') {
+    const trimmed = backendRole.trim().toLowerCase();
+    if (trimmed.length === 0) return null;
+    if (!SUPPORTED_ROLES.includes(trimmed as (typeof SUPPORTED_ROLES)[number])) {
+      return null;
+    }
+    roleList = [trimmed];
+  } else {
+    // Malformed type (e.g. number, object, boolean)
+    return null;
+  }
+
+  // Canonical role precedence mapping
+  if (roleList.includes('superadmin') || roleList.includes('institutionadmin') || roleList.includes('admin')) {
     return 'admin';
   }
-  if (normalized.includes('coach')) {
+  if (roleList.includes('coach')) {
     return 'coach';
   }
-  if (normalized.includes('teacher')) {
+  if (roleList.includes('teacher')) {
     return 'teacher';
   }
-  if (normalized.includes('parent')) {
+  if (roleList.includes('parent')) {
     return 'parent';
   }
-  if (normalized.includes('student')) {
+  if (roleList.includes('student')) {
     return 'student';
   }
 
-  // Fail closed: Unknown role must NEVER fall back to student or any default role
+  // Fail closed
   return null;
 };
 

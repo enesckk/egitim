@@ -20,11 +20,12 @@ export interface AuthSession {
 
 export type AuthStateListener = (user: AuthUser | null) => void;
 
-class AuthService {
+export class AuthService {
   private activeSession: AuthSession | null = null;
   private listeners: Set<AuthStateListener> = new Set();
   private isInitialized = false;
   private initializePromise: Promise<AuthUser | null> | null = null;
+  private sessionGeneration = 0;
 
   constructor() {
     apiClient.setTokenProvider(() => this.getAccessToken());
@@ -33,9 +34,14 @@ class AuthService {
       return session?.accessToken || null;
     });
     apiClient.setSessionExpiredHandler(() => {
+      this.sessionGeneration++;
       this.clearSession();
       this.notifyListeners(null);
     });
+  }
+
+  public getSessionGeneration(): number {
+    return this.sessionGeneration;
   }
 
   public getAccessToken(): string | null {
@@ -71,7 +77,16 @@ class AuthService {
     });
   }
 
-  public setSession(response: LoginResponse): AuthSession {
+  /**
+   * Sets the active session. If an expectedGeneration is provided,
+   * rejects setting the session if the generation has moved (e.g. stale response after logout).
+   */
+  public setSession(response: LoginResponse, expectedGeneration?: number): AuthSession | null {
+    if (expectedGeneration !== undefined && expectedGeneration !== this.sessionGeneration) {
+      // Generation mismatch: this response belongs to a cancelled/stale session lifecycle
+      return null;
+    }
+
     const user = parseUserFromToken(response.accessToken);
     if (!user) {
       throw new Error('Geçersiz veya yetkisiz kimlik doğrulama belirteci.');
@@ -105,15 +120,23 @@ class AuthService {
       return this.initializePromise;
     }
 
+    const initGen = this.sessionGeneration;
+
     this.initializePromise = (async () => {
       try {
         // Attempt silent refresh via HttpOnly cookie
         const session = await this.refresh();
+        if (initGen !== this.sessionGeneration) {
+          // Logged out or session generation advanced while initialize was in-flight
+          return null;
+        }
         this.isInitialized = true;
         return session?.user || null;
       } catch {
-        this.clearSession();
-        this.isInitialized = true;
+        if (initGen === this.sessionGeneration) {
+          this.clearSession();
+          this.isInitialized = true;
+        }
         return null;
       } finally {
         this.initializePromise = null;
@@ -124,35 +147,61 @@ class AuthService {
   }
 
   public async login(credentials: LoginRequest): Promise<AuthSession> {
+    // Increment generation so any older in-flight refresh or request cannot overwrite new login
+    this.sessionGeneration++;
+    const currentGen = this.sessionGeneration;
+
     const response = await apiClient.post<LoginResponse>('/api/v1/auth/login', credentials);
-    return this.setSession(response);
+
+    if (currentGen !== this.sessionGeneration) {
+      throw new Error('Oturum başlatma işlemi iptal edildi.');
+    }
+
+    const session = this.setSession(response, currentGen);
+    if (!session) {
+      throw new Error('Oturum oluşturulamadı.');
+    }
+    return session;
   }
 
   public async refresh(): Promise<AuthSession | null> {
+    const currentGen = this.sessionGeneration;
+
     try {
       const response = await apiClient.post<LoginResponse>('/api/v1/auth/refresh');
-      return this.setSession(response);
+      if (currentGen !== this.sessionGeneration) {
+        // Stale refresh response: user logged out or session invalidated while request was in-flight
+        return null;
+      }
+      return this.setSession(response, currentGen);
     } catch {
-      this.clearSession();
+      if (currentGen === this.sessionGeneration) {
+        this.clearSession();
+      }
       return null;
     }
   }
 
   public async logout(): Promise<void> {
+    // 1. Invalidate session generation BEFORE any async operation or cleanup
+    this.sessionGeneration++;
+    this.initializePromise = null;
+
     const token = this.getAccessToken();
 
+    // 2. Clear local session immediately so UI is logged out synchronously
+    this.clearSession();
+
+    // 3. Notify backend revocation
     try {
       if (token) {
         await apiClient.post<void>('/api/v1/auth/logout', undefined, { token });
       }
     } catch {
-      // Clean up local in-memory session even if backend call fails
-    } finally {
-      this.clearSession();
+      // Local session already safely cleared
     }
   }
 }
-
 
 export const authService = new AuthService();
 

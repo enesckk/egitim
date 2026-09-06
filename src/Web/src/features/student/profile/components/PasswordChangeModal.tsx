@@ -1,8 +1,8 @@
-import React, { useState } from 'react';
+import React from 'react';
 import { Modal } from '@/components/ui/Modal';
-import { Input } from '@/components/ui/Input';
 import { Button } from '@/components/ui/Button';
 import { Alert } from '@/components/ui/Alert';
+import { ShieldAlert } from 'lucide-react';
 
 export interface PasswordChangeModalProps {
   isOpen: boolean;
@@ -10,84 +10,34 @@ export interface PasswordChangeModalProps {
 }
 
 export const PasswordChangeModal: React.FC<PasswordChangeModalProps> = ({ isOpen, onClose }) => {
-  const [currentPassword, setCurrentPassword] = useState('');
-  const [newPassword, setNewPassword] = useState('');
-  const [confirmPassword, setConfirmPassword] = useState('');
-  const [isSuccess, setIsSuccess] = useState(false);
-  const [error, setError] = useState('');
-
-  const handleSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!currentPassword || !newPassword || !confirmPassword) {
-      setError('Lütfen tüm alanları doldurunuz.');
-      return;
-    }
-    if (newPassword !== confirmPassword) {
-      setError('Yeni şifreler birbiriyle eşleşmiyor.');
-      return;
-    }
-    if (newPassword.length < 6) {
-      setError('Yeni şifre en az 6 karakter olmalıdır.');
-      return;
-    }
-
-    setError('');
-    setIsSuccess(true);
-    setTimeout(() => {
-      setIsSuccess(false);
-      setCurrentPassword('');
-      setNewPassword('');
-      setConfirmPassword('');
-      onClose();
-    }, 1500);
-  };
-
   return (
     <Modal
       isOpen={isOpen}
       onClose={onClose}
       title="Şifre Değiştir"
-      subtitle="Hesap güvenliğiniz için şifrenizi güncelleyin"
+      subtitle="Hesap Güvenliği"
       headerVariant="dark"
       footer={
         <div className="flex justify-end gap-2 w-full">
           <Button variant="secondary" size="sm" onClick={onClose}>
-            İptal
-          </Button>
-          <Button variant="primary" size="sm" onClick={handleSubmit}>
-            Şifreyi Güncelle
+            Kapat
           </Button>
         </div>
       }
     >
-      <form onSubmit={handleSubmit} className="space-y-3.5 select-none">
-        {error && <Alert variant="danger">{error}</Alert>}
-        {isSuccess && <Alert variant="success">Şifreniz başarıyla güncellendi!</Alert>}
-
-        <Input
-          type="password"
-          label="Mevcut Şifre"
-          placeholder="••••••••"
-          value={currentPassword}
-          onChange={(e) => setCurrentPassword(e.target.value)}
-        />
-
-        <Input
-          type="password"
-          label="Yeni Şifre"
-          placeholder="En az 6 karakter"
-          value={newPassword}
-          onChange={(e) => setNewPassword(e.target.value)}
-        />
-
-        <Input
-          type="password"
-          label="Yeni Şifre (Tekrar)"
-          placeholder="Yeni şifrenizi doğrulayın"
-          value={confirmPassword}
-          onChange={(e) => setConfirmPassword(e.target.value)}
-        />
-      </form>
+      <div className="space-y-4 py-2 select-none">
+        <div className="w-12 h-12 rounded-2xl bg-amber-50 border border-amber-200 text-amber-600 flex items-center justify-center mx-auto">
+          <ShieldAlert className="h-6 w-6" />
+        </div>
+        <div className="text-center space-y-2">
+          <p className="text-sm font-semibold text-neutral-800">
+            Self-Servis Şifre Değiştirme
+          </p>
+          <Alert variant="warning">
+            Şifre değiştirme işlemi henüz bu platform üzerinden kullanılamıyor. Kurum yöneticinizle iletişime geçin.
+          </Alert>
+        </div>
+      </div>
     </Modal>
   );
 };

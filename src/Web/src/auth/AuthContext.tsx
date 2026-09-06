@@ -76,18 +76,14 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
   }, []);
 
-  const requestPasswordReset = useCallback(async (email: string): Promise<void> => {
-    void email;
-    setIsLoading(true);
-    await new Promise((resolve) => setTimeout(resolve, 800));
-    setIsLoading(false);
+  const requestPasswordReset = useCallback(async (_email: string): Promise<void> => {
+    void _email;
+    throw new Error('Şifre sıfırlama işlemi henüz bu platform üzerinden kullanılamıyor. Kurum yöneticinizle iletişime geçin.');
   }, []);
 
-  const resetPassword = useCallback(async (data: ResetPasswordData): Promise<void> => {
-    void data;
-    setIsLoading(true);
-    await new Promise((resolve) => setTimeout(resolve, 800));
-    setIsLoading(false);
+  const resetPassword = useCallback(async (_data: ResetPasswordData): Promise<void> => {
+    void _data;
+    throw new Error('Şifre değiştirme işlemi henüz bu platform üzerinden kullanılamıyor. Kurum yöneticinizle iletişime geçin.');
   }, []);
 
   return (
