@@ -7,7 +7,6 @@ import { Skeleton } from '@/components/ui/Skeleton';
 import { CoachInfoBanner } from './components/CoachInfoBanner';
 import { MessageBubble } from './components/MessageBubble';
 import { MessageComposer } from './components/MessageComposer';
-import { initialStudentMessagesData } from './mockData';
 import { MessageItem, StudentMessagesViewModel } from './types';
 
 export interface StudentMessagesViewProps {
@@ -18,18 +17,18 @@ export interface StudentMessagesViewProps {
 }
 
 export const StudentMessagesView: React.FC<StudentMessagesViewProps> = ({
-  initialData = initialStudentMessagesData,
+  initialData,
   isLoading = false,
   errorMessage,
   onRetry,
 }) => {
-  const [messages, setMessages] = useState<MessageItem[]>(initialData.messages);
+  const [messages, setMessages] = useState<MessageItem[]>(initialData?.messages || []);
 
   const handleSendMessage = (text: string) => {
     const newMessage: MessageItem = {
       id: `msg-${Date.now()}`,
-      senderId: 'student-01',
-      senderName: 'Ayşe Kaya',
+      senderId: 'student-current',
+      senderName: 'Öğrenci',
       senderRole: 'student',
       content: text,
       timestamp: 'Şimdi',
@@ -41,7 +40,7 @@ export const StudentMessagesView: React.FC<StudentMessagesViewProps> = ({
   // Loading State
   if (isLoading) {
     return (
-      <div className="max-w-3xl mx-auto space-y-4 select-none">
+      <div className="max-w-3xl mx-auto space-y-4 select-none" data-testid="student-messages-loading">
         <Skeleton className="h-20 w-full rounded-2xl" />
         <div className="space-y-3 py-4">
           <Skeleton className="h-16 w-3/4 rounded-2xl" />
@@ -56,7 +55,7 @@ export const StudentMessagesView: React.FC<StudentMessagesViewProps> = ({
   // Error State
   if (errorMessage) {
     return (
-      <div className="max-w-3xl mx-auto py-8 space-y-4">
+      <div className="max-w-3xl mx-auto py-8 space-y-4" data-testid="student-messages-error">
         <Alert variant="danger" icon={<AlertCircle className="h-5 w-5" />} title="Mesajlar Yüklenemedi">
           {errorMessage}
         </Alert>
@@ -71,10 +70,39 @@ export const StudentMessagesView: React.FC<StudentMessagesViewProps> = ({
     );
   }
 
+  const hasMessages = initialData && initialData.messages && initialData.messages.length > 0;
+
+  if (!hasMessages) {
+    return (
+      <div className="max-w-3xl mx-auto select-none space-y-4" data-testid="student-messages-view">
+        <div className="border-b border-neutral-100 pb-3 sm:pb-4">
+          <h1 className="font-serif text-2xl sm:text-3xl text-neutral-900 tracking-tight leading-tight">
+            Mesajlar
+          </h1>
+          <p className="text-neutral-500 text-xs sm:text-sm mt-0.5">
+            Koç ve öğretmen iletişimi
+          </p>
+        </div>
+
+        <div className="bg-white rounded-2xl border border-neutral-200/80 p-6 sm:p-8 shadow-soft-sm text-center">
+          <div className="w-12 h-12 rounded-2xl bg-navy-50 text-navy-800 flex items-center justify-center mx-auto mb-4 border border-navy-100">
+            <MessageSquare className="h-6 w-6 text-primary-600" />
+          </div>
+          <h2 className="text-lg font-semibold text-neutral-900">
+            Henüz Mesajlaşma Başlatılmadı
+          </h2>
+          <p className="text-xs sm:text-sm text-neutral-600 max-w-md mx-auto mt-2 leading-relaxed">
+            Danışman koçunuz veya öğretmenlerinizle mesajlaşma kanalı kurumunuz tarafından yetkilendirildiğinde aktif hale gelecektir.
+          </p>
+        </div>
+      </div>
+    );
+  }
+
   return (
-    <div className="max-w-3xl mx-auto flex flex-col min-h-[calc(100vh-14rem)] md:min-h-[calc(100vh-10rem)] justify-between space-y-4">
+    <div className="max-w-3xl mx-auto flex flex-col min-h-[calc(100vh-14rem)] md:min-h-[calc(100vh-10rem)] justify-between space-y-4" data-testid="student-messages-view">
       {/* 1. Coach Info Header */}
-      <CoachInfoBanner coach={initialData.coach} />
+      {initialData?.coach && <CoachInfoBanner coach={initialData.coach} />}
 
       {/* 2. Message Thread */}
       <div className="flex-1 space-y-3.5 overflow-y-auto py-2 px-1">
@@ -86,7 +114,7 @@ export const StudentMessagesView: React.FC<StudentMessagesViewProps> = ({
           <EmptyState
             icon={<MessageSquare className="h-6 w-6 text-neutral-400" />}
             title="Henüz Mesaj Yok"
-            description="Koçunuz Hasan Bey'e ilk sorunuzu yazarak iletişimi başlatabilirsiniz."
+            description="İlk sorunuzu yazarak iletişimi başlatabilirsiniz."
           />
         )}
       </div>

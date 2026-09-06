@@ -89,7 +89,6 @@ const STUDENT_NAV_ITEMS: PortalNavItem[] = [
     path: '/student/plans',
     label: 'Planlar',
     icon: <CalendarDays className="h-5 w-5" />,
-    badge: 3,
   },
   {
     id: 'exams',
@@ -244,11 +243,11 @@ const StudentPortalLayout: React.FC = () => {
       onNavChange={handleNavChange}
       headerProps={{
         pageTitle: currentNav.label,
-        brandTitle: 'Bilim Akademi',
+        brandTitle: 'Eğitim Platformu',
         brandSubtitle: 'Öğrenci Portalı',
-        institutionName: user?.institutionName || 'Merkez Şube',
-        userName: user?.name || 'Ayşe Kaya',
-        userRole: user?.roleLabel || '11. Sınıf • Sayısal',
+        institutionName: user?.institutionName || 'Kurumsal Şube',
+        userName: user?.name || user?.email || 'Öğrenci',
+        userRole: user?.roleLabel || 'Öğrenci',
         onProfileClick: () => navigate('/student/profile'),
       }}
       sidebarFooter={
@@ -276,7 +275,6 @@ const StudentPortalLayout: React.FC = () => {
         </Routes>
       </Suspense>
     </AppShell>
-
   );
 };
 

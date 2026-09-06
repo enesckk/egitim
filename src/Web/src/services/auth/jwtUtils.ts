@@ -167,7 +167,8 @@ export const parseUserFromToken = (token: string): AuthUser | null => {
     payload['http://schemas.xmlsoap.org/ws/2005/05/identity/claims/surname'] ||
     '';
 
-  const fullName = firstName && lastName ? `${firstName} ${lastName}` : email.split('@')[0] || 'Kullanıcı';
+  const nameClaim = typeof payload.name === 'string' && payload.name.trim().length > 0 ? payload.name.trim() : undefined;
+  const fullName = nameClaim || (firstName && lastName ? `${firstName} ${lastName}` : firstName || email.split('@')[0] || 'Kullanıcı');
 
   const initials = fullName
     .split(' ')
@@ -177,7 +178,8 @@ export const parseUserFromToken = (token: string): AuthUser | null => {
     .join('')
     .toUpperCase() || 'BA';
 
-  const institutionId = payload.institution_id || undefined;
+  const institutionId = (payload.institution_id as string) || (payload.institutionId as string) || undefined;
+  const institutionName = (payload.institution_name as string) || (payload.institutionName as string) || (institutionId ? 'Bağlı Kurum' : 'Eğitim Platformu');
 
   return {
     id,
@@ -186,7 +188,7 @@ export const parseUserFromToken = (token: string): AuthUser | null => {
     role,
     initials,
     roleLabel: getRoleDisplayName(role),
-    institutionName: institutionId ? 'Bağlı Kurum' : 'Bilim Akademi',
+    institutionName,
   };
 };
 

@@ -8,7 +8,6 @@ import { Skeleton } from '@/components/ui/Skeleton';
 import { LatestExamSummaryCard } from './components/LatestExamSummaryCard';
 import { ExamListItemCard } from './components/ExamListItemCard';
 import { ExamDetailModal } from './components/ExamDetailModal';
-import { initialStudentExamsData } from './mockData';
 import { StudentExamItem, StudentExamsViewModel } from './types';
 
 export interface StudentExamsViewProps {
@@ -19,7 +18,7 @@ export interface StudentExamsViewProps {
 }
 
 export const StudentExamsView: React.FC<StudentExamsViewProps> = ({
-  initialData = initialStudentExamsData,
+  initialData,
   isLoading = false,
   errorMessage,
   onRetry,
@@ -36,7 +35,7 @@ export const StudentExamsView: React.FC<StudentExamsViewProps> = ({
   // Loading State
   if (isLoading) {
     return (
-      <div className="max-w-5xl mx-auto space-y-4 select-none">
+      <div className="max-w-5xl mx-auto space-y-4 select-none" data-testid="student-exams-loading">
         <Skeleton className="h-56 w-full rounded-2xl" />
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
           <Skeleton className="h-20 w-full rounded-xl" />
@@ -53,7 +52,7 @@ export const StudentExamsView: React.FC<StudentExamsViewProps> = ({
   // Error State
   if (errorMessage) {
     return (
-      <div className="max-w-5xl mx-auto py-8 space-y-4">
+      <div className="max-w-5xl mx-auto py-8 space-y-4" data-testid="student-exams-error">
         <Alert variant="danger" icon={<AlertCircle className="h-5 w-5" />} title="Deneme Sonuçları Yüklenemedi">
           {errorMessage}
         </Alert>
@@ -68,18 +67,49 @@ export const StudentExamsView: React.FC<StudentExamsViewProps> = ({
     );
   }
 
+  const hasExams = initialData && initialData.exams && initialData.exams.length > 0;
+
+  if (!hasExams) {
+    return (
+      <div className="max-w-5xl mx-auto select-none space-y-4" data-testid="student-exams-view">
+        <div className="border-b border-neutral-100 pb-3 sm:pb-4">
+          <h1 className="font-serif text-2xl sm:text-3xl text-neutral-900 tracking-tight leading-tight">
+            Deneme Sınavları
+          </h1>
+          <p className="text-neutral-500 text-xs sm:text-sm mt-0.5">
+            Sınav sonuçları, net dağılımları ve gelişim analizi
+          </p>
+        </div>
+
+        <div className="bg-white rounded-2xl border border-neutral-200/80 p-6 sm:p-8 shadow-soft-sm text-center">
+          <div className="w-12 h-12 rounded-2xl bg-navy-50 text-navy-800 flex items-center justify-center mx-auto mb-4 border border-navy-100">
+            <FileText className="h-6 w-6 text-primary-600" />
+          </div>
+          <h2 className="text-lg font-semibold text-neutral-900">
+            Kayıtlı Deneme Sınavı Bulunmuyor
+          </h2>
+          <p className="text-xs sm:text-sm text-neutral-600 max-w-md mx-auto mt-2 leading-relaxed">
+            Sisteme henüz işlenmiş bir deneme sınavı sonucu bulunmuyor. Kurum denemelerine katıldıkça veya sınav sonuçlarınız girildikçe TYT/AYT netleriniz ve konu analizleriniz burada görüntülenecektir.
+          </p>
+        </div>
+      </div>
+    );
+  }
+
   const filteredExams = initialData.exams.filter((ex) => {
     if (!examTypeFilter) return true;
     return ex.type === examTypeFilter;
   });
 
   return (
-    <div className="max-w-5xl mx-auto select-none space-y-3.5 sm:space-y-4">
+    <div className="max-w-5xl mx-auto select-none space-y-3.5 sm:space-y-4" data-testid="student-exams-view">
       {/* 1. Latest Exam Summary Card */}
-      <LatestExamSummaryCard
-        exam={initialData.latestExam}
-        onViewAnalysis={handleOpenDetail}
-      />
+      {initialData.latestExam && (
+        <LatestExamSummaryCard
+          exam={initialData.latestExam}
+          onViewAnalysis={handleOpenDetail}
+        />
+      )}
 
       {/* 2. Target & Average Stats Row */}
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5 sm:gap-3">

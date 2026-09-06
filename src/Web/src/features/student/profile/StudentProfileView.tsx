@@ -7,7 +7,7 @@ import { ProfileIdentityCard } from './components/ProfileIdentityCard';
 import { PasswordChangeModal } from './components/PasswordChangeModal';
 import { NotificationSettingsModal } from './components/NotificationSettingsModal';
 import { LogoutConfirmModal } from './components/LogoutConfirmModal';
-import { initialStudentProfileData } from './mockData';
+import { useAuth } from '@/auth';
 import { StudentProfileData } from './types';
 
 export interface StudentProfileViewProps {
@@ -19,13 +19,37 @@ export interface StudentProfileViewProps {
 }
 
 export const StudentProfileView: React.FC<StudentProfileViewProps> = ({
-  initialData = initialStudentProfileData,
+  initialData,
   isLoading = false,
   errorMessage,
   onRetry,
   onLogout,
 }) => {
-  const [profile, setProfile] = useState<StudentProfileData>(initialData);
+  const { user, logout } = useAuth();
+
+  const defaultProfile: StudentProfileData = {
+    id: user?.id || 'student-current',
+    name: user?.name || user?.email?.split('@')[0] || 'Öğrenci',
+    subtitle: `${user?.institutionName || 'Kurumsal Öğrenci'} • ${user?.roleLabel || 'Öğrenci'}`,
+    email: user?.email || '',
+    joined: '2026',
+    initials: user?.name
+      ? user.name
+          .split(' ')
+          .map((w) => w[0])
+          .join('')
+          .substring(0, 2)
+          .toUpperCase()
+      : 'ÖG',
+    notificationPreferences: {
+      emailNotifications: true,
+      smsNotifications: false,
+      studyReminders: true,
+      examResultsAlerts: true,
+    },
+  };
+
+  const [profile, setProfile] = useState<StudentProfileData>(initialData || defaultProfile);
   const [isPasswordModalOpen, setIsPasswordModalOpen] = useState(false);
   const [isNotifModalOpen, setIsNotifModalOpen] = useState(false);
   const [isLogoutModalOpen, setIsLogoutModalOpen] = useState(false);
@@ -150,7 +174,7 @@ export const StudentProfileView: React.FC<StudentProfileViewProps> = ({
         onConfirm={() => {
           setIsLogoutModalOpen(false);
           if (onLogout) onLogout();
-          else setInfoAlert('Oturum başarıyla kapatıldı.');
+          else logout();
         }}
       />
     </div>
