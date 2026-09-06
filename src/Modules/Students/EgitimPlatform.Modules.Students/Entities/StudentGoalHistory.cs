@@ -3,9 +3,9 @@ using EgitimPlatform.BuildingBlocks.Entities;
 namespace EgitimPlatform.Modules.Students.Entities;
 
 /// <summary>
-/// Sprint 2 â€” Immutable audit trail for StudentGoal changes.
+/// Sprint 2 — Immutable audit trail for StudentGoal changes.
 /// Every create/update/deactivation of a goal produces a history row.
-/// History rows are NEVER soft-deleted or modified â€” they are append-only.
+/// History rows are NEVER soft-deleted or modified — they are append-only.
 /// </summary>
 public class StudentGoalHistory : BaseEntity, EgitimPlatform.BuildingBlocks.Interfaces.IImmutableHistory
 {

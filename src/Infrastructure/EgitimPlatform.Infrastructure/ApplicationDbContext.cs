@@ -231,6 +231,8 @@ public class ApplicationDbContext : IdentityDbContext<ApplicationUser, Applicati
         {
             if (entry.Entity is IImmutableHistory && entry.State is EntityState.Modified or EntityState.Deleted)
                 throw new InvalidOperationException("Historical evidence is append-only.");
+            if (entry.Entity is IStableReference && entry.State == EntityState.Deleted)
+                throw new InvalidOperationException("Reference data must be soft-deleted; stable codes cannot be reused.");
             if (entry.Entity is IStableReference && entry.State == EntityState.Modified &&
                 entry.Properties.Any(p => p.IsModified && (p.Metadata.Name == "Code" || p.Metadata.Name.EndsWith("Id"))))
                 throw new InvalidOperationException("Taxonomy codes and hierarchy are immutable.");

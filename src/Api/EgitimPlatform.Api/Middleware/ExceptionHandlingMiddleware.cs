@@ -46,7 +46,7 @@ public class ExceptionHandlingMiddleware
                 return;
             }
 
-            // Other DB update errors â†’ 500 with sanitized message
+            // Other DB update errors → 500 with sanitized message
             await WriteProblemResponse(context, StatusCodes.Status500InternalServerError,
                 "Database error", "An unexpected database error occurred.");
             return;
@@ -62,7 +62,7 @@ public class ExceptionHandlingMiddleware
             _ => (StatusCodes.Status500InternalServerError, "An unexpected error occurred")
         };
 
-        _logger.LogError(exception, "Request error: {Title} â€” {Message}", title, exception.Message);
+        _logger.LogError("Request failed: {ExceptionType}, status {StatusCode}, correlation {CorrelationId}", exception.GetType().Name, statusCode, context.TraceIdentifier);
 
         await WriteProblemResponse(context, statusCode, title,
             statusCode == StatusCodes.Status500InternalServerError

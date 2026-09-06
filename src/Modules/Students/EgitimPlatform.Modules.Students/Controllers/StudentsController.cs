@@ -107,7 +107,7 @@ public class StudentsController : ControllerBase
         return Ok(result);
     }
 
-    // Sprint 2 â€” Academic profile
+    // Sprint 2 — Academic profile
     [HttpPut("{id:guid}/academic-profile")]
     [Authorize(Policy = Policies.CanEditOwnStudent)]
     [ProducesResponseType(typeof(StudentDto), StatusCodes.Status200OK)]
@@ -128,7 +128,7 @@ public class StudentsController : ControllerBase
         return Ok(result);
     }
 
-    // Sprint 2 â€” Student goals
+    // Sprint 2 — Student goals
     [HttpPost("{studentId:guid}/goals")]
     [Authorize(Policy = Policies.CanEditOwnStudent)]
     [ProducesResponseType(typeof(StudentGoalDto), StatusCodes.Status201Created)]

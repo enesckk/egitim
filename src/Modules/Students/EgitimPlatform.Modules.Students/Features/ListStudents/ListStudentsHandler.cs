@@ -36,7 +36,7 @@ public class ListStudentsHandler
         }
         else if (_currentUser.IsInRole(Roles.Coach))
         {
-            // Coach: institution context MANDATORY â€” fail closed if missing
+            // Coach: institution context MANDATORY — fail closed if missing
             if (_currentUser.UserId is null || !institutionId.HasValue)
                 throw new ForbiddenException("Coach must have an institution context.");
 
@@ -69,12 +69,12 @@ public class ListStudentsHandler
         }
         else if (_currentUser.IsInRole(Roles.Teacher))
         {
-            // Teacher/Parent: no relationship defined yet (Sprint 2) â€” default deny
+            // Teacher/Parent: no relationship defined yet (Sprint 2) — default deny
             throw new ForbiddenException("Access not yet available for this role.");
         }
         else
         {
-            // Unknown role or no institution â†’ fail closed
+            // Unknown role or no institution → fail closed
             throw new ForbiddenException("Access denied.");
         }
 

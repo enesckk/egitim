@@ -9,6 +9,6 @@ public class TeacherSubject : SoftDeletableEntity, IHasInstitutionId
     public Guid TeacherId { get; set; }
     public Guid InstitutionId { get; set; }
 
-    /// <summary>Subject name â€” will be replaced by FK to Academic.Subject in future sprint.</summary>
+    /// <summary>Subject name — will be replaced by FK to Academic.Subject in future sprint.</summary>
     public Guid SubjectId { get; set; }
 }

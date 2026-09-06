@@ -28,7 +28,7 @@ try
         .Enrich.WithProperty("Application", "EgitimPlatform.Api")
         .WriteTo.Console());
 
-    // P2-12: Platform persistence (DbContext, Identity EF stores) â€” neutral Infrastructure layer.
+    // P2-12: Platform persistence (DbContext, Identity EF stores) — neutral Infrastructure layer.
     // Must be registered before Identity module (which configures JWT, policies, handlers).
     builder.Services.AddPlatformInfrastructure(builder.Configuration);
 
@@ -50,7 +50,7 @@ try
     // Swagger with JWT auth support
     builder.Services.AddSwaggerWithAuth();
 
-    // P2-3: CORS â€” configurable origins, NOT AllowAny in production.
+    // P2-3: CORS — configurable origins, NOT AllowAny in production.
     // Reads "CorsSettings:AllowedOrigins" from configuration.
     // Falls back to AllowAnyOrigin + AllowAnyHeader (no credentials) only in Development.
     var allowedOrigins = builder.Configuration
@@ -91,7 +91,7 @@ try
         options.AllowAllInDevelopment = builder.Environment.IsDevelopment();
     });
 
-    // P1-02 CLOSURE: ForwardedHeaders â€” configuration-driven trust model.
+    // P1-02 CLOSURE: ForwardedHeaders — configuration-driven trust model.
     // Reverse proxy must be explicitly enabled with known proxy configuration.
     // Never trust forwarded headers from the entire internet.
     // Without this, attackers can spoof X-Forwarded-For to bypass rate limiting.
@@ -124,7 +124,7 @@ try
             }
 
             // P1-02: Configure trusted proxies from configuration.
-            // KnownProxies uses IPAddress â€” simple and sufficient for most deployments.
+            // KnownProxies uses IPAddress — simple and sufficient for most deployments.
             if (knownProxies is { Length: > 0 })
             {
                 options.KnownProxies.Clear();
@@ -136,7 +136,7 @@ try
             }
 
             // P1-02: If proxy is enabled but no trusted proxies configured,
-            // fail safely â€” only trust localhost loopback (development scenario).
+            // fail safely — only trust localhost loopback (development scenario).
             if (knownProxies is null || knownProxies.Length == 0)
             {
                 options.KnownProxies.Clear();
@@ -146,7 +146,7 @@ try
         }
         else
         {
-            // No reverse proxy â€” do NOT process any forwarded headers.
+            // No reverse proxy — do NOT process any forwarded headers.
             // Direct connections: use actual connection info only.
             options.ForwardedHeaders = ForwardedHeaders.None;
         }
@@ -196,8 +196,8 @@ try
     // P2-06 CLOSURE: Explicit production initialization mode.
     // Usage: dotnet EgitimPlatform.Api.dll --initialize-platform
     // This runs migration + role seed + optional bootstrap, then exits.
-    // Does NOT start the web server. Idempotent â€” safe to run multiple times.
-    // Only triggered by explicit command-line argument â€” never by config or test harness.
+    // Does NOT start the web server. Idempotent — safe to run multiple times.
+    // Only triggered by explicit command-line argument — never by config or test harness.
     if (args.Length > 0 && args.Contains("--initialize-platform"))
     {
         Log.Information("Running platform initialization...");
@@ -238,7 +238,7 @@ try
     // client scheme/host/IP when behind a reverse proxy.
     app.UseForwardedHeaders();
 
-    // Database migration â€” Development/Test only.
+    // Database migration — Development/Test only.
     // Production: migrations must be applied via CI/CD or explicit deployment step.
     if (app.Environment.IsDevelopment() || app.Environment.EnvironmentName == "IntegrationTest" || app.Environment.EnvironmentName == "SecurityTest")
     {
@@ -247,7 +247,7 @@ try
         await dbContext.Database.MigrateAsync();
     }
 
-    // P2-8: Role seeding â€” only in Development/test environments.
+    // P2-8: Role seeding — only in Development/test environments.
     // Production deployments should use an explicit initialization/migration step,
     // not rely on application startup to write seed data.
     // This prevents schema/deployment ownership blur in production.
@@ -256,14 +256,14 @@ try
         await app.Services.SeedIdentityRolesAsync();
     }
 
-    // Bootstrap SuperAdmin â€” ONLY if explicitly enabled via config
+    // Bootstrap SuperAdmin — ONLY if explicitly enabled via config
     // and only in non-Production environments
     if (!app.Environment.IsProduction())
     {
         await app.Services.SeedBootstrapSuperAdminAsync();
     }
 
-    // Middleware pipeline â€” CorrelationId BEFORE ExceptionHandling
+    // Middleware pipeline — CorrelationId BEFORE ExceptionHandling
     // so exception logs include the correlation context.
     app.UseMiddleware<CorrelationIdMiddleware>();
     app.UseMiddleware<ExceptionHandlingMiddleware>();
@@ -276,7 +276,7 @@ try
 
     app.UseHttpsRedirection();
     app.UseCors();
-    // P2-02: CSRF origin validation â€” runs after CORS, before auth.
+    // P2-02: CSRF origin validation — runs after CORS, before auth.
     app.UseMiddleware<CsrfOriginMiddleware>();
     app.UseSerilogRequestLogging();
     app.UseAuthentication();

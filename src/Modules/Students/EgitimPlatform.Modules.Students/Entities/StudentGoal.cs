@@ -4,7 +4,7 @@ using EgitimPlatform.BuildingBlocks.Interfaces;
 namespace EgitimPlatform.Modules.Students.Entities;
 
 /// <summary>
-/// Sprint 2 â€” Student academic goal.
+/// Sprint 2 — Student academic goal.
 /// Represents a target the student is working toward (exam, score, school, etc.).
 /// Goal changes are tracked immutably via StudentGoalHistory.
 /// </summary>
@@ -14,7 +14,7 @@ public class StudentGoal : SoftDeletableEntity, IHasInstitutionId
     public Guid InstitutionId { get; set; }
     public Guid StudentId { get; set; }
 
-    /// <summary>Short title â€” e.g. "YKS 2027 SayÄ±sal".</summary>
+    /// <summary>Short title — e.g. "YKS 2027 Sayısal".</summary>
     public string Title { get; set; } = string.Empty;
 
     /// <summary>Optional description / notes about the goal.</summary>

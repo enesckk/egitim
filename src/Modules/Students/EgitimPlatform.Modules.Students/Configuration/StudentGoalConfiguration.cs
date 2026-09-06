@@ -21,15 +21,15 @@ public class StudentGoalConfiguration : IEntityTypeConfiguration<StudentGoal>
         builder.HasIndex(g => g.IsDeleted);
         builder.HasIndex(g => new { g.InstitutionId, g.IsDeleted });
 
-        // Composite FK to Student via (Id, InstitutionId) alternate key â€” same-tenant enforcement.
-        // Sprint 2: Studentâ†’Institution FK already exists, so this transitively enforces same institution.
+        // Composite FK to Student via (Id, InstitutionId) alternate key — same-tenant enforcement.
+        // Sprint 2: Student→Institution FK already exists, so this transitively enforces same institution.
         builder.HasOne<Student>()
             .WithMany()
             .HasForeignKey(g => new { g.StudentId, g.InstitutionId })
             .HasPrincipalKey(s => new { s.Id, s.InstitutionId })
             .OnDelete(DeleteBehavior.Restrict);
 
-        // TargetExamTypeId FK â€” will be wired when Academic module has ExamType entity.
+        // TargetExamTypeId FK — will be wired when Academic module has ExamType entity.
         // For now it's a nullable Guid column with no FK constraint.
     }
 }
