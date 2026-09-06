@@ -30,9 +30,14 @@ public class ExceptionHandlingMiddleware
     {
         // P2-05: Handle DbUpdateException (unique constraint violations) globally.
         // If a handler didn't catch it specifically, we still return 409 not 500.
+        if (exception is Microsoft.EntityFrameworkCore.DbUpdateConcurrencyException)
+        {
+            await WriteProblemResponse(context, StatusCodes.Status409Conflict, "Conflict", "The record changed. Reload and retry.");
+            return;
+        }
         if (exception is Microsoft.EntityFrameworkCore.DbUpdateException dbEx)
         {
-            _logger.LogError(dbEx, "Database update error: {Message}", dbEx.Message);
+            _logger.LogError("Database update failed. Correlation: {CorrelationId}", context.TraceIdentifier);
 
             if (IsUniqueConstraintViolation(dbEx))
             {
@@ -41,7 +46,7 @@ public class ExceptionHandlingMiddleware
                 return;
             }
 
-            // Other DB update errors → 500 with sanitized message
+            // Other DB update errors â†’ 500 with sanitized message
             await WriteProblemResponse(context, StatusCodes.Status500InternalServerError,
                 "Database error", "An unexpected database error occurred.");
             return;
@@ -57,7 +62,7 @@ public class ExceptionHandlingMiddleware
             _ => (StatusCodes.Status500InternalServerError, "An unexpected error occurred")
         };
 
-        _logger.LogError(exception, "Request error: {Title} — {Message}", title, exception.Message);
+        _logger.LogError(exception, "Request error: {Title} â€” {Message}", title, exception.Message);
 
         await WriteProblemResponse(context, statusCode, title,
             statusCode == StatusCodes.Status500InternalServerError
@@ -98,7 +103,7 @@ public class ExceptionHandlingMiddleware
         if (!typeName.Contains("SqlException")) return false;
         var numberProperty = inner.GetType().GetProperty("Number");
         if (numberProperty?.GetValue(inner) is int number)
-            return number is 2601 or 2627;
+            return number is 2601 or 2627 or 547;
         return false;
     }
 

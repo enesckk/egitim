@@ -8,6 +8,7 @@ namespace EgitimPlatform.Modules.Students.Features.UpdateStudentGoal;
 
 public class UpdateStudentGoalHandler
 {
+    private readonly IAcademicCatalog _academic;
     private readonly IApplicationDbContext _dbContext;
     private readonly ICurrentUser _currentUser;
     private readonly IAuditService _auditService;
@@ -17,8 +18,9 @@ public class UpdateStudentGoalHandler
         IApplicationDbContext dbContext,
         ICurrentUser currentUser,
         IAuditService auditService,
-        ICoachStudentQuery coachStudentQuery)
+        ICoachStudentQuery coachStudentQuery, IAcademicCatalog academic)
     {
+        _academic = academic;
         _dbContext = dbContext;
         _currentUser = currentUser;
         _auditService = auditService;
@@ -34,12 +36,11 @@ public class UpdateStudentGoalHandler
         var student = await GoalAuthorizationHelper.FetchStudentOrThrowAsync(_dbContext, goal.StudentId, ct);
         await GoalAuthorizationHelper.AuthorizeForStudentAsync(student, _currentUser, _coachStudentQuery, ct);
 
+        if (command.TargetExamTypeId.HasValue && await _academic.GetExamTypeAsync(command.TargetExamTypeId.Value, ct) is null)
+            throw new FluentValidation.ValidationException("Unknown or inactive exam type.");
+
         // Snapshot previous values for history
-        var previousValues = JsonSerializer.Serialize(new
-        {
-            goal.Title, goal.Description, goal.TargetScore,
-            goal.TargetRank, goal.TargetSchoolName, goal.EffectiveDate
-        });
+        var previousValues = GoalHistory.Snapshot(goal);
 
         // Apply updates (only non-null fields)
         if (command.Title is not null) goal.Title = command.Title;
@@ -50,22 +51,8 @@ public class UpdateStudentGoalHandler
         if (command.TargetSchoolName is not null) goal.TargetSchoolName = command.TargetSchoolName;
         if (command.EffectiveDate.HasValue) goal.EffectiveDate = command.EffectiveDate.Value;
 
-        // History entry
-        var newValues = JsonSerializer.Serialize(new
-        {
-            goal.Title, goal.Description, goal.TargetScore,
-            goal.TargetRank, goal.TargetSchoolName, goal.EffectiveDate
-        });
-
-        _dbContext.Set<StudentGoalHistory>().Add(new StudentGoalHistory
-        {
-            StudentGoalId = goal.Id,
-            Action = "Updated",
-            PreviousValuesJson = previousValues,
-            NewValuesJson = newValues,
-            ChangedAt = DateTimeOffset.UtcNow,
-            ChangedBy = _currentUser.UserId,
-        });
+        goal.UpdatedBy = _currentUser.UserId;
+        _dbContext.Set<StudentGoalHistory>().Add(GoalHistory.Capture(goal, "Updated", _currentUser.UserId, previousValues));
 
         // Audit
         if (_currentUser.UserId.HasValue)

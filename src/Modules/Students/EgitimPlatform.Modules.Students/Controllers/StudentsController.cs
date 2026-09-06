@@ -107,9 +107,9 @@ public class StudentsController : ControllerBase
         return Ok(result);
     }
 
-    // Sprint 2 — Academic profile
+    // Sprint 2 â€” Academic profile
     [HttpPut("{id:guid}/academic-profile")]
-    [Authorize(Policy = Policies.CanManageStudents)]
+    [Authorize(Policy = Policies.CanEditOwnStudent)]
     [ProducesResponseType(typeof(StudentDto), StatusCodes.Status200OK)]
     [ProducesResponseType(typeof(ValidationProblemDetails), StatusCodes.Status400BadRequest)]
     [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status403Forbidden)]
@@ -128,9 +128,9 @@ public class StudentsController : ControllerBase
         return Ok(result);
     }
 
-    // Sprint 2 — Student goals
+    // Sprint 2 â€” Student goals
     [HttpPost("{studentId:guid}/goals")]
-    [Authorize(Policy = Policies.CanManageStudents)]
+    [Authorize(Policy = Policies.CanEditOwnStudent)]
     [ProducesResponseType(typeof(StudentGoalDto), StatusCodes.Status201Created)]
     [ProducesResponseType(typeof(ValidationProblemDetails), StatusCodes.Status400BadRequest)]
     [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status403Forbidden)]
@@ -169,7 +169,7 @@ public class StudentsController : ControllerBase
     }
 
     [HttpPut("goals/{goalId:guid}")]
-    [Authorize(Policy = Policies.CanManageStudents)]
+    [Authorize(Policy = Policies.CanEditOwnStudent)]
     [ProducesResponseType(typeof(StudentGoalDto), StatusCodes.Status200OK)]
     [ProducesResponseType(typeof(ValidationProblemDetails), StatusCodes.Status400BadRequest)]
     [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status404NotFound)]
@@ -187,7 +187,7 @@ public class StudentsController : ControllerBase
     }
 
     [HttpDelete("goals/{goalId:guid}")]
-    [Authorize(Policy = Policies.CanManageStudents)]
+    [Authorize(Policy = Policies.CanEditOwnStudent)]
     [ProducesResponseType(StatusCodes.Status204NoContent)]
     [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status404NotFound)]
     public async Task<IActionResult> DeactivateGoal(Guid goalId, CancellationToken ct)

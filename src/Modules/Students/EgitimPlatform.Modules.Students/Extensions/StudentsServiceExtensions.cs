@@ -23,6 +23,8 @@ public static class StudentsServiceExtensions
         services.AddScoped<GetStudentHandler>();
         services.AddScoped<ListStudentsHandler>();
 
+        services.AddScoped<EgitimPlatform.Modules.Students.Features.ManageParents.ParentHandler>();
+        services.AddScoped<EgitimPlatform.Modules.Students.Features.GetStudent360.GetStudent360Handler>();
         // Sprint 2 handlers
         services.AddScoped<UpdateAcademicProfileHandler>();
         services.AddScoped<CreateStudentGoalHandler>();

@@ -31,23 +31,15 @@ public class DeactivateStudentGoalHandler
             .FirstOrDefaultAsync(g => g.Id == command.GoalId, ct)
             ?? throw new EgitimPlatform.BuildingBlocks.Exceptions.NotFoundException("StudentGoal", command.GoalId);
 
-        if (!goal.IsActive) return; // Already inactive, idempotent
 
         var student = await GoalAuthorizationHelper.FetchStudentOrThrowAsync(_dbContext, goal.StudentId, ct);
         await GoalAuthorizationHelper.AuthorizeForStudentAsync(student, _currentUser, _coachStudentQuery, ct);
 
-        var previousValues = JsonSerializer.Serialize(new { goal.IsActive });
+        if (!goal.IsActive) return; // Idempotency follows resource authorization.
+        var previousValues = GoalHistory.Snapshot(goal);
         goal.IsActive = false;
-
-        _dbContext.Set<StudentGoalHistory>().Add(new StudentGoalHistory
-        {
-            StudentGoalId = goal.Id,
-            Action = "Deactivated",
-            PreviousValuesJson = previousValues,
-            NewValuesJson = JsonSerializer.Serialize(new { IsActive = false }),
-            ChangedAt = DateTimeOffset.UtcNow,
-            ChangedBy = _currentUser.UserId,
-        });
+        goal.UpdatedBy = _currentUser.UserId;
+        _dbContext.Set<StudentGoalHistory>().Add(GoalHistory.Capture(goal, "Deactivated", _currentUser.UserId, previousValues));
 
         if (_currentUser.UserId.HasValue)
         {

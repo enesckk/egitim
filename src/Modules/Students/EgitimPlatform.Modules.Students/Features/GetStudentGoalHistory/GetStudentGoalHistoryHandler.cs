@@ -37,7 +37,7 @@ public class GetStudentGoalHistoryHandler
             .Select(h => new StudentGoalHistoryDto(
                 h.Id, h.StudentGoalId, h.Action,
                 h.PreviousValuesJson, h.NewValuesJson,
-                h.ChangedAt, h.ChangedBy))
+                h.ChangedAt, h.ChangedBy, h.CorrelationId))
             .ToListAsync(ct);
 
         return history;

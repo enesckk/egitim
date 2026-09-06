@@ -2,6 +2,7 @@ namespace EgitimPlatform.BuildingBlocks.Constants;
 
 public static class Policies
 {
+    public const string CanEditOwnStudent = "CanEditOwnStudent";
     public const string CanManageStudents = "CanManageStudents";
     public const string CanViewStudents = "CanViewStudents";
     public const string CanAssignCoach = "CanAssignCoach";

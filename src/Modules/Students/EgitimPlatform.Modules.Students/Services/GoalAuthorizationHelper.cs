@@ -10,7 +10,7 @@ namespace EgitimPlatform.Modules.Students.Services;
 /// Shared authorization logic for StudentGoal operations.
 /// Mirrors the authorization pattern for Student access.
 /// </summary>
-internal static class GoalAuthorizationHelper
+public static class GoalAuthorizationHelper
 {
     public static async Task AuthorizeForStudentAsync(
         Student student,
@@ -18,6 +18,7 @@ internal static class GoalAuthorizationHelper
         ICoachStudentQuery coachStudentQuery,
         CancellationToken ct)
     {
+        if (!currentUser.IsAuthenticated || currentUser.UserId is null) throw new ForbiddenException("Access denied.");
         var institutionId = await currentUser.GetInstitutionIdAsync();
 
         if (currentUser.IsSuperAdmin) return;
@@ -46,7 +47,7 @@ internal static class GoalAuthorizationHelper
 
         if (currentUser.IsInRole(Roles.Student))
         {
-            if (currentUser.UserId is null || student.UserId != currentUser.UserId.Value)
+            if (currentUser.UserId is null || !institutionId.HasValue || student.InstitutionId != institutionId.Value || student.UserId != currentUser.UserId.Value)
                 throw new ForbiddenException("Access denied.");
             return;
         }

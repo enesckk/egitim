@@ -20,4 +20,5 @@ public sealed record StudentGoalHistoryDto(
     string? PreviousValuesJson,
     string? NewValuesJson,
     DateTimeOffset ChangedAt,
-    Guid? ChangedBy);
+    Guid? ChangedBy,
+    string? CorrelationId = null);

@@ -37,7 +37,7 @@ public class UpdateAcademicProfileHandler
             throw new NotFoundException("Student", command.StudentId);
 
         // Authorization: who can update academic profile?
-        await AuthorizeAsync(student, institutionId, ct);
+        await EgitimPlatform.Modules.Students.Services.GoalAuthorizationHelper.AuthorizeForStudentAsync(student, _currentUser, _coachStudentQuery, ct);
 
         // Check StudentNumber uniqueness within institution (if changed)
         if (command.StudentNumber is not null && command.StudentNumber != student.StudentNumber)
@@ -56,6 +56,7 @@ public class UpdateAcademicProfileHandler
         student.GradeLevel = command.GradeLevel;
         student.EnrollmentDate = command.EnrollmentDate;
 
+        student.UpdatedBy = _currentUser.UserId;
         // Audit + save atomically
         if (_currentUser.UserId.HasValue)
         {
@@ -65,7 +66,7 @@ public class UpdateAcademicProfileHandler
                 entityType: "Student",
                 entityId: student.Id.ToString(),
                 institutionId: student.InstitutionId,
-                metadataJson: $"{{\"schoolName\":\"{command.SchoolName ?? ""}\",\"studentNumber\":\"{command.StudentNumber ?? ""}\",\"gradeLevel\":{command.GradeLevel?.ToString() ?? "null"}}}");
+                metadataJson: System.Text.Json.JsonSerializer.Serialize(new { student.GradeLevel }));
         }
 
         await _dbContext.SaveChangesAsync(ct);
@@ -73,40 +74,4 @@ public class UpdateAcademicProfileHandler
         return student.ToDto();
     }
 
-    private async Task AuthorizeAsync(Student student, Guid? institutionId, CancellationToken ct)
-    {
-        if (_currentUser.IsSuperAdmin) return;
-
-        if (_currentUser.IsInRole(Roles.InstitutionAdmin))
-        {
-            if (!institutionId.HasValue || student.InstitutionId != institutionId.Value)
-                throw new ForbiddenException("Access denied.");
-            return;
-        }
-
-        if (_currentUser.IsInRole(Roles.Coach))
-        {
-            if (_currentUser.UserId is null || !institutionId.HasValue)
-                throw new ForbiddenException("Access denied.");
-
-            if (student.InstitutionId != institutionId.Value)
-                throw new ForbiddenException("Access denied.");
-
-            var hasAssignment = await _coachStudentQuery.HasActiveAssignmentAsync(
-                _currentUser.UserId.Value, institutionId.Value, student.Id, ct);
-            if (!hasAssignment)
-                throw new ForbiddenException("Access denied.");
-            return;
-        }
-
-        if (_currentUser.IsInRole(Roles.Student))
-        {
-            // Student can update own profile
-            if (_currentUser.UserId is null || student.UserId != _currentUser.UserId.Value)
-                throw new ForbiddenException("Access denied.");
-            return;
-        }
-
-        throw new ForbiddenException("Access denied.");
-    }
 }

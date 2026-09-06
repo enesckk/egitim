@@ -3,15 +3,15 @@ using EgitimPlatform.BuildingBlocks.Entities;
 namespace EgitimPlatform.Modules.Students.Entities;
 
 /// <summary>
-/// Sprint 2 — Immutable audit trail for StudentGoal changes.
-/// Every create/update/deactivation/reactivation of a goal produces a history row.
-/// History rows are NEVER soft-deleted or modified — they are append-only.
+/// Sprint 2 â€” Immutable audit trail for StudentGoal changes.
+/// Every create/update/deactivation of a goal produces a history row.
+/// History rows are NEVER soft-deleted or modified â€” they are append-only.
 /// </summary>
-public class StudentGoalHistory : BaseEntity
+public class StudentGoalHistory : BaseEntity, EgitimPlatform.BuildingBlocks.Interfaces.IImmutableHistory
 {
     public Guid StudentGoalId { get; set; }
 
-    /// <summary>What changed: Created, Updated, Deactivated, Reactivated.</summary>
+    /// <summary>What changed: Created, Updated, Deactivated.</summary>
     public string Action { get; set; } = string.Empty;
 
     /// <summary>JSON snapshot of previous values (null for Created).</summary>

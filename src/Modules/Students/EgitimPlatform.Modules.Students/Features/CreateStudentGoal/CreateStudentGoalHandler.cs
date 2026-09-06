@@ -9,6 +9,7 @@ namespace EgitimPlatform.Modules.Students.Features.CreateStudentGoal;
 
 public class CreateStudentGoalHandler
 {
+    private readonly IAcademicCatalog _academic;
     private readonly IApplicationDbContext _dbContext;
     private readonly ICurrentUser _currentUser;
     private readonly IAuditService _auditService;
@@ -18,8 +19,9 @@ public class CreateStudentGoalHandler
         IApplicationDbContext dbContext,
         ICurrentUser currentUser,
         IAuditService auditService,
-        ICoachStudentQuery coachStudentQuery)
+        ICoachStudentQuery coachStudentQuery, IAcademicCatalog academic)
     {
+        _academic = academic;
         _dbContext = dbContext;
         _currentUser = currentUser;
         _auditService = auditService;
@@ -37,7 +39,10 @@ public class CreateStudentGoalHandler
         if (student is null)
             throw new NotFoundException("Student", command.StudentId);
 
-        await AuthorizeAsync(student, institutionId, ct);
+        await EgitimPlatform.Modules.Students.Services.GoalAuthorizationHelper.AuthorizeForStudentAsync(student, _currentUser, _coachStudentQuery, ct);
+
+        if (command.TargetExamTypeId.HasValue && await _academic.GetExamTypeAsync(command.TargetExamTypeId.Value, ct) is null)
+            throw new FluentValidation.ValidationException("Unknown or inactive exam type.");
 
         var goal = new StudentGoal
         {
@@ -57,19 +62,7 @@ public class CreateStudentGoalHandler
         _dbContext.Set<StudentGoal>().Add(goal);
 
         // History entry for creation
-        var history = new StudentGoalHistory
-        {
-            StudentGoalId = goal.Id,
-            Action = "Created",
-            NewValuesJson = JsonSerializer.Serialize(new
-            {
-                goal.Title, goal.Description, goal.TargetScore,
-                goal.TargetRank, goal.TargetSchoolName, goal.EffectiveDate
-            }),
-            ChangedAt = DateTimeOffset.UtcNow,
-            ChangedBy = _currentUser.UserId,
-        };
-        _dbContext.Set<StudentGoalHistory>().Add(history);
+        _dbContext.Set<StudentGoalHistory>().Add(EgitimPlatform.Modules.Students.Services.GoalHistory.Capture(goal, "Created", _currentUser.UserId));
 
         // Audit + save atomically
         if (_currentUser.UserId.HasValue)
@@ -80,48 +73,12 @@ public class CreateStudentGoalHandler
                 entityType: "StudentGoal",
                 entityId: goal.Id.ToString(),
                 institutionId: goal.InstitutionId,
-                metadataJson: $"{{\"studentId\":\"{goal.StudentId}\",\"title\":\"{goal.Title}\"}}");
+                metadataJson: JsonSerializer.Serialize(new { goal.StudentId }));
         }
 
         await _dbContext.SaveChangesAsync(ct);
 
         return ToDto(goal);
-    }
-
-    private async Task AuthorizeAsync(Student student, Guid? institutionId, CancellationToken ct)
-    {
-        if (_currentUser.IsSuperAdmin) return;
-
-        if (_currentUser.IsInRole(Roles.InstitutionAdmin))
-        {
-            if (!institutionId.HasValue || student.InstitutionId != institutionId.Value)
-                throw new ForbiddenException("Access denied.");
-            return;
-        }
-
-        if (_currentUser.IsInRole(Roles.Coach))
-        {
-            if (_currentUser.UserId is null || !institutionId.HasValue)
-                throw new ForbiddenException("Access denied.");
-
-            if (student.InstitutionId != institutionId.Value)
-                throw new ForbiddenException("Access denied.");
-
-            var hasAssignment = await _coachStudentQuery.HasActiveAssignmentAsync(
-                _currentUser.UserId.Value, institutionId.Value, student.Id, ct);
-            if (!hasAssignment)
-                throw new ForbiddenException("Access denied.");
-            return;
-        }
-
-        if (_currentUser.IsInRole(Roles.Student))
-        {
-            if (_currentUser.UserId is null || student.UserId != _currentUser.UserId.Value)
-                throw new ForbiddenException("Access denied.");
-            return;
-        }
-
-        throw new ForbiddenException("Access denied.");
     }
 
     private static StudentGoalDto ToDto(StudentGoal g) => new(

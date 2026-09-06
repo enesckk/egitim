@@ -58,10 +58,12 @@ public static class IdentityServiceExtensions
 
         // Authorization policies
         services.AddAuthorizationBuilder()
+            .AddPolicy(Policies.CanEditOwnStudent, policy =>
+                policy.RequireRole(Roles.SuperAdmin, Roles.InstitutionAdmin, Roles.Coach, Roles.Student))
             .AddPolicy(Policies.CanManageStudents, policy =>
                 policy.RequireRole(Roles.SuperAdmin, Roles.InstitutionAdmin, Roles.Coach))
             .AddPolicy(Policies.CanViewStudents, policy =>
-                policy.RequireRole(Roles.SuperAdmin, Roles.InstitutionAdmin, Roles.Coach, Roles.Teacher, Roles.Parent))
+                policy.RequireRole(Roles.SuperAdmin, Roles.InstitutionAdmin, Roles.Coach, Roles.Teacher, Roles.Parent, Roles.Student))
             .AddPolicy(Policies.CanAssignCoach, policy =>
                 policy.RequireRole(Roles.SuperAdmin, Roles.InstitutionAdmin))
             .AddPolicy(Policies.CanManageInstitution, policy =>
@@ -73,6 +75,7 @@ public static class IdentityServiceExtensions
         services.AddScoped<IJwtTokenService, JwtTokenService>();
         services.AddScoped<IRefreshTokenService, RefreshTokenService>();
         services.AddScoped<ICurrentUser, CurrentUser>();
+        services.AddScoped<IUserDirectory, UserDirectory>();
         services.AddScoped<IInstitutionContext, InstitutionContext>();
         services.AddScoped<IAuditService, AuditService>();
 

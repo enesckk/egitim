@@ -36,20 +36,20 @@ public class ListStudentsHandler
         }
         else if (_currentUser.IsInRole(Roles.Coach))
         {
-            // Coach: institution context MANDATORY — fail closed if missing
+            // Coach: institution context MANDATORY â€” fail closed if missing
             if (_currentUser.UserId is null || !institutionId.HasValue)
                 throw new ForbiddenException("Coach must have an institution context.");
 
             var assignedIds = await _coachStudentQuery.GetActiveAssignedStudentIdsAsync(
                 _currentUser.UserId.Value, institutionId.Value, ct);
-            source = source.Where(s => assignedIds.Contains(s.Id));
+            source = source.Where(s => s.InstitutionId == institutionId.Value && assignedIds.Contains(s.Id));
         }
         else if (_currentUser.IsInRole(Roles.Student))
         {
             // Student: only own record
-            if (_currentUser.UserId is null) throw new ForbiddenException("User context required.");
+            if (_currentUser.UserId is null || !institutionId.HasValue) throw new ForbiddenException("User context required.");
             var userId = _currentUser.UserId.Value;
-            source = source.Where(s => s.UserId == userId);
+            source = source.Where(s => s.UserId == userId && s.InstitutionId == institutionId.Value);
         }
         else if (_currentUser.IsInRole(Roles.InstitutionAdmin))
         {
@@ -57,14 +57,24 @@ public class ListStudentsHandler
             if (!institutionId.HasValue) throw new ForbiddenException("Institution context required.");
             source = source.Where(s => s.InstitutionId == institutionId.Value);
         }
-        else if (_currentUser.IsInRole(Roles.Teacher) || _currentUser.IsInRole(Roles.Parent))
+        else if (_currentUser.IsInRole(Roles.Parent))
         {
-            // Teacher/Parent: no relationship defined yet (Sprint 2) — default deny
+            if (_currentUser.UserId is null || !institutionId.HasValue) throw new ForbiddenException("Access denied.");
+            var linkedIds = from link in _dbContext.Set<StudentParent>()
+                            join parent in _dbContext.Set<Parent>() on link.ParentId equals parent.Id
+                            where link.InstitutionId == institutionId && parent.InstitutionId == institutionId &&
+                                parent.UserId == _currentUser.UserId && link.IsActive
+                            select link.StudentId;
+            source = source.Where(s => s.InstitutionId == institutionId && linkedIds.Contains(s.Id));
+        }
+        else if (_currentUser.IsInRole(Roles.Teacher))
+        {
+            // Teacher/Parent: no relationship defined yet (Sprint 2) â€” default deny
             throw new ForbiddenException("Access not yet available for this role.");
         }
         else
         {
-            // Unknown role or no institution → fail closed
+            // Unknown role or no institution â†’ fail closed
             throw new ForbiddenException("Access denied.");
         }
 

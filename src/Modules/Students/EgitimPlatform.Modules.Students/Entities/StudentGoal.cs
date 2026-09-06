@@ -4,22 +4,23 @@ using EgitimPlatform.BuildingBlocks.Interfaces;
 namespace EgitimPlatform.Modules.Students.Entities;
 
 /// <summary>
-/// Sprint 2 — Student academic goal.
+/// Sprint 2 â€” Student academic goal.
 /// Represents a target the student is working toward (exam, score, school, etc.).
 /// Goal changes are tracked immutably via StudentGoalHistory.
 /// </summary>
 public class StudentGoal : SoftDeletableEntity, IHasInstitutionId
 {
+    public byte[] RowVersion { get; set; } = [];
     public Guid InstitutionId { get; set; }
     public Guid StudentId { get; set; }
 
-    /// <summary>Short title — e.g. "YKS 2027 Sayısal".</summary>
+    /// <summary>Short title â€” e.g. "YKS 2027 SayÄ±sal".</summary>
     public string Title { get; set; } = string.Empty;
 
     /// <summary>Optional description / notes about the goal.</summary>
     public string? Description { get; set; }
 
-    /// <summary>Target exam type (FK to Academic.ExamType when taxonomy exists). Null until taxonomy module available.</summary>
+    /// <summary>Optional reference to a real shared Academic.ExamType.</summary>
     public Guid? TargetExamTypeId { get; set; }
 
     /// <summary>Target score (exam-specific). Null if not applicable.</summary>

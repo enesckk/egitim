@@ -46,6 +46,8 @@ public class ApplicationDbContext : IdentityDbContext<ApplicationUser, Applicati
             "EgitimPlatform.Modules.Institutions",
             "EgitimPlatform.Modules.Students",
             "EgitimPlatform.Modules.Coaching",
+            "EgitimPlatform.Modules.Teachers",
+            "EgitimPlatform.Modules.Academic",
         };
 
         foreach (var moduleName in moduleNames)
@@ -84,9 +86,9 @@ public class ApplicationDbContext : IdentityDbContext<ApplicationUser, Applicati
             var assembly = Assembly.Load(assemblyName);
             builder.ApplyConfigurationsFromAssembly(assembly);
         }
-        catch (Exception)
+        catch (Exception ex)
         {
-            // Module assembly not available — skip
+            throw new InvalidOperationException($"Required module {assemblyName} could not be configured.", ex);
         }
     }
 
@@ -141,6 +143,48 @@ public class ApplicationDbContext : IdentityDbContext<ApplicationUser, Applicati
                 .OnDelete(DeleteBehavior.Restrict);
         }
 
+        // Sprint 2: Parent.UserId → ApplicationUser.Id FK (nullable — not all parents have user accounts).
+        if (parentType is not null)
+        {
+            builder.Entity(parentType.ClrType)
+                .HasOne(typeof(ApplicationUser))
+                .WithMany()
+                .HasForeignKey("UserId")
+                .OnDelete(DeleteBehavior.Restrict);
+        }
+
+        // Sprint 2: Teacher entity + Teacher.UserId → ApplicationUser.Id FK.
+        var teacherType = FindEntityType(builder, "Teacher");
+        if (teacherType is not null)
+        {
+            builder.Entity(teacherType.ClrType)
+                .HasOne(typeof(ApplicationUser))
+                .WithMany()
+                .HasForeignKey("UserId")
+                .OnDelete(DeleteBehavior.Restrict);
+
+            // Teacher → Institution FK
+            if (institutionType is not null)
+            {
+                builder.Entity(teacherType.ClrType)
+                    .HasOne(institutionType.ClrType)
+                    .WithMany()
+                    .HasForeignKey("InstitutionId")
+                    .OnDelete(DeleteBehavior.Restrict);
+            }
+        }
+
+        var goalType = FindEntityType(builder, "StudentGoal");
+        var examType = FindEntityType(builder, "ExamType");
+        var teacherSubjectType = FindEntityType(builder, "TeacherSubject");
+        var subjectType = FindEntityType(builder, "Subject");
+        if (goalType is not null && examType is not null)
+            builder.Entity(goalType.ClrType).HasOne(examType.ClrType).WithMany()
+                .HasForeignKey("TargetExamTypeId").OnDelete(DeleteBehavior.Restrict);
+        if (teacherSubjectType is not null && subjectType is not null)
+            builder.Entity(teacherSubjectType.ClrType).HasOne(subjectType.ClrType).WithMany()
+                .HasForeignKey("SubjectId").OnDelete(DeleteBehavior.Restrict);
+
         // P2-6: Cross-tenant composite FKs for StudentCoachAssignment.
         // StudentCoachAssignment → Student (composite: StudentId + InstitutionId)
         if (assignmentType is not null && studentType is not null)
@@ -180,8 +224,32 @@ public class ApplicationDbContext : IdentityDbContext<ApplicationUser, Applicati
             .FirstOrDefault(e => e.ClrType.Name == typeName);
     }
 
+    private void ProtectEvidence()
+    {
+        ChangeTracker.DetectChanges();
+        foreach (var entry in ChangeTracker.Entries())
+        {
+            if (entry.Entity is IImmutableHistory && entry.State is EntityState.Modified or EntityState.Deleted)
+                throw new InvalidOperationException("Historical evidence is append-only.");
+            if (entry.Entity is IStableReference && entry.State == EntityState.Modified &&
+                entry.Properties.Any(p => p.IsModified && (p.Metadata.Name == "Code" || p.Metadata.Name.EndsWith("Id"))))
+                throw new InvalidOperationException("Taxonomy codes and hierarchy are immutable.");
+        }
+    }
+    public override int SaveChanges(bool acceptAllChangesOnSuccess)
+    {
+        ProtectEvidence();
+        return base.SaveChanges(acceptAllChangesOnSuccess);
+    }
+    public override Task<int> SaveChangesAsync(bool acceptAllChangesOnSuccess, CancellationToken cancellationToken = default)
+    {
+        ProtectEvidence();
+        return base.SaveChangesAsync(acceptAllChangesOnSuccess, cancellationToken);
+    }
+
     public override async Task<int> SaveChangesAsync(CancellationToken cancellationToken = default)
     {
+        ProtectEvidence();
         var now = DateTimeOffset.UtcNow;
 
         foreach (var entry in ChangeTracker.Entries<AuditableEntity>())

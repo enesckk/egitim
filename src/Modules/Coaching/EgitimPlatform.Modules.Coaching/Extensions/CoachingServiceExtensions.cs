@@ -12,6 +12,7 @@ public static class CoachingServiceExtensions
     public static IServiceCollection AddCoachingModule(this IServiceCollection services)
     {
         services.AddScoped<AssignCoachHandler>();
+        services.AddScoped<IStudentCoachSummaryQuery, StudentCoachSummaryQuery>();
         services.AddScoped<ICoachStudentQuery, CoachStudentQuery>();
         services.AddScoped<IStudentCoachAssigner, StudentCoachAssigner>();
         services.AddValidatorsFromAssembly(Assembly.GetExecutingAssembly());

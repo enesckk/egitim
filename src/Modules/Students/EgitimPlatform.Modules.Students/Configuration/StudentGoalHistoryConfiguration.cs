@@ -11,8 +11,8 @@ public class StudentGoalHistoryConfiguration : IEntityTypeConfiguration<StudentG
         builder.ToTable("StudentGoalHistories");
 
         builder.Property(h => h.Action).HasMaxLength(50).IsRequired();
-        builder.Property(h => h.PreviousValuesJson).HasMaxLength(4000);
-        builder.Property(h => h.NewValuesJson).HasMaxLength(4000);
+        builder.Property(h => h.PreviousValuesJson).HasColumnType("nvarchar(max)");
+        builder.Property(h => h.NewValuesJson).HasColumnType("nvarchar(max)");
         builder.Property(h => h.CorrelationId).HasMaxLength(100);
 
         // Indexes
