@@ -19,14 +19,14 @@ public sealed class TaxonomyHandler(IApplicationDbContext db) : IAcademicCatalog
         await new TaxonomyQueryValidator().ValidateAndThrowAsync(q, ct);
         IQueryable<TaxonomyDto> source = q.Level switch
         {
-            "exam-types" => ExamTypes.Where(x => !q.ParentId.HasValue).Select(x => new TaxonomyDto(x.Id, x.Code, x.Name, null)),
-            "subjects" => Subjects.Where(x => !q.ParentId.HasValue || x.ExamTypeId == q.ParentId).Select(x => new TaxonomyDto(x.Id, x.Code, x.Name, x.ExamTypeId)),
-            "topics" => Topics.Where(x => !q.ParentId.HasValue || x.SubjectId == q.ParentId).Select(x => new TaxonomyDto(x.Id, x.Code, x.Name, x.SubjectId)),
-            "sub-topics" => SubTopics.Where(x => !q.ParentId.HasValue || x.TopicId == q.ParentId).Select(x => new TaxonomyDto(x.Id, x.Code, x.Name, x.TopicId)),
-            "learning-outcomes" => LearningOutcomes.Where(x => !q.ParentId.HasValue || x.SubTopicId == q.ParentId).Select(x => new TaxonomyDto(x.Id, x.Code, x.Name, x.SubTopicId)),
-            "concepts" => Concepts.Where(x => !q.ParentId.HasValue || x.LearningOutcomeId == q.ParentId).Select(x => new TaxonomyDto(x.Id, x.Code, x.Name, x.LearningOutcomeId)),
+            "exam-types" => ExamTypes.Where(x => !q.ParentId.HasValue).OrderBy(x => x.Code).Select(x => new TaxonomyDto(x.Id, x.Code, x.Name, null)),
+            "subjects" => Subjects.Where(x => !q.ParentId.HasValue || x.ExamTypeId == q.ParentId).OrderBy(x => x.Code).Select(x => new TaxonomyDto(x.Id, x.Code, x.Name, x.ExamTypeId)),
+            "topics" => Topics.Where(x => !q.ParentId.HasValue || x.SubjectId == q.ParentId).OrderBy(x => x.Code).Select(x => new TaxonomyDto(x.Id, x.Code, x.Name, x.SubjectId)),
+            "sub-topics" => SubTopics.Where(x => !q.ParentId.HasValue || x.TopicId == q.ParentId).OrderBy(x => x.Code).Select(x => new TaxonomyDto(x.Id, x.Code, x.Name, x.TopicId)),
+            "learning-outcomes" => LearningOutcomes.Where(x => !q.ParentId.HasValue || x.SubTopicId == q.ParentId).OrderBy(x => x.Code).Select(x => new TaxonomyDto(x.Id, x.Code, x.Name, x.SubTopicId)),
+            "concepts" => Concepts.Where(x => !q.ParentId.HasValue || x.LearningOutcomeId == q.ParentId).OrderBy(x => x.Code).Select(x => new TaxonomyDto(x.Id, x.Code, x.Name, x.LearningOutcomeId)),
             _ => throw new ValidationException("Unknown taxonomy level.")
         };
-        return await source.OrderBy(x => x.Code).Skip((q.Page - 1) * q.PageSize).Take(q.PageSize).ToListAsync(ct);
+        return await source.Skip((q.Page - 1) * q.PageSize).Take(q.PageSize).ToListAsync(ct);
     }
 }
