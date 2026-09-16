@@ -7,4 +7,9 @@ public sealed record StudentDto(
     string FullName,
     string Status,
     Guid InstitutionId,
-    DateTimeOffset CreatedAt);
+    DateTimeOffset CreatedAt,
+    // Sprint 2 — Academic profile
+    string? SchoolName = null,
+    string? StudentNumber = null,
+    int? GradeLevel = null,
+    DateTimeOffset? EnrollmentDate = null);

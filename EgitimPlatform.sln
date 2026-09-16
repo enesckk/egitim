@@ -54,12 +54,18 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "EgitimPlatform.E2E", "tests
 EndProject
 Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "docs", "docs", "{A4B2C3D4-0004-0000-0000-000000000000}"
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "EgitimPlatform.Modules.Teachers", "src\Modules\Teachers\EgitimPlatform.Modules.Teachers\EgitimPlatform.Modules.Teachers.csproj", "{C3D4A1F1-290B-4A09-BFC3-7DF6F7796427}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
 		Release|Any CPU = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(ProjectConfigurationPlatforms) = postSolution
+		{C3D4A1F1-290B-4A09-BFC3-7DF6F7796427}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{C3D4A1F1-290B-4A09-BFC3-7DF6F7796427}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{C3D4A1F1-290B-4A09-BFC3-7DF6F7796427}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{C3D4A1F1-290B-4A09-BFC3-7DF6F7796427}.Release|Any CPU.Build.0 = Release|Any CPU
 		{B1B2C3D4-0001-0000-0000-000000000000}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
 		{B1B2C3D4-0001-0000-0000-000000000000}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{B1B2C3D4-0001-0000-0000-000000000000}.Release|Any CPU.ActiveCfg = Release|Any CPU
@@ -149,6 +155,7 @@ Global
 		HideSolutionNode = FALSE
 	EndGlobalSection
 	GlobalSection(NestedProjects) = preSolution
+		{C3D4A1F1-290B-4A09-BFC3-7DF6F7796427} = {A2B2C3D4-0002-0000-0000-000000000000}
 		{B1B2C3D4-0001-0000-0000-000000000000} = {A1B2C3D4-0001-0000-0000-000000000000}
 		{B2B2C3D4-0002-0000-0000-000000000000} = {A1B2C3D4-0001-0000-0000-000000000000}
 		{B3B2C3D4-0003-0000-0000-000000000000} = {A5B2C3D4-0005-0000-0000-000000000000}

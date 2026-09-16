@@ -83,6 +83,7 @@ public class SecurityTestFactory : WebApplicationFactory<Program>, IAsyncLifetim
         await seeder.SeedBootstrapSuperAdminAsync();
 
         await SecurityTestDataSeeder.SeedAsync(scope.ServiceProvider);
+        await Sprint2TestData.SeedAsync(scope.ServiceProvider);
     }
 
     public new async Task DisposeAsync()

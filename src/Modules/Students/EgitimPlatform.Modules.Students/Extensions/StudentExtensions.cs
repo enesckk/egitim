@@ -13,6 +13,10 @@ internal static class StudentExtensions
             $"{student.FirstName} {student.LastName}",
             student.Status.ToString(),
             student.InstitutionId,
-            student.CreatedAt);
+            student.CreatedAt,
+            student.SchoolName,
+            student.StudentNumber,
+            student.GradeLevel,
+            student.EnrollmentDate);
     }
 }

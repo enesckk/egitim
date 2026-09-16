@@ -47,33 +47,33 @@ public class CrossInstitutionTests
     }
 
     [Fact]
-    public async Task CoachA_CannotSeeStudentCreatedByAdminB()
+    public async Task CoachA_Gets404ForStudentCreatedByAdminB()
     {
         // Admin B creates a student in Institution B
         var adminBClient = await LoginAs("sec-admin-b@test.local");
         var createResponse = await adminBClient.PostAsJsonAsync("/api/v1/students", new CreateStudentCommand("BStudent", "Test", null));
         var student = await createResponse.Content.ReadFromJsonAsync<EgitimPlatform.Modules.Students.Features.StudentDto>();
 
-        // Coach A (Institution A) tries to access it
+        // Coach A (Institution A) must not learn whether the foreign student exists
         var coachAClient = await LoginAs("sec-coach-a@test.local");
         var response = await coachAClient.GetAsync($"/api/v1/students/{student!.Id}");
 
-        response.StatusCode.Should().Be(HttpStatusCode.Forbidden);
+        response.StatusCode.Should().Be(HttpStatusCode.NotFound);
     }
 
     [Fact]
-    public async Task AdminA_CannotSeeStudentCreatedByAdminB()
+    public async Task AdminA_Gets404ForStudentCreatedByAdminB()
     {
         // Admin B creates a student in Institution B
         var adminBClient = await LoginAs("sec-admin-b@test.local");
         var createResponse = await adminBClient.PostAsJsonAsync("/api/v1/students", new CreateStudentCommand("AnotherBStudent", "Test", null));
         var student = await createResponse.Content.ReadFromJsonAsync<EgitimPlatform.Modules.Students.Features.StudentDto>();
 
-        // Admin A (Institution A) tries to access it
+        // Admin A (Institution A) must not learn whether the foreign student exists
         var adminAClient = await LoginAs("sec-admin-a@test.local");
         var response = await adminAClient.GetAsync($"/api/v1/students/{student!.Id}");
 
-        response.StatusCode.Should().Be(HttpStatusCode.Forbidden);
+        response.StatusCode.Should().Be(HttpStatusCode.NotFound);
     }
 
     [Fact]

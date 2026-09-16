@@ -36,7 +36,7 @@ public class AuditService : IAuditService
             EntityId = entityId,
             InstitutionId = institutionId,
             MetadataJson = metadataJson,
-            CorrelationId = correlationId,
+            CorrelationId = correlationId ?? System.Diagnostics.Activity.Current?.TraceId.ToString(),
             IpAddress = ipAddress,
             UserAgent = userAgent,
             Timestamp = DateTimeOffset.UtcNow,

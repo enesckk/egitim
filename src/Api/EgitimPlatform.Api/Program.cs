@@ -1,3 +1,5 @@
+using EgitimPlatform.Modules.Academic.Extensions;
+using EgitimPlatform.Modules.Teachers.Extensions;
 using EgitimPlatform.Api.Extensions;
 using EgitimPlatform.Api.Middleware;
 using EgitimPlatform.Infrastructure;
@@ -36,6 +38,8 @@ try
     // Domain modules
     builder.Services.AddStudentsModule();
     builder.Services.AddCoachingModule();
+    builder.Services.AddAcademicModule();
+    builder.Services.AddTeachersModule();
 
     // Controllers
     builder.Services.AddControllers();
@@ -217,6 +221,14 @@ try
             Log.Information("Bootstrap SuperAdmin processed (if enabled).");
         }
 
+        var taxonomyPath = app.Configuration["Academic:VerifiedSeedManifest"];
+        if (!string.IsNullOrWhiteSpace(taxonomyPath))
+        {
+            var records = System.Text.Json.JsonSerializer.Deserialize<List<EgitimPlatform.Modules.Academic.Seeding.TaxonomySeedRecord>>(
+                await File.ReadAllTextAsync(taxonomyPath), new System.Text.Json.JsonSerializerOptions { PropertyNameCaseInsensitive = true })
+                ?? throw new InvalidOperationException("Invalid taxonomy manifest.");
+            await scope.ServiceProvider.GetRequiredService<EgitimPlatform.Modules.Academic.Seeding.TaxonomySeeder>().SeedAsync(records);
+        }
         Log.Information("Platform initialization complete. Exiting.");
         return; // Exit without starting web server
     }
@@ -274,6 +286,10 @@ try
 
     Log.Information("Application starting in {Environment}...", app.Environment.EnvironmentName);
     app.Run();
+}
+catch (HostAbortedException)
+{
+    throw; // EF design-time host discovery is not an application failure.
 }
 catch (Exception ex)
 {
