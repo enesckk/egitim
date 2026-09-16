@@ -7,7 +7,7 @@ import { ProfileIdentityCard } from './components/ProfileIdentityCard';
 import { PasswordChangeModal } from './components/PasswordChangeModal';
 import { NotificationSettingsModal } from './components/NotificationSettingsModal';
 import { LogoutConfirmModal } from './components/LogoutConfirmModal';
-import { initialStudentProfileData } from './mockData';
+import { useAuth } from '@/auth';
 import { StudentProfileData } from './types';
 
 export interface StudentProfileViewProps {
@@ -19,13 +19,30 @@ export interface StudentProfileViewProps {
 }
 
 export const StudentProfileView: React.FC<StudentProfileViewProps> = ({
-  initialData = initialStudentProfileData,
+  initialData,
   isLoading = false,
   errorMessage,
   onRetry,
   onLogout,
 }) => {
-  const [profile, setProfile] = useState<StudentProfileData>(initialData);
+  const { user, logout } = useAuth();
+
+  const defaultProfile: StudentProfileData = {
+    id: user?.id || 'student-current',
+    name: user?.name || user?.email?.split('@')[0] || 'Öğrenci',
+    subtitle: `${user?.institutionName || 'Kurumsal Öğrenci'} • ${user?.roleLabel || 'Öğrenci'}`,
+    email: user?.email || '',
+    initials: user?.name
+      ? user.name
+          .split(' ')
+          .map((w) => w[0])
+          .join('')
+          .substring(0, 2)
+          .toUpperCase()
+      : 'ÖG',
+  };
+
+  const [profile] = useState<StudentProfileData>(initialData || defaultProfile);
   const [isPasswordModalOpen, setIsPasswordModalOpen] = useState(false);
   const [isNotifModalOpen, setIsNotifModalOpen] = useState(false);
   const [isLogoutModalOpen, setIsLogoutModalOpen] = useState(false);
@@ -106,7 +123,7 @@ export const StudentProfileView: React.FC<StudentProfileViewProps> = ({
 
           <button
             type="button"
-            onClick={() => setInfoAlert('Hesap ve gizlilik ayarlarınız günceldir.')}
+            onClick={() => setInfoAlert('Hesap ve güvenlik ayarları kurum yöneticiniz tarafından yönetilmektedir.')}
             className="flex items-center gap-3 px-5 py-3.5 w-full hover:bg-neutral-50 transition-colors group text-left min-h-[52px]"
           >
             <Settings className="h-4 w-4 text-neutral-400 flex-shrink-0" />
@@ -137,11 +154,6 @@ export const StudentProfileView: React.FC<StudentProfileViewProps> = ({
       <NotificationSettingsModal
         isOpen={isNotifModalOpen}
         onClose={() => setIsNotifModalOpen(false)}
-        initialPreferences={profile.notificationPreferences}
-        onSave={(prefs) => {
-          setProfile((prev) => ({ ...prev, notificationPreferences: prefs }));
-          setInfoAlert('Bildirim tercihleriniz başarıyla kaydedildi.');
-        }}
       />
 
       <LogoutConfirmModal
@@ -150,7 +162,7 @@ export const StudentProfileView: React.FC<StudentProfileViewProps> = ({
         onConfirm={() => {
           setIsLogoutModalOpen(false);
           if (onLogout) onLogout();
-          else setInfoAlert('Oturum başarıyla kapatıldı.');
+          else logout();
         }}
       />
     </div>

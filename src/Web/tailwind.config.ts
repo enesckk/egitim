@@ -5,6 +5,11 @@ export default {
   theme: {
     extend: {
       colors: {
+        brand: {
+          primary: '#17324D',
+          accent: '#2A7F7B',
+          secondary: '#4F6F8F',
+        },
         navy: {
           950: '#060E1B',
           900: '#0F1B2D',
@@ -19,7 +24,8 @@ export default {
           50: '#EEF4FB',
         },
         primary: {
-          900: '#192E80',
+          900: '#17324D',
+          800: '#1F4060',
           700: '#1E43A0',
           600: '#2451B7',
           500: '#3060CE',
@@ -28,18 +34,18 @@ export default {
           50: '#EBF2FD',
         },
         success: {
-          DEFAULT: '#059669',
-          dark: '#047857',
+          DEFAULT: '#2F7D5A',
+          dark: '#246347',
           light: '#ECFDF5',
         },
         warning: {
-          DEFAULT: '#D97706',
-          dark: '#B45309',
+          DEFAULT: '#9A6A1A',
+          dark: '#7D5413',
           light: '#FFFBEB',
         },
         danger: {
-          DEFAULT: '#DC2626',
-          dark: '#B91C1C',
+          DEFAULT: '#B44A4A',
+          dark: '#923636',
           light: '#FEF2F2',
         },
         attention: {
@@ -48,9 +54,12 @@ export default {
           light: '#F5F3FF',
         },
         surface: {
-          DEFAULT: '#F7F8FB',
+          DEFAULT: '#F7F9FC',
           alt: '#EEF0F6',
           card: '#FFFFFF',
+        },
+        border: {
+          subtle: '#D9E1E8',
         },
       },
       borderRadius: {
@@ -74,3 +83,4 @@ export default {
   },
   plugins: [],
 } satisfies Config;
+

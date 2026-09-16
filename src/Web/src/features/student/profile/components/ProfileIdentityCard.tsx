@@ -51,13 +51,15 @@ export const ProfileIdentityCard: React.FC<ProfileIdentityCardProps> = ({ profil
             </div>
           </div>
 
-          <div className="flex items-center gap-3 px-5 py-3.5">
-            <Calendar className="h-4 w-4 text-neutral-400 flex-shrink-0" />
-            <div className="flex-1 min-w-0">
-              <p className="text-[11px] text-neutral-400">Platforma Katılım</p>
-              <p className="text-sm font-medium text-neutral-800">{profile.joined}</p>
+          {profile.joined && (
+            <div className="flex items-center gap-3 px-5 py-3.5">
+              <Calendar className="h-4 w-4 text-neutral-400 flex-shrink-0" />
+              <div className="flex-1 min-w-0">
+                <p className="text-[11px] text-neutral-400">Platforma Katılım</p>
+                <p className="text-sm font-medium text-neutral-800">{profile.joined}</p>
+              </div>
             </div>
-          </div>
+          )}
         </div>
       </div>
     </div>
