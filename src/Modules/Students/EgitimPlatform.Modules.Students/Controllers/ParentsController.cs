@@ -3,11 +3,16 @@ using EgitimPlatform.Modules.Students.Features.ManageParents;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 namespace EgitimPlatform.Modules.Students.Controllers;
-[ApiController, Route("api/v1/parents"), Authorize(Roles = Roles.SuperAdmin + "," + Roles.InstitutionAdmin)]
+[ApiController, Route("api/v1/parents"), Authorize(Policy = Policies.CanManageParents)]
 public class ParentsController(ParentHandler handler) : ControllerBase
 {
     [HttpPost]
     public async Task<ActionResult<ParentDto>> Create(CreateParentCommand c, CancellationToken ct) => StatusCode(201, await handler.CreateAsync(c, ct));
+    [HttpGet("{id:guid}")]
+    public async Task<ActionResult<ParentDto>> Get(Guid id, CancellationToken ct) => Ok(await handler.GetAsync(id, ct));
+    [HttpGet("by-student/{studentId:guid}")]
+    public async Task<ActionResult<IReadOnlyList<StudentParentDto>>> ListForStudent(Guid studentId, CancellationToken ct)
+        => Ok(await handler.ListForStudentAsync(studentId, ct));
     [HttpPost("relationships")]
     public async Task<ActionResult<StudentParentDto>> Link(LinkParentCommand c, CancellationToken ct) => StatusCode(201, await handler.LinkAsync(c, ct));
     [HttpPut("relationships/{id:guid}")]

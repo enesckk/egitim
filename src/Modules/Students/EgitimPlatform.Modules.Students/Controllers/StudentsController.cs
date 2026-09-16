@@ -152,6 +152,7 @@ public class StudentsController : ControllerBase
     [Authorize(Policy = Policies.CanViewStudents)]
     [ProducesResponseType(typeof(IReadOnlyList<StudentGoalDto>), StatusCodes.Status200OK)]
     [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status403Forbidden)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status404NotFound)]
     public async Task<IActionResult> ListGoals(Guid studentId, [FromQuery] bool? isActive, CancellationToken ct)
     {
         var result = await _listGoalsHandler.HandleAsync(new ListStudentGoalsQuery(studentId, isActive), ct);

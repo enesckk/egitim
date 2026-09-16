@@ -23,23 +23,23 @@ public class ListStudentGoalsHandler
 
     public async Task<IReadOnlyList<StudentGoalDto>> HandleAsync(ListStudentGoalsQuery query, CancellationToken ct = default)
     {
-        var student = await GoalAuthorizationHelper.FetchStudentOrThrowAsync(_dbContext, query.StudentId, ct);
+        var student = await GoalAuthorizationHelper.FetchStudentForReadOrThrowAsync(
+            _dbContext, _currentUser, query.StudentId, ct);
         await GoalAuthorizationHelper.AuthorizeForStudentAsync(student, _currentUser, _coachStudentQuery, ct);
 
         var source = _dbContext.Set<StudentGoal>()
             .AsNoTracking()
-            .Where(g => g.StudentId == query.StudentId);
+            .Where(g => g.StudentId == student.Id && g.InstitutionId == student.InstitutionId);
 
         if (query.IsActive.HasValue)
             source = source.Where(g => g.IsActive == query.IsActive.Value);
 
-        var goals = await source
-            .OrderByDescending(g => g.EffectiveDate)
+        return await source
+            .OrderByDescending(g => g.EffectiveDate).ThenBy(g => g.Id)
+            .Select(g => new StudentGoalDto(
+                g.Id, g.StudentId, g.Title, g.Description, g.TargetExamTypeId,
+                g.TargetScore, g.TargetRank, g.TargetSchoolName, g.EffectiveDate,
+                g.IsActive, g.CreatedAt))
             .ToListAsync(ct);
-
-        return goals.Select(g => new StudentGoalDto(
-            g.Id, g.StudentId, g.Title, g.Description, g.TargetExamTypeId,
-            g.TargetScore, g.TargetRank, g.TargetSchoolName, g.EffectiveDate,
-            g.IsActive, g.CreatedAt)).ToList();
     }
 }

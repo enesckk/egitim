@@ -8,4 +8,7 @@ public static class Policies
     public const string CanAssignCoach = "CanAssignCoach";
     public const string CanManageInstitution = "CanManageInstitution";
     public const string CanViewAuditLogs = "CanViewAuditLogs";
+    public const string CanManageTeachers = "CanManageTeachers";
+    public const string CanManageParents = "CanManageParents";
+    public const string CanViewTaxonomy = "CanViewTaxonomy";
 }

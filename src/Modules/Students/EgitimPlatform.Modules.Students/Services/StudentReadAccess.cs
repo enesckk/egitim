@@ -9,7 +9,7 @@ public static class StudentReadAccess
     public static bool IsParentOnly(ICurrentUser user) => user.IsInRole(Roles.Parent) && !user.IsSuperAdmin && !user.IsInRole(Roles.InstitutionAdmin) && !user.IsInRole(Roles.Coach) && !user.IsInRole(Roles.Student);
     public static async Task<Student> GetAsync(IApplicationDbContext db, ICurrentUser user, ICoachStudentQuery coaches, Guid studentId, CancellationToken ct)
     {
-        var student = await db.Set<Student>().SingleOrDefaultAsync(x => x.Id == studentId, ct) ?? throw new NotFoundException("Student", studentId);
+        var student = await GoalAuthorizationHelper.FetchStudentForReadOrThrowAsync(db, user, studentId, ct);
         if (!IsParentOnly(user)) { await GoalAuthorizationHelper.AuthorizeForStudentAsync(student, user, coaches, ct); return student; }
         var institution = await user.GetInstitutionIdAsync();
         if (!user.IsAuthenticated || user.UserId is null || institution is null || institution != student.InstitutionId)

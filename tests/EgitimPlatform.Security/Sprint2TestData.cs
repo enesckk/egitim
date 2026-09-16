@@ -11,7 +11,7 @@ using Microsoft.Extensions.DependencyInjection;
 namespace EgitimPlatform.Security;
 public static class Sprint2TestData
 {
-    public static Guid InstitutionA, InstitutionB, StudentA, StudentOther, StudentForeign, GoalA, InactiveGoalOther, ParentA, ParentForeign, LinkA, TeacherA, Exam, Subject;
+    public static Guid InstitutionA, InstitutionB, StudentA, StudentOther, StudentForeign, GoalA, GoalForeign, InactiveGoalOther, ParentA, ParentForeign, LinkA, LinkForeign, TeacherA, TeacherB, Exam, Subject;
     public static async Task SeedAsync(IServiceProvider services)
     {
         var db = services.GetRequiredService<ApplicationDbContext>(); var users = services.GetRequiredService<UserManager<ApplicationUser>>();
@@ -34,6 +34,7 @@ public static class Sprint2TestData
         var pa = new Parent { InstitutionId=a.Id, UserId=ids["parent"], FirstName="Related", LastName="Parent", Phone="PRIVATE-PHONE" };
         var pb = new Parent { InstitutionId=b.Id, UserId=ids["foreign-parent"], FirstName="Foreign", LastName="Parent" }; db.AddRange(pa,pb); ParentA=pa.Id; ParentForeign=pb.Id;
         var link = new StudentParent { InstitutionId=a.Id, StudentId=sa.Id, ParentId=pa.Id, RelationshipType="Guardian", Notes="PRIVATE-RELATIONSHIP-NOTE" }; db.Add(link); LinkA=link.Id;
+        var foreignLink = new StudentParent { InstitutionId=b.Id, StudentId=sb.Id, ParentId=pb.Id, RelationshipType="Guardian" }; db.Add(foreignLink); LinkForeign=foreignLink.Id;
         var coach = new Coach { InstitutionId=a.Id, UserId=ids["coach"], FirstName="Coach", LastName="Assigned" }; db.Add(coach);
         db.Add(new Coach { InstitutionId=a.Id, UserId=ids["unassigned-coach"], FirstName="Coach", LastName="Unassigned" });
         db.Add(new Coach { InstitutionId=b.Id, UserId=ids["foreign-coach"], FirstName="Coach", LastName="Foreign" });
@@ -41,8 +42,10 @@ public static class Sprint2TestData
         var exam = new ExamType { Code="TEST-S2-EXAM", Name="Synthetic test exam" }; db.Add(exam); Exam=exam.Id;
         var subject = new Subject { Code="TEST-S2-SUBJECT", Name="Synthetic test subject", ExamTypeId=exam.Id }; db.Add(subject); Subject=subject.Id;
         var teacher = new Teacher { InstitutionId=a.Id, UserId=ids["teacher"], FirstName="Teacher", LastName="Test" }; db.Add(teacher); TeacherA=teacher.Id;
+        var teacherB = new Teacher { InstitutionId=b.Id, UserId=ids["foreign-teacher"], FirstName="Teacher", LastName="Foreign" }; db.Add(teacherB); TeacherB=teacherB.Id;
         db.Add(new TeacherSubject { InstitutionId=a.Id, TeacherId=teacher.Id, SubjectId=subject.Id });
         var goal = new StudentGoal { InstitutionId=a.Id, StudentId=sa.Id, Title="Current goal", Description="PRIVATE-GOAL-NOTE", TargetExamTypeId=exam.Id }; db.Add(goal); GoalA=goal.Id;
+        var foreignGoal = new StudentGoal { InstitutionId=b.Id, StudentId=sb.Id, Title="Foreign goal" }; db.Add(foreignGoal); GoalForeign=foreignGoal.Id;
         var inactive = new StudentGoal { InstitutionId=a.Id, StudentId=so.Id, Title="Inactive", IsActive=false }; db.Add(inactive); InactiveGoalOther=inactive.Id;
         db.Add(EgitimPlatform.Modules.Students.Services.GoalHistory.Capture(goal,"Created",ids["student"]));
         await db.SaveChangesAsync();

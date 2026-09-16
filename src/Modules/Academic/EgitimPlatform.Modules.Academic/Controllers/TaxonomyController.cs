@@ -1,8 +1,9 @@
+using EgitimPlatform.BuildingBlocks.Constants;
 using EgitimPlatform.Modules.Academic.Features;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 namespace EgitimPlatform.Modules.Academic.Controllers;
-[ApiController, Authorize, Route("api/v1/academic")]
+[ApiController, Authorize(Policy = Policies.CanViewTaxonomy), Route("api/v1/academic")]
 public class TaxonomyController(TaxonomyHandler handler) : ControllerBase
 {
     [HttpGet("{level}")]

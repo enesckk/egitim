@@ -1,4 +1,5 @@
 using EgitimPlatform.BuildingBlocks.Interfaces;
+using EgitimPlatform.BuildingBlocks.Exceptions;
 using EgitimPlatform.Modules.Students.Entities;
 using EgitimPlatform.Modules.Students.Services;
 using Microsoft.EntityFrameworkCore;
@@ -27,12 +28,27 @@ public class DeactivateStudentGoalHandler
 
     public async Task HandleAsync(DeactivateStudentGoalCommand command, CancellationToken ct = default)
     {
-        var goal = await _dbContext.Set<StudentGoal>()
-            .FirstOrDefaultAsync(g => g.Id == command.GoalId, ct)
-            ?? throw new EgitimPlatform.BuildingBlocks.Exceptions.NotFoundException("StudentGoal", command.GoalId);
+        var goals = _dbContext.Set<StudentGoal>()
+            .Where(g => g.Id == command.GoalId);
 
+        if (!_currentUser.IsSuperAdmin)
+        {
+            var institutionId = await _currentUser.GetInstitutionIdAsync();
+            if (!institutionId.HasValue)
+                throw new ForbiddenException("Access denied.");
 
-        var student = await GoalAuthorizationHelper.FetchStudentOrThrowAsync(_dbContext, goal.StudentId, ct);
+            goals = goals.Where(g => g.InstitutionId == institutionId.Value);
+        }
+
+        var goal = await goals.SingleOrDefaultAsync(ct)
+            ?? throw new NotFoundException("StudentGoal", command.GoalId);
+
+        var student = await _dbContext.Set<Student>()
+            .AsNoTracking()
+            .SingleOrDefaultAsync(
+                s => s.Id == goal.StudentId && s.InstitutionId == goal.InstitutionId,
+                ct)
+            ?? throw new NotFoundException("Student", goal.StudentId);
         await GoalAuthorizationHelper.AuthorizeForStudentAsync(student, _currentUser, _coachStudentQuery, ct);
 
         if (!goal.IsActive) return; // Idempotency follows resource authorization.

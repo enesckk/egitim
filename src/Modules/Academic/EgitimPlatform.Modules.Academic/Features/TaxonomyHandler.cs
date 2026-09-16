@@ -13,6 +13,13 @@ public sealed class TaxonomyHandler(IApplicationDbContext db) : IAcademicCatalog
     private IQueryable<Concept> Concepts => db.Set<Concept>().AsNoTracking().Where(x => LearningOutcomes.Select(p => p.Id).Contains(x.LearningOutcomeId));
     public async Task<AcademicReferenceDto?> GetExamTypeAsync(Guid id, CancellationToken ct = default) =>
         await ExamTypes.Where(x => x.Id == id).Select(x => new AcademicReferenceDto(x.Id, x.Code, x.Name)).SingleOrDefaultAsync(ct);
+    public async Task<IReadOnlyList<AcademicReferenceDto>> GetExamTypesAsync(IEnumerable<Guid> ids, CancellationToken ct = default)
+    {
+        var idList = ids.Distinct().ToList();
+        if (idList.Count == 0) return Array.Empty<AcademicReferenceDto>();
+        return await ExamTypes.Where(x => idList.Contains(x.Id)).OrderBy(x => x.Code)
+            .Select(x => new AcademicReferenceDto(x.Id, x.Code, x.Name)).ToListAsync(ct);
+    }
     public Task<bool> SubjectExistsAsync(Guid id, CancellationToken ct = default) => Subjects.AnyAsync(x => x.Id == id, ct);
     public async Task<IReadOnlyList<TaxonomyDto>> HandleAsync(TaxonomyQuery q, CancellationToken ct = default)
     {

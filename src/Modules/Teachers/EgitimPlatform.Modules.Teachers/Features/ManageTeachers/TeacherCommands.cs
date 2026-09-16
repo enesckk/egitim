@@ -3,7 +3,18 @@ namespace EgitimPlatform.Modules.Teachers.Features.ManageTeachers;
 public record CreateTeacherCommand(Guid InstitutionId, Guid UserId, string FirstName, string LastName, string? Title = null);
 public record TeacherSubjectCommand(Guid TeacherId, Guid SubjectId);
 public record TeacherDto(Guid Id, string FirstName, string LastName);
+public record TeacherDetailDto(Guid Id, Guid UserId, string FirstName, string LastName, string? Title);
+public record TeacherListDto(Guid Id, string FirstName, string LastName, string? Title);
 public record TeacherSubjectDto(Guid Id, Guid TeacherId, Guid SubjectId);
+public record ListTeachersQuery(int Page = 1, int PageSize = 50);
+public class ListTeachersQueryValidator : AbstractValidator<ListTeachersQuery>
+{
+    public ListTeachersQueryValidator()
+    {
+        RuleFor(x => x.Page).InclusiveBetween(1, 100000);
+        RuleFor(x => x.PageSize).InclusiveBetween(1, 200);
+    }
+}
 public class CreateTeacherValidator : AbstractValidator<CreateTeacherCommand>
 {
     public CreateTeacherValidator()

@@ -27,13 +27,9 @@ public class GetStudent360Handler(IApplicationDbContext db, ICurrentUser user, I
                            select new { parent.Id, parent.FirstName, parent.LastName, parent.UserId, link.RelationshipType };
         // A parent may see their own relationship, not details about other guardians.
         if (StudentReadAccess.IsParentOnly(user)) parentsQuery = parentsQuery.Where(x => x.UserId == user.UserId);
-        var parents = await parentsQuery.OrderBy(x => x.Id).Select(x => new ParentRelationshipDto(x.Id, x.FirstName + " " + x.LastName, x.RelationshipType)).ToListAsync(ct);
-        var exams = new List<AcademicReferenceDto>();
-        foreach (var id in goals.Where(x => x.TargetExamTypeId.HasValue).Select(x => x.TargetExamTypeId!.Value).Distinct())
-        {
-            var exam = await academic.GetExamTypeAsync(id, ct);
-            if (exam is not null) exams.Add(exam);
-        }
+        var parents = await parentsQuery.OrderBy(x => x.LastName).ThenBy(x => x.FirstName).ThenBy(x => x.Id).Select(x => new ParentRelationshipDto(x.Id, x.FirstName + " " + x.LastName, x.RelationshipType)).ToListAsync(ct);
+        var examIds = goals.Where(x => x.TargetExamTypeId.HasValue).Select(x => x.TargetExamTypeId!.Value).Distinct();
+        var exams = await academic.GetExamTypesAsync(examIds, ct);
         return new(student.ToDto(), goals, await coaches.GetAsync(student.Id, student.InstitutionId, ct), parents, exams);
     }
 }

@@ -1,4 +1,5 @@
 using EgitimPlatform.BuildingBlocks.Interfaces;
+using EgitimPlatform.BuildingBlocks.Exceptions;
 using EgitimPlatform.Modules.Students.Entities;
 using EgitimPlatform.Modules.Students.Services;
 using Microsoft.EntityFrameworkCore;
@@ -23,18 +24,25 @@ public class GetStudentGoalHandler
 
     public async Task<StudentGoalDto> HandleAsync(Guid goalId, CancellationToken ct = default)
     {
-        var goal = await _dbContext.Set<StudentGoal>()
-            .FirstOrDefaultAsync(g => g.Id == goalId, ct)
-            ?? throw new EgitimPlatform.BuildingBlocks.Exceptions.NotFoundException("StudentGoal", goalId);
+        var institutionId = await _currentUser.GetInstitutionIdAsync();
+        if (!_currentUser.IsSuperAdmin && !institutionId.HasValue)
+            throw new ForbiddenException("Access denied.");
+
+        var goals = _dbContext.Set<StudentGoal>().AsNoTracking().Where(g => g.Id == goalId);
+        if (!_currentUser.IsSuperAdmin)
+            goals = goals.Where(g => g.InstitutionId == institutionId!.Value);
+
+        var goal = await goals
+            .Select(g => new StudentGoalDto(
+                g.Id, g.StudentId, g.Title, g.Description, g.TargetExamTypeId,
+                g.TargetScore, g.TargetRank, g.TargetSchoolName, g.EffectiveDate,
+                g.IsActive, g.CreatedAt))
+            .SingleOrDefaultAsync(ct)
+            ?? throw new NotFoundException("StudentGoal", goalId);
 
         var student = await GoalAuthorizationHelper.FetchStudentOrThrowAsync(_dbContext, goal.StudentId, ct);
         await GoalAuthorizationHelper.AuthorizeForStudentAsync(student, _currentUser, _coachStudentQuery, ct);
 
-        return ToDto(goal);
+        return goal;
     }
-
-    private static StudentGoalDto ToDto(StudentGoal g) => new(
-        g.Id, g.StudentId, g.Title, g.Description, g.TargetExamTypeId,
-        g.TargetScore, g.TargetRank, g.TargetSchoolName, g.EffectiveDate,
-        g.IsActive, g.CreatedAt);
 }

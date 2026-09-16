@@ -112,17 +112,17 @@ public class ClosurePatchSecurityTests
     }
 
     [Fact]
-    public async Task CrossInstitutionCoach_Denied()
+    public async Task CrossInstitutionCoach_Returns404ToHideStudentExistence()
     {
         // Admin B creates student in Institution B
         var adminBClient = await LoginAs("sec-admin-b@test.local");
         var cr = await adminBClient.PostAsJsonAsync("/api/v1/students", new CreateStudentCommand("CrossInstP101", "Test", null));
         var student = await cr.Content.ReadFromJsonAsync<EgitimPlatform.Modules.Students.Features.StudentDto>();
 
-        // Coach A (Institution A) tries to access — denied
+        // Coach A (Institution A) must not learn whether the foreign student exists
         var coachAClient = await LoginAs("sec-coach-a@test.local");
         var getResponse = await coachAClient.GetAsync($"/api/v1/students/{student!.Id}");
-        getResponse.StatusCode.Should().Be(HttpStatusCode.Forbidden);
+        getResponse.StatusCode.Should().Be(HttpStatusCode.NotFound);
     }
 
     // ===== P2-02: CSRF / Origin Validation =====

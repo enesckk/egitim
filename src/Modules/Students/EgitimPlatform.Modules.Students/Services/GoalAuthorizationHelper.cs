@@ -12,6 +12,26 @@ namespace EgitimPlatform.Modules.Students.Services;
 /// </summary>
 public static class GoalAuthorizationHelper
 {
+    public static async Task<Student> FetchStudentForReadOrThrowAsync(
+        IApplicationDbContext dbContext,
+        ICurrentUser currentUser,
+        Guid studentId,
+        CancellationToken ct)
+    {
+        var students = dbContext.Set<Student>().AsNoTracking().Where(s => s.Id == studentId);
+        if (!currentUser.IsSuperAdmin)
+        {
+            var institutionId = await currentUser.GetInstitutionIdAsync();
+            if (!institutionId.HasValue)
+                throw new ForbiddenException("Access denied.");
+
+            students = students.Where(s => s.InstitutionId == institutionId.Value);
+        }
+
+        return await students.SingleOrDefaultAsync(ct)
+            ?? throw new NotFoundException("Student", studentId);
+    }
+
     public static async Task AuthorizeForStudentAsync(
         Student student,
         ICurrentUser currentUser,

@@ -27,11 +27,20 @@ public class UpdateAcademicProfileHandler
 
     public async Task<StudentDto> HandleAsync(UpdateAcademicProfileCommand command, CancellationToken ct = default)
     {
-        var institutionId = await _currentUser.GetInstitutionIdAsync();
+        var students = _dbContext.Set<Student>()
+            .Where(s => s.Id == command.StudentId);
 
-        // Fetch student (query filter handles soft-delete)
-        var student = await _dbContext.Set<Student>()
-            .FirstOrDefaultAsync(s => s.Id == command.StudentId, ct);
+        if (!_currentUser.IsSuperAdmin)
+        {
+            var institutionId = await _currentUser.GetInstitutionIdAsync();
+            if (!institutionId.HasValue)
+                throw new ForbiddenException("Access denied.");
+
+            students = students.Where(s => s.InstitutionId == institutionId.Value);
+        }
+
+        // Resolve within the caller's tenant; the global filter still handles soft-delete.
+        var student = await students.SingleOrDefaultAsync(ct);
 
         if (student is null)
             throw new NotFoundException("Student", command.StudentId);

@@ -30,11 +30,21 @@ public class CreateStudentGoalHandler
 
     public async Task<StudentGoalDto> HandleAsync(CreateStudentGoalCommand command, CancellationToken ct = default)
     {
-        var institutionId = await _currentUser.GetInstitutionIdAsync();
+        var students = _dbContext.Set<Student>()
+            .AsNoTracking()
+            .Where(s => s.Id == command.StudentId);
 
-        // Verify student exists and authorize
-        var student = await _dbContext.Set<Student>()
-            .FirstOrDefaultAsync(s => s.Id == command.StudentId, ct);
+        if (!_currentUser.IsSuperAdmin)
+        {
+            var institutionId = await _currentUser.GetInstitutionIdAsync();
+            if (!institutionId.HasValue)
+                throw new ForbiddenException("Access denied.");
+
+            students = students.Where(s => s.InstitutionId == institutionId.Value);
+        }
+
+        // Resolve within the caller's tenant before applying resource authorization.
+        var student = await students.SingleOrDefaultAsync(ct);
 
         if (student is null)
             throw new NotFoundException("Student", command.StudentId);

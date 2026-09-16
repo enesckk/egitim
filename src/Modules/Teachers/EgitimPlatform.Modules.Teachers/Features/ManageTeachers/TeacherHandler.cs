@@ -8,11 +8,51 @@ using Microsoft.EntityFrameworkCore;
 namespace EgitimPlatform.Modules.Teachers.Features.ManageTeachers;
 public class TeacherHandler(IApplicationDbContext db, ICurrentUser user, IUserDirectory users, IAcademicCatalog academic, IAuditService audit)
 {
+    public async Task<TeacherDetailDto> GetAsync(Guid teacherId, CancellationToken ct)
+    {
+        var institutionId = await user.GetInstitutionIdAsync();
+        if (!user.IsSuperAdmin && !institutionId.HasValue)
+            throw new ForbiddenException("Access denied.");
+
+        var teachers = db.Set<Teacher>().AsNoTracking().Where(x => x.Id == teacherId);
+        if (!user.IsSuperAdmin)
+            teachers = teachers.Where(x => x.InstitutionId == institutionId!.Value);
+
+        var teacher = await teachers
+            .Select(x => new TeacherDetailDto(x.Id, x.UserId, x.FirstName, x.LastName, x.Title))
+            .SingleOrDefaultAsync(ct) ?? throw new NotFoundException("Teacher", teacherId);
+        return teacher;
+    }
+    public async Task<IReadOnlyList<TeacherListDto>> ListAsync(ListTeachersQuery q, CancellationToken ct)
+    {
+        await new ListTeachersQueryValidator().ValidateAndThrowAsync(q, ct);
+        var institutionId = await user.GetInstitutionIdAsync();
+        if (!user.IsSuperAdmin && !institutionId.HasValue)
+            throw new ForbiddenException("Access denied.");
+
+        var teachers = db.Set<Teacher>().AsNoTracking();
+        if (!user.IsSuperAdmin)
+            teachers = teachers.Where(x => x.InstitutionId == institutionId!.Value);
+
+        return await teachers
+            .OrderBy(x => x.LastName).ThenBy(x => x.FirstName).ThenBy(x => x.Id)
+            .Skip((q.Page - 1) * q.PageSize).Take(q.PageSize)
+            .Select(x => new TeacherListDto(x.Id, x.FirstName, x.LastName, x.Title))
+            .ToListAsync(ct);
+    }
     public async Task<IReadOnlyList<TeacherSubjectDto>> GetSubjectsAsync(Guid teacherId, CancellationToken ct)
     {
         if (teacherId == Guid.Empty) throw new ValidationException("Teacher identity is required.");
-        var teacher = await db.Set<Teacher>().AsNoTracking().SingleOrDefaultAsync(x => x.Id == teacherId, ct) ?? throw new NotFoundException("Teacher", teacherId);
-        var isOwnTeacher = user.IsAuthenticated && user.IsInRole(Roles.Teacher) && user.UserId == teacher.UserId && await user.GetInstitutionIdAsync() == teacher.InstitutionId;
+        var institutionId = await user.GetInstitutionIdAsync();
+        if (!user.IsSuperAdmin && !institutionId.HasValue)
+            throw new ForbiddenException("Access denied.");
+
+        var teachers = db.Set<Teacher>().AsNoTracking().Where(x => x.Id == teacherId);
+        if (!user.IsSuperAdmin)
+            teachers = teachers.Where(x => x.InstitutionId == institutionId!.Value);
+
+        var teacher = await teachers.SingleOrDefaultAsync(ct) ?? throw new NotFoundException("Teacher", teacherId);
+        var isOwnTeacher = user.IsAuthenticated && user.IsInRole(Roles.Teacher) && user.UserId == teacher.UserId && institutionId == teacher.InstitutionId;
         if (!isOwnTeacher) await InstitutionManagement.DemandAsync(user, teacher.InstitutionId);
         return await db.Set<TeacherSubject>().AsNoTracking().Where(x => x.TeacherId == teacher.Id && x.InstitutionId == teacher.InstitutionId)
             .OrderBy(x => x.SubjectId).Select(x => new TeacherSubjectDto(x.Id, x.TeacherId, x.SubjectId)).ToListAsync(ct);
@@ -32,7 +72,16 @@ public class TeacherHandler(IApplicationDbContext db, ICurrentUser user, IUserDi
     public async Task<TeacherSubjectDto> SetSubjectAsync(TeacherSubjectCommand c, bool remove, CancellationToken ct)
     {
         await new TeacherSubjectValidator().ValidateAndThrowAsync(c, ct);
-        var teacher = await db.Set<Teacher>().SingleOrDefaultAsync(x => x.Id == c.TeacherId, ct) ?? throw new NotFoundException("Teacher", c.TeacherId);
+        var institutionId = await user.GetInstitutionIdAsync();
+        if (!user.IsSuperAdmin && !institutionId.HasValue)
+            throw new ForbiddenException("Access denied.");
+
+        var teachers = db.Set<Teacher>().Where(x => x.Id == c.TeacherId);
+        if (!user.IsSuperAdmin)
+            teachers = teachers.Where(x => x.InstitutionId == institutionId!.Value);
+
+        var teacher = await teachers.SingleOrDefaultAsync(ct)
+            ?? throw new NotFoundException("Teacher", c.TeacherId);
         await InstitutionManagement.DemandAsync(user, teacher.InstitutionId);
         if (!remove && !await academic.SubjectExistsAsync(c.SubjectId, ct)) throw new ValidationException("Unknown or inactive subject.");
         var link = await db.Set<TeacherSubject>().SingleOrDefaultAsync(x => x.TeacherId == c.TeacherId && x.SubjectId == c.SubjectId && x.InstitutionId == teacher.InstitutionId, ct);
