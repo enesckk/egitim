@@ -10,7 +10,7 @@ public class GetStudent360Validator : AbstractValidator<GetStudent360Query>
     public GetStudent360Validator() => RuleFor(x => x.StudentId).NotEmpty();
 }
 public class GetStudent360Handler(IApplicationDbContext db, ICurrentUser user, ICoachStudentQuery assignments,
-    IStudentCoachSummaryQuery coaches, IAcademicCatalog academic)
+    IStudentCoachSummaryQuery coaches, IAcademicCatalog academic, IExamSummaryQuery? examSummary = null)
 {
     public async Task<Student360Dto> HandleAsync(GetStudent360Query query, CancellationToken ct = default)
     {
@@ -30,6 +30,11 @@ public class GetStudent360Handler(IApplicationDbContext db, ICurrentUser user, I
         var parents = await parentsQuery.OrderBy(x => x.LastName).ThenBy(x => x.FirstName).ThenBy(x => x.Id).Select(x => new ParentRelationshipDto(x.Id, x.FirstName + " " + x.LastName, x.RelationshipType)).ToListAsync(ct);
         var examIds = goals.Where(x => x.TargetExamTypeId.HasValue).Select(x => x.TargetExamTypeId!.Value).Distinct();
         var exams = await academic.GetExamTypesAsync(examIds, ct);
-        return new(student.ToDto(), goals, await coaches.GetAsync(student.Id, student.InstitutionId, ct), parents, exams);
+
+        var recentExamDto = examSummary is not null
+            ? await examSummary.GetRecentExamSummaryAsync(student.Id, student.InstitutionId, ct)
+            : null;
+
+        return new(student.ToDto(), goals, await coaches.GetAsync(student.Id, student.InstitutionId, ct), parents, exams, recentExamDto);
     }
 }

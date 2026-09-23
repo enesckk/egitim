@@ -21,6 +21,27 @@ public sealed class TaxonomyHandler(IApplicationDbContext db) : IAcademicCatalog
             .Select(x => new AcademicReferenceDto(x.Id, x.Code, x.Name)).ToListAsync(ct);
     }
     public Task<bool> SubjectExistsAsync(Guid id, CancellationToken ct = default) => Subjects.AnyAsync(x => x.Id == id, ct);
+    public Task<bool> ValidateExamTypeSubjectAsync(Guid examTypeId, Guid subjectId, CancellationToken ct = default) =>
+        Subjects.AnyAsync(x => x.Id == subjectId && x.ExamTypeId == examTypeId, ct);
+    public async Task<bool> ValidateSubjectTopicsAsync(Guid subjectId, IEnumerable<Guid> topicIds, CancellationToken ct = default)
+    {
+        var idList = topicIds.Distinct().ToList();
+        if (idList.Count == 0) return true;
+        var validCount = await Topics.Where(x => x.SubjectId == subjectId && idList.Contains(x.Id)).CountAsync(ct);
+        return validCount == idList.Count;
+    }
+    public async Task<IReadOnlyDictionary<Guid, string>> GetSubjectNamesAsync(IEnumerable<Guid> subjectIds, CancellationToken ct = default)
+    {
+        var idList = subjectIds.Distinct().ToList();
+        if (idList.Count == 0) return new Dictionary<Guid, string>();
+        return await Subjects.Where(x => idList.Contains(x.Id)).ToDictionaryAsync(x => x.Id, x => x.Name, ct);
+    }
+    public async Task<IReadOnlyDictionary<Guid, string>> GetTopicNamesAsync(IEnumerable<Guid> topicIds, CancellationToken ct = default)
+    {
+        var idList = topicIds.Distinct().ToList();
+        if (idList.Count == 0) return new Dictionary<Guid, string>();
+        return await Topics.Where(x => idList.Contains(x.Id)).ToDictionaryAsync(x => x.Id, x => x.Name, ct);
+    }
     public async Task<IReadOnlyList<TaxonomyDto>> HandleAsync(TaxonomyQuery q, CancellationToken ct = default)
     {
         await new TaxonomyQueryValidator().ValidateAndThrowAsync(q, ct);

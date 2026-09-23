@@ -166,13 +166,49 @@ test.describe('A1: Student Experience Foundation Tests', () => {
     await expect(page.locator('text="Aktif Çalışma Planı Bulunmuyor"')).toBeVisible();
   });
 
-  test('10. Honest Data: Student Exams route renders honest empty state and no fake exams', async ({ page }) => {
+  test('10. Honest Data: Student Exams route renders honest empty state when no exams exist', async ({ page }) => {
     await page.goto('/student/exams');
     await page.waitForLoadState('networkidle');
     await expect(page).toHaveURL(/\/student\/exams/);
 
     await expect(page.locator('h1.font-serif')).toContainText('Deneme Sınavları');
     await expect(page.locator('text="Kayıtlı Deneme Sınavı Bulunmuyor"')).toBeVisible();
+  });
+
+  test('17. Student Exams route handles API data rendering correctly', async ({ page }) => {
+    await page.route('**/api/v1/students/*/exam-results', async (route) => {
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({
+          items: [
+            {
+              attemptId: 'att-001',
+              examId: 'exam-001',
+              examTitle: 'TYT Deneme Sınavı 1',
+              examTypeId: 'type-001',
+              examTypeName: 'TYT',
+              takenAt: new Date().toISOString(),
+              status: 1,
+              totalCorrect: 90,
+              totalWrong: 10,
+              totalBlank: 20,
+              totalNet: 87.5,
+              reportedScore: 410,
+              scoreSource: 1,
+            },
+          ],
+          totalCount: 1,
+          page: 1,
+          pageSize: 20,
+        }),
+      });
+    });
+
+    await page.goto('/student/exams');
+    await page.waitForLoadState('networkidle');
+    await expect(page).toHaveURL(/\/student\/exams/);
+    await expect(page.locator('text="TYT Deneme Sınavı 1"')).toBeVisible();
   });
 
   test('11. Honest Data: Student Messages route renders honest empty state and no fake conversations', async ({ page }) => {
