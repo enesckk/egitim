@@ -102,3 +102,7 @@ playwright/.cache/
 tmp/
 temp/
 *.tmp
+.claude/
+.local/
+Library/
+

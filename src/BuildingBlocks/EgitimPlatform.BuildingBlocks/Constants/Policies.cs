@@ -11,4 +11,7 @@ public static class Policies
     public const string CanManageTeachers = "CanManageTeachers";
     public const string CanManageParents = "CanManageParents";
     public const string CanViewTaxonomy = "CanViewTaxonomy";
+    public const string CanManageExams = "CanManageExams";
+    public const string CanRecordExamResults = "CanRecordExamResults";
+    public const string CanViewExamResults = "CanViewExamResults";
 }

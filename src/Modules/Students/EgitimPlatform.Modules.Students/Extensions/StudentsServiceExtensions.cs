@@ -22,6 +22,7 @@ public static class StudentsServiceExtensions
         services.AddScoped<CreateStudentHandler>();
         services.AddScoped<GetStudentHandler>();
         services.AddScoped<ListStudentsHandler>();
+        services.AddScoped<EgitimPlatform.BuildingBlocks.Interfaces.IStudentDirectory, EgitimPlatform.Modules.Students.Services.StudentDirectory>();
 
         services.AddScoped<EgitimPlatform.Modules.Students.Features.ManageParents.ParentHandler>();
         services.AddScoped<EgitimPlatform.Modules.Students.Features.GetStudent360.GetStudent360Handler>();

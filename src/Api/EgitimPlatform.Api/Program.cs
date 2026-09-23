@@ -1,5 +1,6 @@
 using EgitimPlatform.Modules.Academic.Extensions;
 using EgitimPlatform.Modules.Teachers.Extensions;
+using EgitimPlatform.Modules.Exams.Extensions;
 using EgitimPlatform.Api.Extensions;
 using EgitimPlatform.Api.Middleware;
 using EgitimPlatform.Infrastructure;
@@ -40,6 +41,7 @@ try
     builder.Services.AddCoachingModule();
     builder.Services.AddAcademicModule();
     builder.Services.AddTeachersModule();
+    builder.Services.AddExamsModule();
 
     // Controllers
     builder.Services.AddControllers();

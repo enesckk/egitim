@@ -48,6 +48,7 @@ public class ApplicationDbContext : IdentityDbContext<ApplicationUser, Applicati
             "EgitimPlatform.Modules.Coaching",
             "EgitimPlatform.Modules.Teachers",
             "EgitimPlatform.Modules.Academic",
+            "EgitimPlatform.Modules.Exams",
         };
 
         foreach (var moduleName in moduleNames)
@@ -215,6 +216,171 @@ public class ApplicationDbContext : IdentityDbContext<ApplicationUser, Applicati
                 .HasIndex("StudentId", "IsPrimary")
                 .IsUnique()
                 .HasFilter("[IsPrimary] = 1 AND [IsActive] = 1");
+        }
+
+        // Sprint 3: Exams module cross-module & composite tenant-safe FKs
+        var examEntityType = FindEntityType(builder, "Exam");
+        var examSectionType = FindEntityType(builder, "ExamSection");
+        var attemptType = FindEntityType(builder, "StudentExamAttempt");
+        var subjectResultType = FindEntityType(builder, "StudentExamSubjectResult");
+        var topicResultType = FindEntityType(builder, "StudentExamTopicResult");
+        var topicType = FindEntityType(builder, "Topic");
+
+        if (examEntityType is not null)
+        {
+            if (institutionType is not null)
+            {
+                builder.Entity(examEntityType.ClrType)
+                    .HasOne(institutionType.ClrType)
+                    .WithMany()
+                    .HasForeignKey("InstitutionId")
+                    .OnDelete(DeleteBehavior.Restrict);
+            }
+
+            if (examType is not null)
+            {
+                builder.Entity(examEntityType.ClrType)
+                    .HasOne(examType.ClrType)
+                    .WithMany()
+                    .HasForeignKey("ExamTypeId")
+                    .OnDelete(DeleteBehavior.Restrict);
+            }
+        }
+
+        if (examSectionType is not null)
+        {
+            if (institutionType is not null)
+            {
+                builder.Entity(examSectionType.ClrType)
+                    .HasOne(institutionType.ClrType)
+                    .WithMany()
+                    .HasForeignKey("InstitutionId")
+                    .OnDelete(DeleteBehavior.Restrict);
+            }
+
+            if (subjectType is not null)
+            {
+                builder.Entity(examSectionType.ClrType)
+                    .HasOne(subjectType.ClrType)
+                    .WithMany()
+                    .HasForeignKey("SubjectId")
+                    .OnDelete(DeleteBehavior.Restrict);
+            }
+
+            if (examEntityType is not null)
+            {
+                builder.Entity(examSectionType.ClrType)
+                    .HasOne(examEntityType.ClrType)
+                    .WithMany("Sections")
+                    .HasForeignKey("ExamId", "InstitutionId")
+                    .HasPrincipalKey("Id", "InstitutionId")
+                    .OnDelete(DeleteBehavior.Restrict);
+            }
+        }
+
+        if (attemptType is not null)
+        {
+            if (institutionType is not null)
+            {
+                builder.Entity(attemptType.ClrType)
+                    .HasOne(institutionType.ClrType)
+                    .WithMany()
+                    .HasForeignKey("InstitutionId")
+                    .OnDelete(DeleteBehavior.Restrict);
+            }
+
+            if (examEntityType is not null)
+            {
+                builder.Entity(attemptType.ClrType)
+                    .HasOne(examEntityType.ClrType)
+                    .WithMany()
+                    .HasForeignKey("ExamId", "InstitutionId")
+                    .HasPrincipalKey("Id", "InstitutionId")
+                    .OnDelete(DeleteBehavior.Restrict);
+            }
+
+            if (studentType is not null)
+            {
+                builder.Entity(attemptType.ClrType)
+                    .HasOne(studentType.ClrType)
+                    .WithMany()
+                    .HasForeignKey("StudentId", "InstitutionId")
+                    .HasPrincipalKey("Id", "InstitutionId")
+                    .OnDelete(DeleteBehavior.Restrict);
+            }
+        }
+
+        if (subjectResultType is not null)
+        {
+            if (institutionType is not null)
+            {
+                builder.Entity(subjectResultType.ClrType)
+                    .HasOne(institutionType.ClrType)
+                    .WithMany()
+                    .HasForeignKey("InstitutionId")
+                    .OnDelete(DeleteBehavior.Restrict);
+            }
+
+            if (attemptType is not null)
+            {
+                builder.Entity(subjectResultType.ClrType)
+                    .HasOne(attemptType.ClrType)
+                    .WithMany("SubjectResults")
+                    .HasForeignKey("StudentExamAttemptId", "InstitutionId")
+                    .HasPrincipalKey("Id", "InstitutionId")
+                    .OnDelete(DeleteBehavior.Restrict);
+            }
+
+            if (examSectionType is not null)
+            {
+                builder.Entity(subjectResultType.ClrType)
+                    .HasOne(examSectionType.ClrType)
+                    .WithMany()
+                    .HasForeignKey("ExamSectionId", "InstitutionId")
+                    .HasPrincipalKey("Id", "InstitutionId")
+                    .OnDelete(DeleteBehavior.Restrict);
+            }
+        }
+
+        if (topicResultType is not null)
+        {
+            if (institutionType is not null)
+            {
+                builder.Entity(topicResultType.ClrType)
+                    .HasOne(institutionType.ClrType)
+                    .WithMany()
+                    .HasForeignKey("InstitutionId")
+                    .OnDelete(DeleteBehavior.Restrict);
+            }
+
+            if (attemptType is not null)
+            {
+                builder.Entity(topicResultType.ClrType)
+                    .HasOne(attemptType.ClrType)
+                    .WithMany("TopicResults")
+                    .HasForeignKey("StudentExamAttemptId", "InstitutionId")
+                    .HasPrincipalKey("Id", "InstitutionId")
+                    .OnDelete(DeleteBehavior.Restrict);
+            }
+
+            if (examSectionType is not null)
+            {
+                builder.Entity(topicResultType.ClrType)
+                    .HasOne(examSectionType.ClrType)
+                    .WithMany()
+                    .HasForeignKey("ExamSectionId", "InstitutionId")
+                    .HasPrincipalKey("Id", "InstitutionId")
+                    .OnDelete(DeleteBehavior.Restrict);
+            }
+
+            if (topicType is not null)
+            {
+                builder.Entity(topicResultType.ClrType)
+                    .HasOne(topicType.ClrType)
+                    .WithMany()
+                    .HasForeignKey("TopicId")
+                    .OnDelete(DeleteBehavior.Restrict);
+            }
         }
     }
 

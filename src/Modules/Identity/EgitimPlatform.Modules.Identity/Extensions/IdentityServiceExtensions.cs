@@ -75,7 +75,13 @@ public static class IdentityServiceExtensions
             .AddPolicy(Policies.CanManageParents, policy =>
                 policy.RequireRole(Roles.SuperAdmin, Roles.InstitutionAdmin))
             .AddPolicy(Policies.CanViewTaxonomy, policy =>
-                policy.RequireAuthenticatedUser());
+                policy.RequireAuthenticatedUser())
+            .AddPolicy(Policies.CanManageExams, policy =>
+                policy.RequireRole(Roles.SuperAdmin, Roles.InstitutionAdmin))
+            .AddPolicy(Policies.CanRecordExamResults, policy =>
+                policy.RequireRole(Roles.SuperAdmin, Roles.InstitutionAdmin, Roles.Coach))
+            .AddPolicy(Policies.CanViewExamResults, policy =>
+                policy.RequireRole(Roles.SuperAdmin, Roles.InstitutionAdmin, Roles.Coach, Roles.Student, Roles.Parent, Roles.Teacher));
 
         // Auth services — all use IApplicationDbContext (not concrete ApplicationDbContext)
         services.AddScoped<IJwtTokenService, JwtTokenService>();
