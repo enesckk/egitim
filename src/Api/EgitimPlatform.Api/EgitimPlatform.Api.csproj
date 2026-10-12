@@ -36,9 +36,7 @@
     <ProjectReference Include="..\..\Modules\Notebook\EgitimPlatform.Modules.Notebook\EgitimPlatform.Modules.Notebook.csproj" />
     <ProjectReference Include="..\..\Modules\Reporting\EgitimPlatform.Modules.Reporting\EgitimPlatform.Modules.Reporting.csproj" />
     <ProjectReference Include="..\..\Modules\AI\EgitimPlatform.Modules.AI\EgitimPlatform.Modules.AI.csproj" />
-  </ItemGroup>
-
-  <ItemGroup>
     <ProjectReference Include="..\..\Modules\Teachers\EgitimPlatform.Modules.Teachers\EgitimPlatform.Modules.Teachers.csproj" />
   </ItemGroup>
+
 </Project>

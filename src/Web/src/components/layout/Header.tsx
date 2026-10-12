@@ -9,6 +9,7 @@ export interface HeaderProps {
   institutionName?: string;
   userName?: string;
   userRole?: string;
+  unreadCount?: number;
   onMenuToggle?: () => void;
   onNotificationClick?: () => void;
   onProfileClick?: () => void;
@@ -22,6 +23,7 @@ export const Header: React.FC<HeaderProps> = ({
   institutionName,
   userName = 'Ayşe Kaya',
   userRole,
+  unreadCount,
   onMenuToggle,
   onNotificationClick,
   onProfileClick,
@@ -74,7 +76,11 @@ export const Header: React.FC<HeaderProps> = ({
           aria-label="Bildirimler"
         >
           <Bell className="h-[18px] w-[18px]" />
-          <span className="absolute top-2.5 right-2.5 w-2 h-2 bg-danger rounded-full border-2 border-white" />
+          {typeof unreadCount === 'number' && unreadCount > 0 && (
+            <span className="absolute -top-0.5 -right-0.5 min-w-[18px] h-[18px] px-1 bg-danger text-white text-[10px] font-bold rounded-full flex items-center justify-center border-2 border-white">
+              {unreadCount > 99 ? '99+' : unreadCount}
+            </span>
+          )}
         </button>
 
         <button

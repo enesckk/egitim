@@ -301,9 +301,13 @@ test.describe('A1: Student Experience Foundation Tests', () => {
     await firstNavBtn.focus();
     await expect(firstNavBtn).toBeFocused();
 
-    // Tab to the next nav item (Planlar)
+    // Tab to the next nav item (Akademik Analiz then Planlar)
     await page.keyboard.press('Tab');
-    const activeElText = await page.evaluate(() => document.activeElement?.textContent);
+    let activeElText = await page.evaluate(() => document.activeElement?.textContent);
+    if (activeElText?.includes('Akademik Analiz')) {
+      await page.keyboard.press('Tab');
+      activeElText = await page.evaluate(() => document.activeElement?.textContent);
+    }
     expect(activeElText).toContain('Planlar');
 
     // Press Enter to navigate

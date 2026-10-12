@@ -1,4 +1,4 @@
-﻿import React from 'react';
+import React from 'react';
 import { AlertCircle, RefreshCw } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Button } from './Button';
@@ -27,8 +27,8 @@ export const ErrorState: React.FC<ErrorStateProps> = ({
       <div className="w-12 h-12 rounded-2xl bg-red-50 flex items-center justify-center mx-auto mb-4 text-red-600">
         <AlertCircle className="h-6 w-6" />
       </div>
-      <h3 className="font-semibold text-base text-[#17212B] mb-1">{title}</h3>
-      <p className="text-xs text-[#66788A] leading-relaxed mb-6">{message}</p>
+      <h3 className="font-semibold text-base text-neutral-900 mb-1">{title}</h3>
+      <p className="text-xs text-neutral-500 leading-relaxed mb-6">{message}</p>
       {onRetry && (
         <Button
           variant="secondary"

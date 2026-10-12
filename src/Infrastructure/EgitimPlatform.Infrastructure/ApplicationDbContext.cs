@@ -1,9 +1,11 @@
 using EgitimPlatform.BuildingBlocks.Entities;
+using EgitimPlatform.BuildingBlocks.Exceptions;
 using EgitimPlatform.BuildingBlocks.Interfaces;
 using EgitimPlatform.Modules.Identity.Entities;
 using Microsoft.AspNetCore.Identity.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata;
+using System.Collections;
 using System.Linq.Expressions;
 using System.Reflection;
 
@@ -179,12 +181,38 @@ public class ApplicationDbContext : IdentityDbContext<ApplicationUser, Applicati
         var examType = FindEntityType(builder, "ExamType");
         var teacherSubjectType = FindEntityType(builder, "TeacherSubject");
         var subjectType = FindEntityType(builder, "Subject");
+        var academicTopicType = FindEntityType(builder, "Topic");
+        var examEntityType = FindEntityType(builder, "Exam");
+        var examSectionType = FindEntityType(builder, "ExamSection");
+        var examAttemptType = FindEntityType(builder, "StudentExamAttempt");
+        var examTopicResultType = FindEntityType(builder, "StudentExamTopicResult");
         if (goalType is not null && examType is not null)
             builder.Entity(goalType.ClrType).HasOne(examType.ClrType).WithMany()
                 .HasForeignKey("TargetExamTypeId").OnDelete(DeleteBehavior.Restrict);
         if (teacherSubjectType is not null && subjectType is not null)
             builder.Entity(teacherSubjectType.ClrType).HasOne(subjectType.ClrType).WithMany()
                 .HasForeignKey("SubjectId").OnDelete(DeleteBehavior.Restrict);
+
+        // Sprint 3 Exams cross-module constraints. Same-module composite FKs are
+        // configured inside Exams; reflection keeps Infrastructure as the shared
+        // persistence owner without introducing direct module references.
+        if (examEntityType is not null && institutionType is not null)
+            builder.Entity(examEntityType.ClrType).HasOne(institutionType.ClrType).WithMany()
+                .HasForeignKey("InstitutionId").OnDelete(DeleteBehavior.Restrict);
+        if (examEntityType is not null && examType is not null)
+            builder.Entity(examEntityType.ClrType).HasOne(examType.ClrType).WithMany()
+                .HasForeignKey("ExamTypeId").OnDelete(DeleteBehavior.Restrict);
+        if (examSectionType is not null && subjectType is not null)
+            builder.Entity(examSectionType.ClrType).HasOne(subjectType.ClrType).WithMany()
+                .HasForeignKey("SubjectId").OnDelete(DeleteBehavior.Restrict);
+        if (examAttemptType is not null && studentType is not null)
+            builder.Entity(examAttemptType.ClrType).HasOne(studentType.ClrType).WithMany()
+                .HasForeignKey("StudentId", "InstitutionId")
+                .HasPrincipalKey("Id", "InstitutionId")
+                .OnDelete(DeleteBehavior.Restrict);
+        if (examTopicResultType is not null && academicTopicType is not null)
+            builder.Entity(examTopicResultType.ClrType).HasOne(academicTopicType.ClrType).WithMany()
+                .HasForeignKey("TopicId").OnDelete(DeleteBehavior.Restrict);
 
         // P2-6: Cross-tenant composite FKs for StudentCoachAssignment.
         // StudentCoachAssignment → Student (composite: StudentId + InstitutionId)
@@ -217,171 +245,6 @@ public class ApplicationDbContext : IdentityDbContext<ApplicationUser, Applicati
                 .IsUnique()
                 .HasFilter("[IsPrimary] = 1 AND [IsActive] = 1");
         }
-
-        // Sprint 3: Exams module cross-module & composite tenant-safe FKs
-        var examEntityType = FindEntityType(builder, "Exam");
-        var examSectionType = FindEntityType(builder, "ExamSection");
-        var attemptType = FindEntityType(builder, "StudentExamAttempt");
-        var subjectResultType = FindEntityType(builder, "StudentExamSubjectResult");
-        var topicResultType = FindEntityType(builder, "StudentExamTopicResult");
-        var topicType = FindEntityType(builder, "Topic");
-
-        if (examEntityType is not null)
-        {
-            if (institutionType is not null)
-            {
-                builder.Entity(examEntityType.ClrType)
-                    .HasOne(institutionType.ClrType)
-                    .WithMany()
-                    .HasForeignKey("InstitutionId")
-                    .OnDelete(DeleteBehavior.Restrict);
-            }
-
-            if (examType is not null)
-            {
-                builder.Entity(examEntityType.ClrType)
-                    .HasOne(examType.ClrType)
-                    .WithMany()
-                    .HasForeignKey("ExamTypeId")
-                    .OnDelete(DeleteBehavior.Restrict);
-            }
-        }
-
-        if (examSectionType is not null)
-        {
-            if (institutionType is not null)
-            {
-                builder.Entity(examSectionType.ClrType)
-                    .HasOne(institutionType.ClrType)
-                    .WithMany()
-                    .HasForeignKey("InstitutionId")
-                    .OnDelete(DeleteBehavior.Restrict);
-            }
-
-            if (subjectType is not null)
-            {
-                builder.Entity(examSectionType.ClrType)
-                    .HasOne(subjectType.ClrType)
-                    .WithMany()
-                    .HasForeignKey("SubjectId")
-                    .OnDelete(DeleteBehavior.Restrict);
-            }
-
-            if (examEntityType is not null)
-            {
-                builder.Entity(examSectionType.ClrType)
-                    .HasOne(examEntityType.ClrType)
-                    .WithMany("Sections")
-                    .HasForeignKey("ExamId", "InstitutionId")
-                    .HasPrincipalKey("Id", "InstitutionId")
-                    .OnDelete(DeleteBehavior.Restrict);
-            }
-        }
-
-        if (attemptType is not null)
-        {
-            if (institutionType is not null)
-            {
-                builder.Entity(attemptType.ClrType)
-                    .HasOne(institutionType.ClrType)
-                    .WithMany()
-                    .HasForeignKey("InstitutionId")
-                    .OnDelete(DeleteBehavior.Restrict);
-            }
-
-            if (examEntityType is not null)
-            {
-                builder.Entity(attemptType.ClrType)
-                    .HasOne(examEntityType.ClrType)
-                    .WithMany()
-                    .HasForeignKey("ExamId", "InstitutionId")
-                    .HasPrincipalKey("Id", "InstitutionId")
-                    .OnDelete(DeleteBehavior.Restrict);
-            }
-
-            if (studentType is not null)
-            {
-                builder.Entity(attemptType.ClrType)
-                    .HasOne(studentType.ClrType)
-                    .WithMany()
-                    .HasForeignKey("StudentId", "InstitutionId")
-                    .HasPrincipalKey("Id", "InstitutionId")
-                    .OnDelete(DeleteBehavior.Restrict);
-            }
-        }
-
-        if (subjectResultType is not null)
-        {
-            if (institutionType is not null)
-            {
-                builder.Entity(subjectResultType.ClrType)
-                    .HasOne(institutionType.ClrType)
-                    .WithMany()
-                    .HasForeignKey("InstitutionId")
-                    .OnDelete(DeleteBehavior.Restrict);
-            }
-
-            if (attemptType is not null)
-            {
-                builder.Entity(subjectResultType.ClrType)
-                    .HasOne(attemptType.ClrType)
-                    .WithMany("SubjectResults")
-                    .HasForeignKey("StudentExamAttemptId", "InstitutionId")
-                    .HasPrincipalKey("Id", "InstitutionId")
-                    .OnDelete(DeleteBehavior.Restrict);
-            }
-
-            if (examSectionType is not null)
-            {
-                builder.Entity(subjectResultType.ClrType)
-                    .HasOne(examSectionType.ClrType)
-                    .WithMany()
-                    .HasForeignKey("ExamSectionId", "InstitutionId")
-                    .HasPrincipalKey("Id", "InstitutionId")
-                    .OnDelete(DeleteBehavior.Restrict);
-            }
-        }
-
-        if (topicResultType is not null)
-        {
-            if (institutionType is not null)
-            {
-                builder.Entity(topicResultType.ClrType)
-                    .HasOne(institutionType.ClrType)
-                    .WithMany()
-                    .HasForeignKey("InstitutionId")
-                    .OnDelete(DeleteBehavior.Restrict);
-            }
-
-            if (attemptType is not null)
-            {
-                builder.Entity(topicResultType.ClrType)
-                    .HasOne(attemptType.ClrType)
-                    .WithMany("TopicResults")
-                    .HasForeignKey("StudentExamAttemptId", "InstitutionId")
-                    .HasPrincipalKey("Id", "InstitutionId")
-                    .OnDelete(DeleteBehavior.Restrict);
-            }
-
-            if (examSectionType is not null)
-            {
-                builder.Entity(topicResultType.ClrType)
-                    .HasOne(examSectionType.ClrType)
-                    .WithMany()
-                    .HasForeignKey("ExamSectionId", "InstitutionId")
-                    .HasPrincipalKey("Id", "InstitutionId")
-                    .OnDelete(DeleteBehavior.Restrict);
-            }
-
-            if (topicType is not null)
-            {
-                builder.Entity(topicResultType.ClrType)
-                    .HasOne(topicType.ClrType)
-                    .WithMany()
-                    .HasForeignKey("TopicId")
-                    .OnDelete(DeleteBehavior.Restrict);
-            }
-        }
     }
 
     private static IMutableEntityType? FindEntityType(ModelBuilder builder, string typeName)
@@ -390,9 +253,13 @@ public class ApplicationDbContext : IdentityDbContext<ApplicationUser, Applicati
             .FirstOrDefault(e => e.ClrType.Name == typeName);
     }
 
-    private void ProtectEvidence()
+    private EvidenceProtectionPlan PrepareEvidenceProtection()
     {
         ChangeTracker.DetectChanges();
+        var changedResultAttemptIds = new HashSet<Guid>();
+        var addedAttemptIds = new HashSet<Guid>();
+        Type? attemptType = null;
+
         foreach (var entry in ChangeTracker.Entries())
         {
             if (entry.Entity is IImmutableHistory && entry.State is EntityState.Modified or EntityState.Deleted)
@@ -402,37 +269,150 @@ public class ApplicationDbContext : IdentityDbContext<ApplicationUser, Applicati
             if (entry.Entity is IStableReference && entry.State == EntityState.Modified &&
                 entry.Properties.Any(p => p.IsModified && (p.Metadata.Name == "Code" || p.Metadata.Name.EndsWith("Id"))))
                 throw new InvalidOperationException("Taxonomy codes and hierarchy are immutable.");
+
+            // Finalized exam attempts and their persisted aggregates are immutable.
+            // This is deliberately enforced below the HTTP/application layer as a
+            // defense against future handlers accidentally bypassing the lifecycle.
+            if (entry.Metadata.ClrType.Name == "StudentExamAttempt")
+            {
+                attemptType = entry.Metadata.ClrType;
+                var attemptId = (Guid)entry.Property("Id").CurrentValue!;
+                if (entry.State == EntityState.Added)
+                    addedAttemptIds.Add(attemptId);
+                else if (entry.State is EntityState.Modified or EntityState.Deleted)
+                    changedResultAttemptIds.Add(attemptId);
+            }
+
+            if (entry.Metadata.ClrType.Name is "StudentExamSubjectResult" or "StudentExamTopicResult" &&
+                entry.State is EntityState.Added or EntityState.Modified or EntityState.Deleted)
+            {
+                var attemptProperty = entry.Property("StudentExamAttemptId");
+                if (attemptProperty.CurrentValue is Guid currentAttemptId)
+                    changedResultAttemptIds.Add(currentAttemptId);
+                if (entry.State is EntityState.Modified or EntityState.Deleted &&
+                    attemptProperty.OriginalValue is Guid originalAttemptId)
+                    changedResultAttemptIds.Add(originalAttemptId);
+            }
+        }
+
+        if (changedResultAttemptIds.Count == 0)
+            return new EvidenceProtectionPlan(null, []);
+
+        attemptType ??= Model.GetEntityTypes().FirstOrDefault(x => x.ClrType.Name == "StudentExamAttempt")?.ClrType
+            ?? throw new InvalidOperationException("StudentExamAttempt metadata is unavailable; result immutability cannot be verified.");
+        return new EvidenceProtectionPlan(attemptType,
+            changedResultAttemptIds.Where(id => !addedAttemptIds.Contains(id)).ToArray());
+    }
+
+    private void ProtectEvidence()
+    {
+        var plan = PrepareEvidenceProtection();
+        var persistedStatuses = plan.UnresolvedAttemptIds.Length == 0
+            ? new Dictionary<Guid, int>()
+            : LoadAttemptStatuses(plan.AttemptType!, plan.UnresolvedAttemptIds);
+        ValidateChangedResults(plan, persistedStatuses);
+    }
+
+    private async Task ProtectEvidenceAsync(CancellationToken cancellationToken)
+    {
+        var plan = PrepareEvidenceProtection();
+        var persistedStatuses = plan.UnresolvedAttemptIds.Length == 0
+            ? new Dictionary<Guid, int>()
+            : await LoadAttemptStatusesAsync(plan.AttemptType!, plan.UnresolvedAttemptIds, cancellationToken);
+        ValidateChangedResults(plan, persistedStatuses);
+    }
+
+    private static void ValidateChangedResults(EvidenceProtectionPlan plan, IReadOnlyDictionary<Guid, int> persistedStatuses)
+    {
+        foreach (var attemptId in plan.UnresolvedAttemptIds)
+        {
+            if (!persistedStatuses.TryGetValue(attemptId, out var status))
+                throw new InvalidOperationException("The parent exam attempt could not be verified; result changes are rejected.");
+            if (status == 1)
+                throw new ConflictException("Results of a finalized exam attempt are immutable.");
+        }
+
+    }
+
+    private Dictionary<Guid, int> LoadAttemptStatuses(Type attemptType, Guid[] attemptIds)
+        => ReadAttemptStatuses(BuildAttemptStatusQuery(attemptType, attemptIds));
+
+    private async Task<Dictionary<Guid, int>> LoadAttemptStatusesAsync(Type attemptType, Guid[] attemptIds,
+        CancellationToken cancellationToken)
+    {
+        var query = BuildAttemptStatusQuery(attemptType, attemptIds);
+        var toListAsync = typeof(EntityFrameworkQueryableExtensions).GetMethods()
+            .Single(method => method.Name == nameof(EntityFrameworkQueryableExtensions.ToListAsync) &&
+                              method.IsGenericMethodDefinition && method.GetParameters().Length == 2);
+        var task = (Task)toListAsync.MakeGenericMethod(attemptType)
+            .Invoke(null, [query, cancellationToken])!;
+        await task.ConfigureAwait(false);
+        var rows = (IEnumerable)task.GetType().GetProperty("Result")!.GetValue(task)!;
+        return ReadAttemptStatuses(rows);
+    }
+
+    private IQueryable BuildAttemptStatusQuery(Type attemptType, Guid[] attemptIds)
+    {
+        var setMethod = typeof(DbContext).GetMethods()
+            .Single(method => method.Name == nameof(Set) && method.IsGenericMethodDefinition &&
+                              method.GetParameters().Length == 0);
+        var set = (IQueryable)setMethod.MakeGenericMethod(attemptType).Invoke(this, null)!;
+        var asNoTracking = typeof(EntityFrameworkQueryableExtensions).GetMethods()
+            .Single(method => method.Name == nameof(EntityFrameworkQueryableExtensions.AsNoTracking) &&
+                              method.IsGenericMethodDefinition && method.GetParameters().Length == 1)
+            .MakeGenericMethod(attemptType);
+        set = (IQueryable)asNoTracking.Invoke(null, [set])!;
+        var parameter = Expression.Parameter(attemptType, "attempt");
+        var id = Expression.Property(parameter, "Id");
+        var contains = Expression.Call(typeof(Enumerable), nameof(Enumerable.Contains), [typeof(Guid)],
+            Expression.Constant(attemptIds), id);
+        var predicate = Expression.Lambda(contains, parameter);
+        var where = Expression.Call(typeof(Queryable), nameof(Queryable.Where), [attemptType],
+            set.Expression, Expression.Quote(predicate));
+        return set.Provider.CreateQuery(where);
+    }
+
+    private static Dictionary<Guid, int> ReadAttemptStatuses(IEnumerable rows)
+    {
+        var result = new Dictionary<Guid, int>();
+        foreach (var row in rows)
+        {
+            var type = row!.GetType();
+            result[(Guid)type.GetProperty("Id")!.GetValue(row)!] =
+                Convert.ToInt32(type.GetProperty("Status")!.GetValue(row));
+        }
+        return result;
+    }
+
+    private sealed record EvidenceProtectionPlan(Type? AttemptType, Guid[] UnresolvedAttemptIds);
+
+    private void StampAuditFields()
+    {
+        var now = DateTimeOffset.UtcNow;
+        foreach (var entry in ChangeTracker.Entries<AuditableEntity>())
+        {
+            if (entry.State == EntityState.Added) entry.Entity.CreatedAt = now;
+            else if (entry.State == EntityState.Modified) entry.Entity.UpdatedAt = now;
         }
     }
+
     public override int SaveChanges(bool acceptAllChangesOnSuccess)
     {
         ProtectEvidence();
+        StampAuditFields();
         return base.SaveChanges(acceptAllChangesOnSuccess);
     }
-    public override Task<int> SaveChangesAsync(bool acceptAllChangesOnSuccess, CancellationToken cancellationToken = default)
+    public override async Task<int> SaveChangesAsync(bool acceptAllChangesOnSuccess, CancellationToken cancellationToken = default)
     {
-        ProtectEvidence();
-        return base.SaveChangesAsync(acceptAllChangesOnSuccess, cancellationToken);
+        await ProtectEvidenceAsync(cancellationToken);
+        StampAuditFields();
+        return await base.SaveChangesAsync(acceptAllChangesOnSuccess, cancellationToken);
     }
 
     public override async Task<int> SaveChangesAsync(CancellationToken cancellationToken = default)
     {
-        ProtectEvidence();
-        var now = DateTimeOffset.UtcNow;
-
-        foreach (var entry in ChangeTracker.Entries<AuditableEntity>())
-        {
-            switch (entry.State)
-            {
-                case EntityState.Added:
-                    entry.Entity.CreatedAt = now;
-                    break;
-                case EntityState.Modified:
-                    entry.Entity.UpdatedAt = now;
-                    break;
-            }
-        }
-
-        return await base.SaveChangesAsync(cancellationToken);
+        await ProtectEvidenceAsync(cancellationToken);
+        StampAuditFields();
+        return await base.SaveChangesAsync(true, cancellationToken);
     }
 }

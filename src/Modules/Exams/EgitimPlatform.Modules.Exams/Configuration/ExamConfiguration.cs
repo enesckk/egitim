@@ -4,30 +4,24 @@ using Microsoft.EntityFrameworkCore.Metadata.Builders;
 
 namespace EgitimPlatform.Modules.Exams.Configuration;
 
-public class ExamConfiguration : IEntityTypeConfiguration<Exam>
+public sealed class ExamConfiguration : IEntityTypeConfiguration<Exam>
 {
     public void Configure(EntityTypeBuilder<Exam> builder)
     {
-        builder.ToTable("Exams");
-        builder.Property(x => x.RowVersion).IsRowVersion();
+        builder.ToTable("Exams", table =>
+            table.HasCheckConstraint("CK_Exams_WrongAnswerPenalty", "[WrongAnswerPenalty] > 0"));
 
         builder.Property(x => x.Code).HasMaxLength(50).IsRequired();
         builder.Property(x => x.Title).HasMaxLength(200).IsRequired();
-        builder.Property(x => x.WrongAnswerPenalty).HasPrecision(5, 2);
+        builder.Property(x => x.WrongAnswerPenalty).HasPrecision(9, 4).HasDefaultValue(4m);
+        builder.Property(x => x.RowVersion).IsRowVersion();
 
-        // Filtered unique active index on (InstitutionId, Code)
+        builder.HasAlternateKey(x => new { x.Id, x.InstitutionId });
+        builder.HasIndex(x => new { x.InstitutionId, x.ExamDate, x.Id });
+        builder.HasIndex(x => new { x.InstitutionId, x.ExamTypeId, x.ExamDate });
         builder.HasIndex(x => new { x.InstitutionId, x.Code })
             .IsUnique()
             .HasFilter("[IsDeleted] = 0");
-
-        // Indexes for performance
-        builder.HasIndex(x => new { x.InstitutionId, x.ExamDate, x.Id });
-        builder.HasIndex(x => new { x.InstitutionId, x.ExamTypeId, x.ExamDate });
-
-        // Relationships
-        builder.HasMany(x => x.Sections)
-            .WithOne()
-            .HasForeignKey(x => x.ExamId)
-            .OnDelete(DeleteBehavior.Restrict);
+        builder.HasIndex(x => new { x.InstitutionId, x.IsDeleted });
     }
 }

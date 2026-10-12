@@ -8,6 +8,7 @@ import { Alert } from '@/components/ui/Alert';
 import { Skeleton } from '@/components/ui/Skeleton';
 import { StudentOverviewTab } from './components/StudentOverviewTab';
 import { StudentPlanTab } from './components/StudentPlanTab';
+import { CoachTasksTab } from './components/CoachTasksTab';
 import { StudentExamsTab } from './components/StudentExamsTab';
 import { CoachPrivateNotesTab } from './components/CoachPrivateNotesTab';
 import { initialCoachStudentsData } from './mockData';
@@ -55,7 +56,7 @@ export const CoachStudentDetailView: React.FC<CoachStudentDetailViewProps> = ({
   const [activeTab, setActiveTab] = useState(initialTab);
   const [students, setStudents] = useState<AssignedStudentDetail[]>(initialStudents);
 
-  const student = students.find((s) => s.id === studentId) || students[0];
+  const student = students.find((s) => s.id === studentId);
 
   const handleAddPrivateNote = (newNoteData: Omit<CoachPrivateNote, 'id' | 'createdAt'>) => {
     const newNote: CoachPrivateNote = {
@@ -115,6 +116,7 @@ export const CoachStudentDetailView: React.FC<CoachStudentDetailViewProps> = ({
 
   const detailTabs = [
     { id: 'overview', label: 'Özet', count: undefined },
+    { id: 'tasks', label: 'Görevler', count: undefined },
     { id: 'plan', label: 'Plan İnceleme', count: student.weeklyPlanTasks.length },
     { id: 'exams', label: 'Denemeler', count: student.recentExams.length },
     { id: 'notes', label: '🔒 Koça Özel Notlar', count: student.privateNotes.length },
@@ -185,6 +187,7 @@ export const CoachStudentDetailView: React.FC<CoachStudentDetailViewProps> = ({
       {/* 3. Tab Content Panes */}
       <div>
         {activeTab === 'overview' && <StudentOverviewTab student={student} />}
+        {activeTab === 'tasks' && <CoachTasksTab studentId={student.id} studentName={student.name} />}
         {activeTab === 'plan' && (
           <StudentPlanTab tasks={student.weeklyPlanTasks} studentName={student.name} />
         )}

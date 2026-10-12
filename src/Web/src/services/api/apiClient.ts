@@ -89,8 +89,12 @@ class ApiClient {
 
     let requestBody: BodyInit | undefined;
     if (body !== undefined) {
-      requestHeaders['Content-Type'] = 'application/json';
-      requestBody = typeof body === 'string' ? body : JSON.stringify(body);
+      if (body instanceof FormData) {
+        requestBody = body;
+      } else {
+        requestHeaders['Content-Type'] = 'application/json';
+        requestBody = typeof body === 'string' ? body : JSON.stringify(body);
+      }
     }
 
     const config: RequestInit = {
@@ -202,6 +206,38 @@ class ApiClient {
 
   public delete<TResponse>(path: string, options?: RequestOptions): Promise<TResponse> {
     return this.request<TResponse>(path, { ...options, method: 'DELETE' });
+  }
+
+  public postForm<TResponse>(path: string, formData: FormData, options?: RequestOptions): Promise<TResponse> {
+    return this.request<TResponse>(path, { ...options, method: 'POST', body: formData });
+  }
+
+  public async getBlob(path: string, options?: RequestOptions): Promise<Blob> {
+    const url = this.buildUrl(path, options?.params);
+    const activeToken = options?.token !== undefined ? options.token : this.tokenProvider();
+
+    const requestHeaders: Record<string, string> = {
+      'Accept': 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet, application/octet-stream, */*',
+    };
+
+    if (activeToken) {
+      requestHeaders['Authorization'] = `Bearer ${activeToken}`;
+    }
+
+    const response = await fetch(url, {
+      method: 'GET',
+      credentials: 'include',
+      headers: {
+        ...requestHeaders,
+        ...(options?.headers as Record<string, string>),
+      },
+    });
+
+    if (!response.ok) {
+      throw new ApiError(response.status, `HTTP ${response.status}: Şablon dosyası indirilemedi.`);
+    }
+
+    return response.blob();
   }
 }
 

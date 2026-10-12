@@ -1,4 +1,4 @@
-﻿import React from 'react';
+import React from 'react';
 import { cn } from '@/lib/utils';
 
 export interface LoadingStateProps {
@@ -18,8 +18,8 @@ export const LoadingState: React.FC<LoadingStateProps> = ({
         className
       )}
     >
-      <div className="w-10 h-10 rounded-full border-2 border-[#17324D]/20 border-t-[#17324D] animate-spin mb-3" />
-      <p className="text-xs font-medium text-[#66788A]">{message}</p>
+      <div className="w-10 h-10 rounded-full border-2 border-navy-900/20 border-t-navy-900 animate-spin mb-3" />
+      <p className="text-xs font-medium text-neutral-500">{message}</p>
       <span className="sr-only">{message}</span>
     </div>
   );

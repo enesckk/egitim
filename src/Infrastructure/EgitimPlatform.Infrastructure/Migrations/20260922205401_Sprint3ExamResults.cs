@@ -16,15 +16,15 @@ namespace EgitimPlatform.Infrastructure.Migrations
                 columns: table => new
                 {
                     Id = table.Column<Guid>(type: "uniqueidentifier", nullable: false),
-                    RowVersion = table.Column<byte[]>(type: "rowversion", rowVersion: true, nullable: false),
                     InstitutionId = table.Column<Guid>(type: "uniqueidentifier", nullable: false),
                     ExamTypeId = table.Column<Guid>(type: "uniqueidentifier", nullable: false),
                     Code = table.Column<string>(type: "nvarchar(50)", maxLength: 50, nullable: false),
                     Title = table.Column<string>(type: "nvarchar(200)", maxLength: 200, nullable: false),
                     ExamDate = table.Column<DateTimeOffset>(type: "datetimeoffset", nullable: false),
                     Status = table.Column<int>(type: "int", nullable: false),
-                    WrongAnswerPenalty = table.Column<decimal>(type: "decimal(5,2)", precision: 5, scale: 2, nullable: false),
+                    WrongAnswerPenalty = table.Column<decimal>(type: "decimal(9,4)", precision: 9, scale: 4, nullable: false, defaultValue: 4m),
                     ScoreSource = table.Column<int>(type: "int", nullable: false),
+                    RowVersion = table.Column<byte[]>(type: "rowversion", rowVersion: true, nullable: false),
                     CreatedAt = table.Column<DateTimeOffset>(type: "datetimeoffset", nullable: false),
                     UpdatedAt = table.Column<DateTimeOffset>(type: "datetimeoffset", nullable: true),
                     CreatedBy = table.Column<Guid>(type: "uniqueidentifier", nullable: true),
@@ -37,6 +37,7 @@ namespace EgitimPlatform.Infrastructure.Migrations
                 {
                     table.PrimaryKey("PK_Exams", x => x.Id);
                     table.UniqueConstraint("AK_Exams_Id_InstitutionId", x => new { x.Id, x.InstitutionId });
+                    table.CheckConstraint("CK_Exams_WrongAnswerPenalty", "[WrongAnswerPenalty] > 0");
                     table.ForeignKey(
                         name: "FK_Exams_AcademicExamTypes_ExamTypeId",
                         column: x => x.ExamTypeId,
@@ -61,7 +62,7 @@ namespace EgitimPlatform.Infrastructure.Migrations
                     SubjectId = table.Column<Guid>(type: "uniqueidentifier", nullable: false),
                     DisplayOrder = table.Column<int>(type: "int", nullable: false),
                     QuestionCount = table.Column<int>(type: "int", nullable: false),
-                    WrongAnswerPenalty = table.Column<decimal>(type: "decimal(5,2)", precision: 5, scale: 2, nullable: true),
+                    WrongAnswerPenalty = table.Column<decimal>(type: "decimal(9,4)", precision: 9, scale: 4, nullable: true),
                     CreatedAt = table.Column<DateTimeOffset>(type: "datetimeoffset", nullable: false),
                     UpdatedAt = table.Column<DateTimeOffset>(type: "datetimeoffset", nullable: true),
                     CreatedBy = table.Column<Guid>(type: "uniqueidentifier", nullable: true),
@@ -73,7 +74,10 @@ namespace EgitimPlatform.Infrastructure.Migrations
                 constraints: table =>
                 {
                     table.PrimaryKey("PK_ExamSections", x => x.Id);
-                    table.UniqueConstraint("AK_ExamSections_Id_InstitutionId", x => new { x.Id, x.InstitutionId });
+                    table.UniqueConstraint("AK_ExamSections_Id_InstitutionId_ExamId", x => new { x.Id, x.InstitutionId, x.ExamId });
+                    table.CheckConstraint("CK_ExamSections_DisplayOrder", "[DisplayOrder] >= 0");
+                    table.CheckConstraint("CK_ExamSections_QuestionCount", "[QuestionCount] > 0");
+                    table.CheckConstraint("CK_ExamSections_WrongAnswerPenalty", "[WrongAnswerPenalty] IS NULL OR [WrongAnswerPenalty] > 0");
                     table.ForeignKey(
                         name: "FK_ExamSections_AcademicSubjects_SubjectId",
                         column: x => x.SubjectId,
@@ -86,12 +90,6 @@ namespace EgitimPlatform.Infrastructure.Migrations
                         principalTable: "Exams",
                         principalColumns: new[] { "Id", "InstitutionId" },
                         onDelete: ReferentialAction.Restrict);
-                    table.ForeignKey(
-                        name: "FK_ExamSections_Institutions_InstitutionId",
-                        column: x => x.InstitutionId,
-                        principalTable: "Institutions",
-                        principalColumn: "Id",
-                        onDelete: ReferentialAction.Restrict);
                 });
 
             migrationBuilder.CreateTable(
@@ -99,7 +97,6 @@ namespace EgitimPlatform.Infrastructure.Migrations
                 columns: table => new
                 {
                     Id = table.Column<Guid>(type: "uniqueidentifier", nullable: false),
-                    RowVersion = table.Column<byte[]>(type: "rowversion", rowVersion: true, nullable: false),
                     InstitutionId = table.Column<Guid>(type: "uniqueidentifier", nullable: false),
                     ExamId = table.Column<Guid>(type: "uniqueidentifier", nullable: false),
                     StudentId = table.Column<Guid>(type: "uniqueidentifier", nullable: false),
@@ -109,10 +106,11 @@ namespace EgitimPlatform.Infrastructure.Migrations
                     TotalCorrect = table.Column<int>(type: "int", nullable: false),
                     TotalWrong = table.Column<int>(type: "int", nullable: false),
                     TotalBlank = table.Column<int>(type: "int", nullable: false),
-                    TotalNet = table.Column<decimal>(type: "decimal(7,2)", precision: 7, scale: 2, nullable: false),
-                    ReportedScore = table.Column<decimal>(type: "decimal(7,2)", precision: 7, scale: 2, nullable: true),
+                    TotalNet = table.Column<decimal>(type: "decimal(18,4)", precision: 18, scale: 4, nullable: false),
+                    ReportedScore = table.Column<decimal>(type: "decimal(12,4)", precision: 12, scale: 4, nullable: true),
                     ScoreSource = table.Column<int>(type: "int", nullable: false),
                     FinalizedAt = table.Column<DateTimeOffset>(type: "datetimeoffset", nullable: true),
+                    RowVersion = table.Column<byte[]>(type: "rowversion", rowVersion: true, nullable: false),
                     CreatedAt = table.Column<DateTimeOffset>(type: "datetimeoffset", nullable: false),
                     UpdatedAt = table.Column<DateTimeOffset>(type: "datetimeoffset", nullable: true),
                     CreatedBy = table.Column<Guid>(type: "uniqueidentifier", nullable: true),
@@ -124,18 +122,14 @@ namespace EgitimPlatform.Infrastructure.Migrations
                 constraints: table =>
                 {
                     table.PrimaryKey("PK_StudentExamAttempts", x => x.Id);
-                    table.UniqueConstraint("AK_StudentExamAttempts_Id_InstitutionId", x => new { x.Id, x.InstitutionId });
+                    table.UniqueConstraint("AK_StudentExamAttempts_Id_InstitutionId_ExamId", x => new { x.Id, x.InstitutionId, x.ExamId });
+                    table.CheckConstraint("CK_StudentExamAttempts_AttemptNumber", "[AttemptNumber] >= 1");
+                    table.CheckConstraint("CK_StudentExamAttempts_Totals", "[TotalCorrect] >= 0 AND [TotalWrong] >= 0 AND [TotalBlank] >= 0");
                     table.ForeignKey(
                         name: "FK_StudentExamAttempts_Exams_ExamId_InstitutionId",
                         columns: x => new { x.ExamId, x.InstitutionId },
                         principalTable: "Exams",
                         principalColumns: new[] { "Id", "InstitutionId" },
-                        onDelete: ReferentialAction.Restrict);
-                    table.ForeignKey(
-                        name: "FK_StudentExamAttempts_Institutions_InstitutionId",
-                        column: x => x.InstitutionId,
-                        principalTable: "Institutions",
-                        principalColumn: "Id",
                         onDelete: ReferentialAction.Restrict);
                     table.ForeignKey(
                         name: "FK_StudentExamAttempts_Students_StudentId_InstitutionId",
@@ -151,12 +145,13 @@ namespace EgitimPlatform.Infrastructure.Migrations
                 {
                     Id = table.Column<Guid>(type: "uniqueidentifier", nullable: false),
                     InstitutionId = table.Column<Guid>(type: "uniqueidentifier", nullable: false),
+                    ExamId = table.Column<Guid>(type: "uniqueidentifier", nullable: false),
                     StudentExamAttemptId = table.Column<Guid>(type: "uniqueidentifier", nullable: false),
                     ExamSectionId = table.Column<Guid>(type: "uniqueidentifier", nullable: false),
                     Correct = table.Column<int>(type: "int", nullable: false),
                     Wrong = table.Column<int>(type: "int", nullable: false),
                     Blank = table.Column<int>(type: "int", nullable: false),
-                    Net = table.Column<decimal>(type: "decimal(7,2)", precision: 7, scale: 2, nullable: false),
+                    Net = table.Column<decimal>(type: "decimal(18,4)", precision: 18, scale: 4, nullable: false),
                     CreatedAt = table.Column<DateTimeOffset>(type: "datetimeoffset", nullable: false),
                     UpdatedAt = table.Column<DateTimeOffset>(type: "datetimeoffset", nullable: true),
                     CreatedBy = table.Column<Guid>(type: "uniqueidentifier", nullable: true),
@@ -168,23 +163,18 @@ namespace EgitimPlatform.Infrastructure.Migrations
                 constraints: table =>
                 {
                     table.PrimaryKey("PK_StudentExamSubjectResults", x => x.Id);
+                    table.CheckConstraint("CK_StudentExamSubjectResults_Counts", "[Correct] >= 0 AND [Wrong] >= 0 AND [Blank] >= 0");
                     table.ForeignKey(
-                        name: "FK_StudentExamSubjectResults_ExamSections_ExamSectionId_InstitutionId",
-                        columns: x => new { x.ExamSectionId, x.InstitutionId },
+                        name: "FK_StudentExamSubjectResults_ExamSections_ExamSectionId_InstitutionId_ExamId",
+                        columns: x => new { x.ExamSectionId, x.InstitutionId, x.ExamId },
                         principalTable: "ExamSections",
-                        principalColumns: new[] { "Id", "InstitutionId" },
+                        principalColumns: new[] { "Id", "InstitutionId", "ExamId" },
                         onDelete: ReferentialAction.Restrict);
                     table.ForeignKey(
-                        name: "FK_StudentExamSubjectResults_Institutions_InstitutionId",
-                        column: x => x.InstitutionId,
-                        principalTable: "Institutions",
-                        principalColumn: "Id",
-                        onDelete: ReferentialAction.Restrict);
-                    table.ForeignKey(
-                        name: "FK_StudentExamSubjectResults_StudentExamAttempts_StudentExamAttemptId_InstitutionId",
-                        columns: x => new { x.StudentExamAttemptId, x.InstitutionId },
+                        name: "FK_StudentExamSubjectResults_StudentExamAttempts_StudentExamAttemptId_InstitutionId_ExamId",
+                        columns: x => new { x.StudentExamAttemptId, x.InstitutionId, x.ExamId },
                         principalTable: "StudentExamAttempts",
-                        principalColumns: new[] { "Id", "InstitutionId" },
+                        principalColumns: new[] { "Id", "InstitutionId", "ExamId" },
                         onDelete: ReferentialAction.Restrict);
                 });
 
@@ -194,13 +184,14 @@ namespace EgitimPlatform.Infrastructure.Migrations
                 {
                     Id = table.Column<Guid>(type: "uniqueidentifier", nullable: false),
                     InstitutionId = table.Column<Guid>(type: "uniqueidentifier", nullable: false),
+                    ExamId = table.Column<Guid>(type: "uniqueidentifier", nullable: false),
                     StudentExamAttemptId = table.Column<Guid>(type: "uniqueidentifier", nullable: false),
                     ExamSectionId = table.Column<Guid>(type: "uniqueidentifier", nullable: false),
                     TopicId = table.Column<Guid>(type: "uniqueidentifier", nullable: false),
                     Correct = table.Column<int>(type: "int", nullable: false),
                     Wrong = table.Column<int>(type: "int", nullable: false),
                     Blank = table.Column<int>(type: "int", nullable: false),
-                    Net = table.Column<decimal>(type: "decimal(7,2)", precision: 7, scale: 2, nullable: false),
+                    Net = table.Column<decimal>(type: "decimal(18,4)", precision: 18, scale: 4, nullable: false),
                     CreatedAt = table.Column<DateTimeOffset>(type: "datetimeoffset", nullable: false),
                     UpdatedAt = table.Column<DateTimeOffset>(type: "datetimeoffset", nullable: true),
                     CreatedBy = table.Column<Guid>(type: "uniqueidentifier", nullable: true),
@@ -212,6 +203,7 @@ namespace EgitimPlatform.Infrastructure.Migrations
                 constraints: table =>
                 {
                     table.PrimaryKey("PK_StudentExamTopicResults", x => x.Id);
+                    table.CheckConstraint("CK_StudentExamTopicResults_Counts", "[Correct] >= 0 AND [Wrong] >= 0 AND [Blank] >= 0");
                     table.ForeignKey(
                         name: "FK_StudentExamTopicResults_AcademicTopics_TopicId",
                         column: x => x.TopicId,
@@ -219,22 +211,16 @@ namespace EgitimPlatform.Infrastructure.Migrations
                         principalColumn: "Id",
                         onDelete: ReferentialAction.Restrict);
                     table.ForeignKey(
-                        name: "FK_StudentExamTopicResults_ExamSections_ExamSectionId_InstitutionId",
-                        columns: x => new { x.ExamSectionId, x.InstitutionId },
+                        name: "FK_StudentExamTopicResults_ExamSections_ExamSectionId_InstitutionId_ExamId",
+                        columns: x => new { x.ExamSectionId, x.InstitutionId, x.ExamId },
                         principalTable: "ExamSections",
-                        principalColumns: new[] { "Id", "InstitutionId" },
+                        principalColumns: new[] { "Id", "InstitutionId", "ExamId" },
                         onDelete: ReferentialAction.Restrict);
                     table.ForeignKey(
-                        name: "FK_StudentExamTopicResults_Institutions_InstitutionId",
-                        column: x => x.InstitutionId,
-                        principalTable: "Institutions",
-                        principalColumn: "Id",
-                        onDelete: ReferentialAction.Restrict);
-                    table.ForeignKey(
-                        name: "FK_StudentExamTopicResults_StudentExamAttempts_StudentExamAttemptId_InstitutionId",
-                        columns: x => new { x.StudentExamAttemptId, x.InstitutionId },
+                        name: "FK_StudentExamTopicResults_StudentExamAttempts_StudentExamAttemptId_InstitutionId_ExamId",
+                        columns: x => new { x.StudentExamAttemptId, x.InstitutionId, x.ExamId },
                         principalTable: "StudentExamAttempts",
-                        principalColumns: new[] { "Id", "InstitutionId" },
+                        principalColumns: new[] { "Id", "InstitutionId", "ExamId" },
                         onDelete: ReferentialAction.Restrict);
                 });
 
@@ -261,6 +247,11 @@ namespace EgitimPlatform.Infrastructure.Migrations
                 columns: new[] { "InstitutionId", "ExamTypeId", "ExamDate" });
 
             migrationBuilder.CreateIndex(
+                name: "IX_Exams_InstitutionId_IsDeleted",
+                table: "Exams",
+                columns: new[] { "InstitutionId", "IsDeleted" });
+
+            migrationBuilder.CreateIndex(
                 name: "IX_ExamSections_ExamId_DisplayOrder",
                 table: "ExamSections",
                 columns: new[] { "ExamId", "DisplayOrder" });
@@ -278,9 +269,9 @@ namespace EgitimPlatform.Infrastructure.Migrations
                 filter: "[IsDeleted] = 0");
 
             migrationBuilder.CreateIndex(
-                name: "IX_ExamSections_InstitutionId",
+                name: "IX_ExamSections_InstitutionId_IsDeleted",
                 table: "ExamSections",
-                column: "InstitutionId");
+                columns: new[] { "InstitutionId", "IsDeleted" });
 
             migrationBuilder.CreateIndex(
                 name: "IX_ExamSections_SubjectId",
@@ -305,6 +296,11 @@ namespace EgitimPlatform.Infrastructure.Migrations
                 columns: new[] { "InstitutionId", "ExamId", "Status" });
 
             migrationBuilder.CreateIndex(
+                name: "IX_StudentExamAttempts_InstitutionId_IsDeleted",
+                table: "StudentExamAttempts",
+                columns: new[] { "InstitutionId", "IsDeleted" });
+
+            migrationBuilder.CreateIndex(
                 name: "IX_StudentExamAttempts_InstitutionId_StudentId_TakenAt_Id",
                 table: "StudentExamAttempts",
                 columns: new[] { "InstitutionId", "StudentId", "TakenAt", "Id" });
@@ -315,14 +311,14 @@ namespace EgitimPlatform.Infrastructure.Migrations
                 columns: new[] { "StudentId", "InstitutionId" });
 
             migrationBuilder.CreateIndex(
-                name: "IX_StudentExamSubjectResults_ExamSectionId_InstitutionId",
+                name: "IX_StudentExamSubjectResults_ExamSectionId_InstitutionId_ExamId",
                 table: "StudentExamSubjectResults",
-                columns: new[] { "ExamSectionId", "InstitutionId" });
+                columns: new[] { "ExamSectionId", "InstitutionId", "ExamId" });
 
             migrationBuilder.CreateIndex(
-                name: "IX_StudentExamSubjectResults_InstitutionId",
+                name: "IX_StudentExamSubjectResults_InstitutionId_IsDeleted",
                 table: "StudentExamSubjectResults",
-                column: "InstitutionId");
+                columns: new[] { "InstitutionId", "IsDeleted" });
 
             migrationBuilder.CreateIndex(
                 name: "IX_StudentExamSubjectResults_StudentExamAttemptId_ExamSectionId",
@@ -332,19 +328,19 @@ namespace EgitimPlatform.Infrastructure.Migrations
                 filter: "[IsDeleted] = 0");
 
             migrationBuilder.CreateIndex(
-                name: "IX_StudentExamSubjectResults_StudentExamAttemptId_InstitutionId",
+                name: "IX_StudentExamSubjectResults_StudentExamAttemptId_InstitutionId_ExamId",
                 table: "StudentExamSubjectResults",
-                columns: new[] { "StudentExamAttemptId", "InstitutionId" });
+                columns: new[] { "StudentExamAttemptId", "InstitutionId", "ExamId" });
 
             migrationBuilder.CreateIndex(
-                name: "IX_StudentExamTopicResults_ExamSectionId_InstitutionId",
+                name: "IX_StudentExamTopicResults_ExamSectionId_InstitutionId_ExamId",
                 table: "StudentExamTopicResults",
-                columns: new[] { "ExamSectionId", "InstitutionId" });
+                columns: new[] { "ExamSectionId", "InstitutionId", "ExamId" });
 
             migrationBuilder.CreateIndex(
-                name: "IX_StudentExamTopicResults_InstitutionId",
+                name: "IX_StudentExamTopicResults_InstitutionId_IsDeleted",
                 table: "StudentExamTopicResults",
-                column: "InstitutionId");
+                columns: new[] { "InstitutionId", "IsDeleted" });
 
             migrationBuilder.CreateIndex(
                 name: "IX_StudentExamTopicResults_StudentExamAttemptId_ExamSectionId_TopicId",
@@ -354,9 +350,9 @@ namespace EgitimPlatform.Infrastructure.Migrations
                 filter: "[IsDeleted] = 0");
 
             migrationBuilder.CreateIndex(
-                name: "IX_StudentExamTopicResults_StudentExamAttemptId_InstitutionId",
+                name: "IX_StudentExamTopicResults_StudentExamAttemptId_InstitutionId_ExamId",
                 table: "StudentExamTopicResults",
-                columns: new[] { "StudentExamAttemptId", "InstitutionId" });
+                columns: new[] { "StudentExamAttemptId", "InstitutionId", "ExamId" });
 
             migrationBuilder.CreateIndex(
                 name: "IX_StudentExamTopicResults_TopicId_StudentExamAttemptId",

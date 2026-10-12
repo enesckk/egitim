@@ -1,6 +1,7 @@
 import React from 'react';
 import { Clock, AlertCircle } from 'lucide-react';
 import { AssignedStudentDetail } from '../types';
+import { AcademicAiSummaryCard } from '@/features/student/academic/components/AcademicAiSummaryCard';
 
 export interface StudentOverviewTabProps {
   student: AssignedStudentDetail;
@@ -9,6 +10,7 @@ export interface StudentOverviewTabProps {
 export const StudentOverviewTab: React.FC<StudentOverviewTabProps> = ({ student }) => {
   return (
     <div className="space-y-4 select-none">
+      <AcademicAiSummaryCard studentId={student.id} audience="coach" />
       {/* 1. Academic Metrics */}
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
         <div className="bg-white rounded-2xl border border-neutral-100 p-4 shadow-soft-sm">

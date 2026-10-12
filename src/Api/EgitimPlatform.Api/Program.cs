@@ -6,6 +6,7 @@ using EgitimPlatform.Api.Middleware;
 using EgitimPlatform.Infrastructure;
 using EgitimPlatform.Modules.Coaching.Extensions;
 using EgitimPlatform.Modules.Identity.Extensions;
+using EgitimPlatform.Modules.Institutions.Extensions;
 using EgitimPlatform.Modules.Students.Extensions;
 using Microsoft.AspNetCore.HttpOverrides;
 using Microsoft.AspNetCore.RateLimiting;
@@ -37,6 +38,7 @@ try
     builder.Services.AddIdentityModule(builder.Configuration);
 
     // Domain modules
+    builder.Services.AddInstitutionsModule();
     builder.Services.AddStudentsModule();
     builder.Services.AddCoachingModule();
     builder.Services.AddAcademicModule();

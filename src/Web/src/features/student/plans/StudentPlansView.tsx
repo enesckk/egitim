@@ -10,6 +10,7 @@ import { DaySelectorRow } from './components/DaySelectorRow';
 import { PlanTaskCard } from './components/PlanTaskCard';
 import { PlanSubjectProgressCard } from './components/PlanSubjectProgressCard';
 import { TaskDetailModal } from './components/TaskDetailModal';
+import { StudentCoachTasksCard } from './components/StudentCoachTasksCard';
 import { PlanTaskItem, StudentPlanViewModel } from './types';
 
 export interface StudentPlansViewProps {
@@ -152,6 +153,9 @@ export const StudentPlansView: React.FC<StudentPlansViewProps> = ({
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-3.5 sm:gap-4">
         {/* Left Column: Daily Tasks */}
         <div className="lg:col-span-2 space-y-3">
+          {/* Koç Görevleri Section */}
+          <StudentCoachTasksCard />
+
           {/* Day Title & Filter Bar */}
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 bg-white rounded-2xl border border-neutral-100 p-3 sm:px-4">
             <div className="flex items-center gap-2">

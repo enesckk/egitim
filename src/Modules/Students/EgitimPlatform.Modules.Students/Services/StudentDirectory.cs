@@ -23,4 +23,13 @@ public class StudentDirectory(IApplicationDbContext db) : IStudentDirectory
                             parent.InstitutionId == institutionId && parent.UserId == parentUserId
                       select link.Id).AnyAsync(ct);
     }
+
+    public async Task<IReadOnlyList<StudentImportLookupDto>> GetActiveStudentsForImportAsync(Guid institutionId, CancellationToken ct = default)
+    {
+        return await db.Set<Student>()
+            .AsNoTracking()
+            .Where(s => s.InstitutionId == institutionId && !s.IsDeleted)
+            .Select(s => new StudentImportLookupDto(s.Id, s.InstitutionId, s.StudentNumber, s.FirstName, s.LastName))
+            .ToListAsync(ct);
+    }
 }

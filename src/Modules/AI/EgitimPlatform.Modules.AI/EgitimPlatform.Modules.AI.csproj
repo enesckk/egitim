@@ -2,14 +2,19 @@
 
   <PropertyGroup>
     <TargetFramework>net10.0</TargetFramework>
-    <Nullable>enable</Nullable>
     <ImplicitUsings>enable</ImplicitUsings>
-    <RootNamespace>EgitimPlatform.Modules.AI</RootNamespace>
-    <AssemblyName>EgitimPlatform.Modules.AI</AssemblyName>
+    <Nullable>enable</Nullable>
   </PropertyGroup>
 
   <ItemGroup>
+    <FrameworkReference Include="Microsoft.AspNetCore.App" />
+  </ItemGroup>
+
+  <ItemGroup>
     <ProjectReference Include="..\..\..\BuildingBlocks\EgitimPlatform.BuildingBlocks\EgitimPlatform.BuildingBlocks.csproj" />
+    <ProjectReference Include="..\..\Academic\EgitimPlatform.Modules.Academic\EgitimPlatform.Modules.Academic.csproj" />
+    <ProjectReference Include="..\..\Exams\EgitimPlatform.Modules.Exams\EgitimPlatform.Modules.Exams.csproj" />
+    <ProjectReference Include="..\..\Planning\EgitimPlatform.Modules.Planning\EgitimPlatform.Modules.Planning.csproj" />
   </ItemGroup>
 
 </Project>

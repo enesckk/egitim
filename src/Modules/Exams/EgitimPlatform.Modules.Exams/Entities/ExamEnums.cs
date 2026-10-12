@@ -4,18 +4,20 @@ public enum ExamStatus
 {
     Draft = 0,
     Published = 1,
-    Closed = 2
+    Completed = 2,
+    Cancelled = 3,
 }
 
 public enum AttemptStatus
 {
-    Draft = 0,
-    Finalized = 1
+    InProgress = 0,
+    Completed = 1,
+    Abandoned = 2,
 }
 
 public enum ScoreSource
 {
-    None = 0,
-    Institution = 1,
-    Provider = 2
+    Automatic = 0,
+    Manual = 1,
+    Imported = 2,
 }

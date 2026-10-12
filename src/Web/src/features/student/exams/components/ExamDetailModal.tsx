@@ -4,6 +4,7 @@ import { Modal } from '@/components/ui/Modal';
 import { Button } from '@/components/ui/Button';
 import { Badge } from '@/components/ui/Badge';
 import { StudentExamItem } from '../types';
+import { StudentQuestionResultReview } from './StudentQuestionResultReview';
 
 export interface ExamDetailModalProps {
   exam: StudentExamItem | null;
@@ -125,6 +126,14 @@ export const ExamDetailModal: React.FC<ExamDetailModalProps> = ({ exam, isOpen, 
             </div>
           </div>
         )}
+
+        {/* Question-by-Question Result Review (Sprint 4C/4D) */}
+        <div className="border-t border-neutral-100 pt-3">
+          <StudentQuestionResultReview
+            attemptId={exam.attemptId || exam.id}
+            isRawAvailable={exam.isRawAvailable ?? true}
+          />
+        </div>
       </div>
     </Modal>
   );

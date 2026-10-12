@@ -250,6 +250,30 @@ export const StudentTodayView: React.FC<StudentTodayViewProps> = ({
               <div className="mt-5 pt-4 border-t border-neutral-100 grid grid-cols-1 sm:grid-cols-2 gap-2.5">
                 <button
                   type="button"
+                  onClick={() => navigate('/student/academic')}
+                  className="flex items-center gap-3 p-3 rounded-xl border border-neutral-100 bg-neutral-50/60 hover:bg-neutral-100/80 hover:border-neutral-200 transition-all text-left group min-h-[52px]"
+                >
+                  <Sparkles className="h-4 w-4 text-primary-600 flex-shrink-0 group-hover:scale-110 transition-transform" />
+                  <div className="min-w-0">
+                    <p className="text-xs font-semibold text-neutral-800">Akademik Analiz & Zeka</p>
+                    <p className="text-[11px] text-neutral-500 truncate">Başarım ve zayıf konularını incele</p>
+                  </div>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => navigate('/student/plans')}
+                  className="flex items-center gap-3 p-3 rounded-xl border border-neutral-100 bg-neutral-50/60 hover:bg-neutral-100/80 hover:border-neutral-200 transition-all text-left group min-h-[52px]"
+                >
+                  <BookOpen className="h-4 w-4 text-primary-600 flex-shrink-0 group-hover:scale-110 transition-transform" />
+                  <div className="min-w-0">
+                    <p className="text-xs font-semibold text-neutral-800">Çalışma Planlarım</p>
+                    <p className="text-[11px] text-neutral-500 truncate">Haftalık planını ve hedeflerini gör</p>
+                  </div>
+                </button>
+
+                <button
+                  type="button"
                   onClick={() => navigate('/student/exams')}
                   className="flex items-center gap-3 p-3 rounded-xl border border-neutral-100 bg-neutral-50/60 hover:bg-neutral-100/80 hover:border-neutral-200 transition-all text-left group min-h-[52px]"
                 >

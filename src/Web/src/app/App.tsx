@@ -21,6 +21,7 @@ import {
   UserCheck,
   Building2,
   LogOut,
+  HelpCircle,
 } from 'lucide-react';
 import { AppShell } from '@/components/layout/AppShell';
 import { NavItem } from '@/components/layout/BottomNav';
@@ -36,8 +37,14 @@ import { LoginView, ForgotPasswordView, ResetPasswordView } from '@/features/aut
 import { ForbiddenView } from '@/features/common/ForbiddenView';
 import { NotFoundView } from '@/features/common/NotFoundView';
 
+// Question Bank & Assembly Features (Lazy Loaded)
+const QuestionBankView = lazy(() => import('@/features/questions/QuestionBankView').then((m) => ({ default: m.QuestionBankView })));
+const ExamQuestionAssemblyView = lazy(() => import('@/features/admin/exams/ExamQuestionAssemblyView').then((m) => ({ default: m.ExamQuestionAssemblyView })));
+const ExamResultEntryView = lazy(() => import('@/features/exams/results').then((m) => ({ default: m.ExamResultEntryView })));
+
 // Student Portal Features (Lazy Loaded)
 const StudentTodayView = lazy(() => import('@/features/student/today').then((m) => ({ default: m.StudentTodayView })));
+const StudentAcademicView = lazy(() => import('@/features/student/academic').then((m) => ({ default: m.StudentAcademicView })));
 const StudentPlansView = lazy(() => import('@/features/student/plans').then((m) => ({ default: m.StudentPlansView })));
 const StudentExamsView = lazy(() => import('@/features/student/exams').then((m) => ({ default: m.StudentExamsView })));
 const StudentMessagesView = lazy(() => import('@/features/student/messages').then((m) => ({ default: m.StudentMessagesView })));
@@ -83,6 +90,12 @@ const STUDENT_NAV_ITEMS: PortalNavItem[] = [
     path: '/student/today',
     label: 'Bugün',
     icon: <LayoutDashboard className="h-5 w-5" />,
+  },
+  {
+    id: 'academic',
+    path: '/student/academic',
+    label: 'Akademik Analiz',
+    icon: <BookOpen className="h-5 w-5" />,
   },
   {
     id: 'plans',
@@ -171,6 +184,12 @@ const TEACHER_NAV_ITEMS: PortalNavItem[] = [
     icon: <FileText className="h-5 w-5" />,
   },
   {
+    id: 'questions',
+    path: '/teacher/questions',
+    label: 'Soru Bankası',
+    icon: <HelpCircle className="h-5 w-5" />,
+  },
+  {
     id: 'messages',
     path: '/teacher/messages',
     label: 'Mesajlar',
@@ -209,6 +228,12 @@ const ADMIN_NAV_ITEMS: PortalNavItem[] = [
     path: '/admin/classes',
     label: 'Sınıflar',
     icon: <Building2 className="h-5 w-5" />,
+  },
+  {
+    id: 'questions',
+    path: '/admin/questions',
+    label: 'Soru Bankası',
+    icon: <HelpCircle className="h-5 w-5" />,
   },
   {
     id: 'reports',
@@ -267,6 +292,7 @@ const StudentPortalLayout: React.FC = () => {
       <Suspense fallback={<LoadingState message="Sayfa yükleniyor..." />}>
         <Routes>
           <Route path="/today" element={<StudentTodayView />} />
+          <Route path="/academic" element={<StudentAcademicView />} />
           <Route path="/plans" element={<StudentPlansView />} />
           <Route path="/exams" element={<StudentExamsView />} />
           <Route path="/messages" element={<StudentMessagesView />} />
@@ -341,6 +367,7 @@ const CoachPortalLayout: React.FC = () => {
           <Route path="/meetings" element={<CoachMeetingsView />} />
           <Route path="/messages" element={<CoachMessagesView />} />
           <Route path="/reports" element={<CoachReportsView />} />
+          <Route path="/exams/:examId/results/entry" element={<ExamResultEntryView portalRole="coach" />} />
           <Route path="*" element={<Navigate to="/coach/today" replace />} />
         </Routes>
       </Suspense>
@@ -415,6 +442,9 @@ const TeacherPortalLayout: React.FC = () => {
           <Route path="/students/:studentId" element={<TeacherStudentDetailView />} />
           <Route path="/academic" element={<TeacherAcademicView />} />
           <Route path="/content" element={<TeacherContentView />} />
+          <Route path="/questions" element={<QuestionBankView role="teacher" />} />
+          <Route path="/exams/:examId/questions" element={<ExamQuestionAssemblyView />} />
+          <Route path="/exams/:examId/results/entry" element={<ExamResultEntryView portalRole="teacher" />} />
           <Route path="/messages" element={<TeacherMessagesView />} />
           <Route path="*" element={<Navigate to="/teacher/today" replace />} />
         </Routes>
@@ -508,6 +538,9 @@ const AdminPortalLayout: React.FC = () => {
           <Route path="/coaches" element={<AdminCoachesView />} />
           <Route path="/teachers" element={<AdminTeachersView />} />
           <Route path="/classes" element={<AdminClassesView />} />
+          <Route path="/questions" element={<QuestionBankView role="admin" />} />
+          <Route path="/exams/:examId/questions" element={<ExamQuestionAssemblyView />} />
+          <Route path="/exams/:examId/results/entry" element={<ExamResultEntryView portalRole="admin" />} />
           <Route path="/reports" element={<AdminReportsView />} />
           <Route path="*" element={<Navigate to="/admin/overview" replace />} />
         </Routes>

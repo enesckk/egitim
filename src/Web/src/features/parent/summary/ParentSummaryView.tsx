@@ -11,6 +11,8 @@ import { WeeklyActivityCard } from './components/WeeklyActivityCard';
 import { AcademicStatusCard } from './components/AcademicStatusCard';
 import { UpcomingCard } from './components/UpcomingCard';
 
+import { AcademicAiSummaryCard } from '@/features/student/academic/components/AcademicAiSummaryCard';
+
 export interface ParentSummaryViewProps {
   initialData?: ParentSummaryViewModel;
   isLoading?: boolean;
@@ -97,7 +99,12 @@ export const ParentSummaryView: React.FC<ParentSummaryViewProps> = ({
         planAdherencePercentage={initialData.planAdherencePercentage}
       />
 
-      {/* 4. Academic Status Qualitative Cards */}
+      {/* 4. AI Academic Summary for Parent */}
+      {initialData.student?.id && (
+        <AcademicAiSummaryCard studentId={initialData.student.id} audience="parent" />
+      )}
+
+      {/* 5. Academic Status Qualitative Cards */}
       <AcademicStatusCard items={initialData.academicStatus} />
 
       {/* 5. Upcoming Events */}

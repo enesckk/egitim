@@ -74,4 +74,68 @@ export const examService = {
   finalizeAttempt: (attemptId: string): Promise<void> => {
     return apiClient.post<void>(`/api/v1/exam-attempts/${attemptId}/finalize`);
   },
+
+  getAttemptQuestionResults: (attemptId: string): Promise<import('@/types/question').StudentQuestionResultDto[]> => {
+    return apiClient.get<import('@/types/question').StudentQuestionResultDto[]>(`/api/v1/exam-attempts/${attemptId}/question-results`);
+  },
+
+  // Sprint 5E — Manual Result Entry
+  createSingleManualResult: (
+    examId: string,
+    command: import('@/types/examResultImport').CreateSingleManualResultCommand
+  ): Promise<import('@/types/examResultImport').SingleManualResultResponse> => {
+    return apiClient.post<import('@/types/examResultImport').SingleManualResultResponse>(
+      `/api/v1/exams/${examId}/manual-results`,
+      command
+    );
+  },
+
+  createBulkManualResults: (
+    examId: string,
+    command: import('@/types/examResultImport').CreateBulkManualResultCommand
+  ): Promise<import('@/types/examResultImport').BulkManualResultResponse> => {
+    return apiClient.post<import('@/types/examResultImport').BulkManualResultResponse>(
+      `/api/v1/exams/${examId}/manual-results/bulk`,
+      command
+    );
+  },
+
+  // Sprint 5E — Excel Result Imports
+  downloadAggregateTemplate: (examId: string): Promise<Blob> => {
+    return apiClient.getBlob(`/api/v1/exams/${examId}/result-imports/templates/aggregate`);
+  },
+
+  downloadQuestionAnswersTemplate: (examId: string): Promise<Blob> => {
+    return apiClient.getBlob(`/api/v1/exams/${examId}/result-imports/templates/question-answers`);
+  },
+
+  previewResultImport: (
+    examId: string,
+    importType: import('@/types/examResultImport').ImportType,
+    file: File
+  ): Promise<import('@/types/examResultImport').ExamResultImportPreviewDto> => {
+    const formData = new FormData();
+    formData.append('importType', String(importType));
+    formData.append('file', file);
+    return apiClient.postForm<import('@/types/examResultImport').ExamResultImportPreviewDto>(
+      `/api/v1/exams/${examId}/result-imports/preview`,
+      formData
+    );
+  },
+
+  commitResultImport: (
+    examId: string,
+    importType: import('@/types/examResultImport').ImportType,
+    fileHash: string,
+    file: File
+  ): Promise<import('@/types/examResultImport').ExamResultImportCommitResultDto> => {
+    const formData = new FormData();
+    formData.append('importType', String(importType));
+    formData.append('fileHash', fileHash);
+    formData.append('file', file);
+    return apiClient.postForm<import('@/types/examResultImport').ExamResultImportCommitResultDto>(
+      `/api/v1/exams/${examId}/result-imports/commit`,
+      formData
+    );
+  },
 };

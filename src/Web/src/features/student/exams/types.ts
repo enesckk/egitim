@@ -24,6 +24,8 @@ export interface StudentExamItem {
   subjects: SubjectExamResult[];
   focusWeakTopics?: string[];
   coachReviewNote?: string;
+  attemptId?: string;
+  isRawAvailable?: boolean;
 }
 
 export interface StudentExamsViewModel {

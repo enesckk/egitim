@@ -103,6 +103,7 @@ export interface ExamResultDetailDto {
   reportedScore: number | null;
   scoreSource: ScoreSource;
   finalizedAt: string | null;
+  isRawAvailable: boolean;
   rowVersion: string;
   subjectResults: SubjectResultDetailDto[];
 }
