@@ -19,21 +19,7 @@
 
   <ItemGroup>
     <ProjectReference Include="..\..\BuildingBlocks\EgitimPlatform.BuildingBlocks\EgitimPlatform.BuildingBlocks.csproj" />
-    <ProjectReference Include="..\..\Modules\Academic\EgitimPlatform.Modules.Academic\EgitimPlatform.Modules.Academic.csproj" />
-    <ProjectReference Include="..\..\Modules\AI\EgitimPlatform.Modules.AI\EgitimPlatform.Modules.AI.csproj" />
-    <ProjectReference Include="..\..\Modules\Coaching\EgitimPlatform.Modules.Coaching\EgitimPlatform.Modules.Coaching.csproj" />
-    <ProjectReference Include="..\..\Modules\Communication\EgitimPlatform.Modules.Communication\EgitimPlatform.Modules.Communication.csproj" />
-    <ProjectReference Include="..\..\Modules\Content\EgitimPlatform.Modules.Content\EgitimPlatform.Modules.Content.csproj" />
-    <ProjectReference Include="..\..\Modules\Exams\EgitimPlatform.Modules.Exams\EgitimPlatform.Modules.Exams.csproj" />
     <ProjectReference Include="..\..\Modules\Identity\EgitimPlatform.Modules.Identity\EgitimPlatform.Modules.Identity.csproj" />
-    <ProjectReference Include="..\..\Modules\Institutions\EgitimPlatform.Modules.Institutions\EgitimPlatform.Modules.Institutions.csproj" />
-    <ProjectReference Include="..\..\Modules\Learning\EgitimPlatform.Modules.Learning\EgitimPlatform.Modules.Learning.csproj" />
-    <ProjectReference Include="..\..\Modules\Notebook\EgitimPlatform.Modules.Notebook\EgitimPlatform.Modules.Notebook.csproj" />
-    <ProjectReference Include="..\..\Modules\Planning\EgitimPlatform.Modules.Planning\EgitimPlatform.Modules.Planning.csproj" />
-    <ProjectReference Include="..\..\Modules\Questions\EgitimPlatform.Modules.Questions\EgitimPlatform.Modules.Questions.csproj" />
-    <ProjectReference Include="..\..\Modules\Reporting\EgitimPlatform.Modules.Reporting\EgitimPlatform.Modules.Reporting.csproj" />
-    <ProjectReference Include="..\..\Modules\Students\EgitimPlatform.Modules.Students\EgitimPlatform.Modules.Students.csproj" />
-    <ProjectReference Include="..\..\Modules\Teachers\EgitimPlatform.Modules.Teachers\EgitimPlatform.Modules.Teachers.csproj" />
   </ItemGroup>
 
 </Project>

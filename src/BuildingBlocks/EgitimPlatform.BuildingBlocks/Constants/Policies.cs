@@ -13,5 +13,8 @@ public static class Policies
     public const string CanViewTaxonomy = "CanViewTaxonomy";
     public const string CanManageExams = "CanManageExams";
     public const string CanRecordExamResults = "CanRecordExamResults";
+    public const string CanSubmitExamAnswers = "CanSubmitExamAnswers";
     public const string CanViewExamResults = "CanViewExamResults";
+    public const string CanManageQuestions = "CanManageQuestions";
+    public const string CanViewQuestions = "CanViewQuestions";
 }

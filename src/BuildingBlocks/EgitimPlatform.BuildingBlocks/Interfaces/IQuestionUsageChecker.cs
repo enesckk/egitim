@@ -2,5 +2,5 @@ namespace EgitimPlatform.BuildingBlocks.Interfaces;
 
 public interface IQuestionUsageChecker
 {
-    Task<bool> IsQuestionUsedInAnyExamAsync(Guid questionId, CancellationToken cancellationToken = default);
+    Task<bool> IsQuestionLinkedToExamAsync(Guid questionId, CancellationToken ct = default);
 }

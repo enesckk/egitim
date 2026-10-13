@@ -2,9 +2,16 @@
 
   <PropertyGroup>
     <TargetFramework>net10.0</TargetFramework>
-    <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <RootNamespace>EgitimPlatform.Modules.Exams</RootNamespace>
+    <AssemblyName>EgitimPlatform.Modules.Exams</AssemblyName>
   </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="ClosedXML" Version="0.104.2" />
+    <PackageReference Include="Microsoft.EntityFrameworkCore.Relational" Version="10.0.11" />
+  </ItemGroup>
 
   <ItemGroup>
     <FrameworkReference Include="Microsoft.AspNetCore.App" />
@@ -12,6 +19,8 @@
 
   <ItemGroup>
     <ProjectReference Include="..\..\..\BuildingBlocks\EgitimPlatform.BuildingBlocks\EgitimPlatform.BuildingBlocks.csproj" />
+    <ProjectReference Include="..\..\Academic\EgitimPlatform.Modules.Academic\EgitimPlatform.Modules.Academic.csproj" />
+    <ProjectReference Include="..\..\Questions\EgitimPlatform.Modules.Questions\EgitimPlatform.Modules.Questions.csproj" />
   </ItemGroup>
 
 </Project>

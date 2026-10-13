@@ -1,4 +1,3 @@
-using EgitimPlatform.BuildingBlocks.Interfaces;
 using EgitimPlatform.Modules.Students.Features.CreateStudent;
 using EgitimPlatform.Modules.Students.Features.CreateStudentGoal;
 using EgitimPlatform.Modules.Students.Features.DeactivateStudentGoal;
@@ -9,7 +8,6 @@ using EgitimPlatform.Modules.Students.Features.ListStudentGoals;
 using EgitimPlatform.Modules.Students.Features.ListStudents;
 using EgitimPlatform.Modules.Students.Features.UpdateAcademicProfile;
 using EgitimPlatform.Modules.Students.Features.UpdateStudentGoal;
-using EgitimPlatform.Modules.Students.Services;
 using FluentValidation;
 using Microsoft.Extensions.DependencyInjection;
 using System.Reflection;
@@ -24,6 +22,7 @@ public static class StudentsServiceExtensions
         services.AddScoped<CreateStudentHandler>();
         services.AddScoped<GetStudentHandler>();
         services.AddScoped<ListStudentsHandler>();
+        services.AddScoped<EgitimPlatform.BuildingBlocks.Interfaces.IStudentDirectory, EgitimPlatform.Modules.Students.Services.StudentDirectory>();
 
         services.AddScoped<EgitimPlatform.Modules.Students.Features.ManageParents.ParentHandler>();
         services.AddScoped<EgitimPlatform.Modules.Students.Features.GetStudent360.GetStudent360Handler>();
@@ -35,7 +34,6 @@ public static class StudentsServiceExtensions
         services.AddScoped<GetStudentGoalHandler>();
         services.AddScoped<ListStudentGoalsHandler>();
         services.AddScoped<GetStudentGoalHistoryHandler>();
-        services.AddScoped<IStudentExamAccessQuery, StudentExamAccessQuery>();
 
         services.AddValidatorsFromAssembly(Assembly.GetExecutingAssembly());
         return services;

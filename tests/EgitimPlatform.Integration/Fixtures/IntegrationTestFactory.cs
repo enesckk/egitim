@@ -19,7 +19,12 @@ public class IntegrationTestFactory : WebApplicationFactory<Program>, IAsyncLife
     private readonly MsSqlContainer _container = new MsSqlBuilder("mcr.microsoft.com/mssql/server:2022-latest")
         .Build();
 
-    public string ConnectionString => _container.GetConnectionString();
+    private readonly string _dbName = $"EgitimPlatform_Integration_{Guid.NewGuid():N}";
+
+    public string ConnectionString => new Microsoft.Data.SqlClient.SqlConnectionStringBuilder(_container.GetConnectionString())
+    {
+        InitialCatalog = _dbName
+    }.ConnectionString;
 
     public const string TestIssuer = "TestIssuer";
     public const string TestAudience = "TestAudience";
@@ -48,12 +53,15 @@ public class IntegrationTestFactory : WebApplicationFactory<Program>, IAsyncLife
 
         builder.ConfigureServices(services =>
         {
-            // Remove existing DbContext registration and re-add with test connection
-            var descriptor = services.SingleOrDefault(d => d.ServiceType == typeof(DbContextOptions<ApplicationDbContext>));
-            if (descriptor is not null) services.Remove(descriptor);
+            // Remove existing DbContext registrations and re-add with test connection
+            var descriptors = services.Where(d =>
+                d.ServiceType == typeof(DbContextOptions<ApplicationDbContext>) ||
+                d.ServiceType == typeof(DbContextOptions) ||
+                d.ServiceType == typeof(ApplicationDbContext)).ToList();
+            foreach (var d in descriptors) services.Remove(d);
 
             services.AddDbContext<ApplicationDbContext>(options =>
-                options.UseSqlServer(ConnectionString));
+                options.UseSqlServer(ConnectionString, sql => sql.MigrationsAssembly(typeof(ApplicationDbContext).Assembly.FullName)));
 
             // Override JWT bearer validation to use test settings
             services.Configure<JwtBearerOptions>(JwtBearerDefaults.AuthenticationScheme, options =>
@@ -76,10 +84,10 @@ public class IntegrationTestFactory : WebApplicationFactory<Program>, IAsyncLife
     public async Task InitializeAsync()
     {
         await _container.StartAsync();
+        Environment.SetEnvironmentVariable("ConnectionStrings__DefaultConnection", ConnectionString);
 
         using var scope = Services.CreateScope();
         var context = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
-        await context.Database.MigrateAsync();
 
         var seeder = scope.ServiceProvider.GetRequiredService<EgitimPlatform.Modules.Identity.Infrastructure.IdentitySeeder>();
         await seeder.SeedRolesAsync();

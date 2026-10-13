@@ -433,6 +433,76 @@ namespace EgitimPlatform.Infrastructure.Migrations
                     b.ToTable("StudentCoachAssignments", (string)null);
                 });
 
+            modelBuilder.Entity("EgitimPlatform.Modules.Communication.Entities.Notification", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("datetimeoffset");
+
+                    b.Property<Guid?>("CreatedBy")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<DateTimeOffset?>("DeletedAt")
+                        .HasColumnType("datetimeoffset");
+
+                    b.Property<Guid?>("DeletedBy")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<Guid>("InstitutionId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<bool>("IsDeleted")
+                        .HasColumnType("bit");
+
+                    b.Property<bool>("IsRead")
+                        .HasColumnType("bit");
+
+                    b.Property<string>("Message")
+                        .IsRequired()
+                        .HasMaxLength(1000)
+                        .HasColumnType("nvarchar(1000)");
+
+                    b.Property<DateTimeOffset?>("ReadAt")
+                        .HasColumnType("datetimeoffset");
+
+                    b.Property<Guid?>("RelatedEntityId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<string>("RelatedEntityType")
+                        .HasMaxLength(100)
+                        .HasColumnType("nvarchar(100)");
+
+                    b.Property<string>("Title")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("nvarchar(200)");
+
+                    b.Property<int>("Type")
+                        .HasColumnType("int");
+
+                    b.Property<DateTimeOffset?>("UpdatedAt")
+                        .HasColumnType("datetimeoffset");
+
+                    b.Property<Guid?>("UpdatedBy")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<Guid>("UserId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("InstitutionId");
+
+                    b.HasIndex("Type", "RelatedEntityId", "UserId");
+
+                    b.HasIndex("UserId", "IsRead", "CreatedAt");
+
+                    b.ToTable("Notifications", (string)null);
+                });
+
             modelBuilder.Entity("EgitimPlatform.Modules.Exams.Entities.Exam", b =>
                 {
                     b.Property<Guid>("Id")
@@ -492,10 +562,8 @@ namespace EgitimPlatform.Infrastructure.Migrations
                         .HasColumnType("uniqueidentifier");
 
                     b.Property<decimal>("WrongAnswerPenalty")
-                        .ValueGeneratedOnAdd()
-                        .HasPrecision(9, 4)
-                        .HasColumnType("decimal(9,4)")
-                        .HasDefaultValue(4m);
+                        .HasPrecision(5, 2)
+                        .HasColumnType("decimal(5,2)");
 
                     b.HasKey("Id");
 
@@ -505,16 +573,157 @@ namespace EgitimPlatform.Infrastructure.Migrations
                         .IsUnique()
                         .HasFilter("[IsDeleted] = 0");
 
-                    b.HasIndex("InstitutionId", "IsDeleted");
-
                     b.HasIndex("InstitutionId", "ExamDate", "Id");
 
                     b.HasIndex("InstitutionId", "ExamTypeId", "ExamDate");
 
-                    b.ToTable("Exams", null, t =>
-                        {
-                            t.HasCheckConstraint("CK_Exams_WrongAnswerPenalty", "[WrongAnswerPenalty] > 0");
-                        });
+                    b.ToTable("Exams", (string)null);
+                });
+
+            modelBuilder.Entity("EgitimPlatform.Modules.Exams.Entities.ExamQuestion", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<string>("CorrectOption")
+                        .IsRequired()
+                        .HasMaxLength(10)
+                        .HasColumnType("nvarchar(10)");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("datetimeoffset");
+
+                    b.Property<Guid?>("CreatedBy")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<DateTimeOffset?>("DeletedAt")
+                        .HasColumnType("datetimeoffset");
+
+                    b.Property<Guid?>("DeletedBy")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<Guid>("ExamId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<Guid>("ExamSectionId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<Guid>("InstitutionId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<bool>("IsDeleted")
+                        .HasColumnType("bit");
+
+                    b.Property<int>("Order")
+                        .HasColumnType("int");
+
+                    b.Property<Guid>("QuestionId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<int>("QuestionNumber")
+                        .HasColumnType("int");
+
+                    b.Property<DateTimeOffset?>("UpdatedAt")
+                        .HasColumnType("datetimeoffset");
+
+                    b.Property<Guid?>("UpdatedBy")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("QuestionId");
+
+                    b.HasIndex("ExamId", "InstitutionId");
+
+                    b.HasIndex("ExamSectionId", "InstitutionId");
+
+                    b.HasIndex("ExamSectionId", "QuestionId")
+                        .IsUnique()
+                        .HasFilter("[IsDeleted] = 0");
+
+                    b.HasIndex("ExamSectionId", "QuestionNumber")
+                        .IsUnique()
+                        .HasFilter("[IsDeleted] = 0");
+
+                    b.HasIndex("InstitutionId", "ExamId");
+
+                    b.HasIndex("InstitutionId", "QuestionId");
+
+                    b.ToTable("ExamQuestions", (string)null);
+                });
+
+            modelBuilder.Entity("EgitimPlatform.Modules.Exams.Entities.ExamResultImport", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("datetimeoffset");
+
+                    b.Property<int>("CreatedAttemptsCount")
+                        .HasColumnType("int");
+
+                    b.Property<Guid?>("CreatedBy")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<DateTimeOffset?>("DeletedAt")
+                        .HasColumnType("datetimeoffset");
+
+                    b.Property<Guid?>("DeletedBy")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<Guid>("ExamId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<string>("FileHash")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("nvarchar(100)");
+
+                    b.Property<int>("ImportType")
+                        .HasColumnType("int");
+
+                    b.Property<DateTimeOffset>("ImportedAt")
+                        .HasColumnType("datetimeoffset");
+
+                    b.Property<Guid>("ImportedByUserId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<int>("ImportedStudentsCount")
+                        .HasColumnType("int");
+
+                    b.Property<Guid>("InstitutionId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<bool>("IsDeleted")
+                        .HasColumnType("bit");
+
+                    b.Property<int>("Status")
+                        .HasColumnType("int");
+
+                    b.Property<int>("TemplateVersion")
+                        .HasColumnType("int");
+
+                    b.Property<int>("TotalRows")
+                        .HasColumnType("int");
+
+                    b.Property<DateTimeOffset?>("UpdatedAt")
+                        .HasColumnType("datetimeoffset");
+
+                    b.Property<Guid?>("UpdatedBy")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("InstitutionId", "ExamId", "ImportedAt");
+
+                    b.HasIndex("InstitutionId", "ExamId", "ImportType", "FileHash")
+                        .IsUnique()
+                        .HasFilter("[IsDeleted] = 0");
+
+                    b.ToTable("ExamResultImports", (string)null);
                 });
 
             modelBuilder.Entity("EgitimPlatform.Modules.Exams.Entities.ExamSection", b =>
@@ -560,10 +769,12 @@ namespace EgitimPlatform.Infrastructure.Migrations
                         .HasColumnType("uniqueidentifier");
 
                     b.Property<decimal?>("WrongAnswerPenalty")
-                        .HasPrecision(9, 4)
-                        .HasColumnType("decimal(9,4)");
+                        .HasPrecision(5, 2)
+                        .HasColumnType("decimal(5,2)");
 
                     b.HasKey("Id");
+
+                    b.HasIndex("InstitutionId");
 
                     b.HasIndex("SubjectId");
 
@@ -575,16 +786,7 @@ namespace EgitimPlatform.Infrastructure.Migrations
                         .IsUnique()
                         .HasFilter("[IsDeleted] = 0");
 
-                    b.HasIndex("InstitutionId", "IsDeleted");
-
-                    b.ToTable("ExamSections", null, t =>
-                        {
-                            t.HasCheckConstraint("CK_ExamSections_DisplayOrder", "[DisplayOrder] >= 0");
-
-                            t.HasCheckConstraint("CK_ExamSections_QuestionCount", "[QuestionCount] > 0");
-
-                            t.HasCheckConstraint("CK_ExamSections_WrongAnswerPenalty", "[WrongAnswerPenalty] IS NULL OR [WrongAnswerPenalty] > 0");
-                        });
+                    b.ToTable("ExamSections", (string)null);
                 });
 
             modelBuilder.Entity("EgitimPlatform.Modules.Exams.Entities.StudentExamAttempt", b =>
@@ -620,9 +822,12 @@ namespace EgitimPlatform.Infrastructure.Migrations
                     b.Property<bool>("IsDeleted")
                         .HasColumnType("bit");
 
+                    b.Property<bool>("IsRawAvailable")
+                        .HasColumnType("bit");
+
                     b.Property<decimal?>("ReportedScore")
-                        .HasPrecision(12, 4)
-                        .HasColumnType("decimal(12,4)");
+                        .HasPrecision(7, 2)
+                        .HasColumnType("decimal(7,2)");
 
                     b.Property<byte[]>("RowVersion")
                         .IsConcurrencyToken()
@@ -649,8 +854,8 @@ namespace EgitimPlatform.Infrastructure.Migrations
                         .HasColumnType("int");
 
                     b.Property<decimal>("TotalNet")
-                        .HasPrecision(18, 4)
-                        .HasColumnType("decimal(18,4)");
+                        .HasPrecision(7, 2)
+                        .HasColumnType("decimal(7,2)");
 
                     b.Property<int>("TotalWrong")
                         .HasColumnType("int");
@@ -665,8 +870,6 @@ namespace EgitimPlatform.Infrastructure.Migrations
 
                     b.HasIndex("ExamId", "InstitutionId");
 
-                    b.HasIndex("InstitutionId", "IsDeleted");
-
                     b.HasIndex("StudentId", "InstitutionId");
 
                     b.HasIndex("ExamId", "StudentId", "AttemptNumber")
@@ -677,12 +880,77 @@ namespace EgitimPlatform.Infrastructure.Migrations
 
                     b.HasIndex("InstitutionId", "StudentId", "TakenAt", "Id");
 
-                    b.ToTable("StudentExamAttempts", null, t =>
-                        {
-                            t.HasCheckConstraint("CK_StudentExamAttempts_AttemptNumber", "[AttemptNumber] >= 1");
+                    b.ToTable("StudentExamAttempts", (string)null);
+                });
 
-                            t.HasCheckConstraint("CK_StudentExamAttempts_Totals", "[TotalCorrect] >= 0 AND [TotalWrong] >= 0 AND [TotalBlank] >= 0");
-                        });
+            modelBuilder.Entity("EgitimPlatform.Modules.Exams.Entities.StudentExamQuestionResult", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("datetimeoffset");
+
+                    b.Property<Guid?>("CreatedBy")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<DateTimeOffset?>("DeletedAt")
+                        .HasColumnType("datetimeoffset");
+
+                    b.Property<Guid?>("DeletedBy")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<Guid>("ExamQuestionId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<Guid>("InstitutionId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<bool>("IsBlank")
+                        .HasColumnType("bit");
+
+                    b.Property<bool?>("IsCorrect")
+                        .HasColumnType("bit");
+
+                    b.Property<bool>("IsDeleted")
+                        .HasColumnType("bit");
+
+                    b.Property<decimal>("NetContribution")
+                        .HasPrecision(5, 2)
+                        .HasColumnType("decimal(5,2)");
+
+                    b.Property<Guid>("QuestionId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<string>("SelectedOption")
+                        .HasMaxLength(10)
+                        .HasColumnType("nvarchar(10)");
+
+                    b.Property<Guid>("StudentExamAttemptId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<DateTimeOffset?>("UpdatedAt")
+                        .HasColumnType("datetimeoffset");
+
+                    b.Property<Guid?>("UpdatedBy")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("QuestionId");
+
+                    b.HasIndex("ExamQuestionId", "InstitutionId");
+
+                    b.HasIndex("InstitutionId", "StudentExamAttemptId");
+
+                    b.HasIndex("StudentExamAttemptId", "ExamQuestionId")
+                        .IsUnique()
+                        .HasFilter("[IsDeleted] = 0");
+
+                    b.HasIndex("StudentExamAttemptId", "InstitutionId");
+
+                    b.ToTable("StudentExamQuestionResults", (string)null);
                 });
 
             modelBuilder.Entity("EgitimPlatform.Modules.Exams.Entities.StudentExamSubjectResult", b =>
@@ -709,9 +977,6 @@ namespace EgitimPlatform.Infrastructure.Migrations
                     b.Property<Guid?>("DeletedBy")
                         .HasColumnType("uniqueidentifier");
 
-                    b.Property<Guid>("ExamId")
-                        .HasColumnType("uniqueidentifier");
-
                     b.Property<Guid>("ExamSectionId")
                         .HasColumnType("uniqueidentifier");
 
@@ -722,8 +987,8 @@ namespace EgitimPlatform.Infrastructure.Migrations
                         .HasColumnType("bit");
 
                     b.Property<decimal>("Net")
-                        .HasPrecision(18, 4)
-                        .HasColumnType("decimal(18,4)");
+                        .HasPrecision(7, 2)
+                        .HasColumnType("decimal(7,2)");
 
                     b.Property<Guid>("StudentExamAttemptId")
                         .HasColumnType("uniqueidentifier");
@@ -739,20 +1004,17 @@ namespace EgitimPlatform.Infrastructure.Migrations
 
                     b.HasKey("Id");
 
-                    b.HasIndex("InstitutionId", "IsDeleted");
+                    b.HasIndex("InstitutionId");
+
+                    b.HasIndex("ExamSectionId", "InstitutionId");
 
                     b.HasIndex("StudentExamAttemptId", "ExamSectionId")
                         .IsUnique()
                         .HasFilter("[IsDeleted] = 0");
 
-                    b.HasIndex("ExamSectionId", "InstitutionId", "ExamId");
+                    b.HasIndex("StudentExamAttemptId", "InstitutionId");
 
-                    b.HasIndex("StudentExamAttemptId", "InstitutionId", "ExamId");
-
-                    b.ToTable("StudentExamSubjectResults", null, t =>
-                        {
-                            t.HasCheckConstraint("CK_StudentExamSubjectResults_Counts", "[Correct] >= 0 AND [Wrong] >= 0 AND [Blank] >= 0");
-                        });
+                    b.ToTable("StudentExamSubjectResults", (string)null);
                 });
 
             modelBuilder.Entity("EgitimPlatform.Modules.Exams.Entities.StudentExamTopicResult", b =>
@@ -779,9 +1041,6 @@ namespace EgitimPlatform.Infrastructure.Migrations
                     b.Property<Guid?>("DeletedBy")
                         .HasColumnType("uniqueidentifier");
 
-                    b.Property<Guid>("ExamId")
-                        .HasColumnType("uniqueidentifier");
-
                     b.Property<Guid>("ExamSectionId")
                         .HasColumnType("uniqueidentifier");
 
@@ -792,8 +1051,8 @@ namespace EgitimPlatform.Infrastructure.Migrations
                         .HasColumnType("bit");
 
                     b.Property<decimal>("Net")
-                        .HasPrecision(18, 4)
-                        .HasColumnType("decimal(18,4)");
+                        .HasPrecision(7, 2)
+                        .HasColumnType("decimal(7,2)");
 
                     b.Property<Guid>("StudentExamAttemptId")
                         .HasColumnType("uniqueidentifier");
@@ -812,22 +1071,19 @@ namespace EgitimPlatform.Infrastructure.Migrations
 
                     b.HasKey("Id");
 
-                    b.HasIndex("InstitutionId", "IsDeleted");
+                    b.HasIndex("InstitutionId");
+
+                    b.HasIndex("ExamSectionId", "InstitutionId");
+
+                    b.HasIndex("StudentExamAttemptId", "InstitutionId");
 
                     b.HasIndex("TopicId", "StudentExamAttemptId");
-
-                    b.HasIndex("ExamSectionId", "InstitutionId", "ExamId");
 
                     b.HasIndex("StudentExamAttemptId", "ExamSectionId", "TopicId")
                         .IsUnique()
                         .HasFilter("[IsDeleted] = 0");
 
-                    b.HasIndex("StudentExamAttemptId", "InstitutionId", "ExamId");
-
-                    b.ToTable("StudentExamTopicResults", null, t =>
-                        {
-                            t.HasCheckConstraint("CK_StudentExamTopicResults_Counts", "[Correct] >= 0 AND [Wrong] >= 0 AND [Blank] >= 0");
-                        });
+                    b.ToTable("StudentExamTopicResults", (string)null);
                 });
 
             modelBuilder.Entity("EgitimPlatform.Modules.Identity.Entities.ApplicationRole", b =>
@@ -1190,6 +1446,448 @@ namespace EgitimPlatform.Infrastructure.Migrations
                         .HasFilter("[IsDeleted] = 0");
 
                     b.ToTable("Institutions", (string)null);
+                });
+
+            modelBuilder.Entity("EgitimPlatform.Modules.Planning.Entities.CoachTask", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<Guid>("CoachUserId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<DateTimeOffset?>("CompletedAt")
+                        .HasColumnType("datetimeoffset");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("datetimeoffset");
+
+                    b.Property<Guid?>("CreatedBy")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<DateTimeOffset?>("DeletedAt")
+                        .HasColumnType("datetimeoffset");
+
+                    b.Property<Guid?>("DeletedBy")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<string>("Description")
+                        .HasMaxLength(2000)
+                        .HasColumnType("nvarchar(2000)");
+
+                    b.Property<DateTimeOffset?>("DueDate")
+                        .HasColumnType("datetimeoffset");
+
+                    b.Property<int?>("DurationMinutes")
+                        .HasColumnType("int");
+
+                    b.Property<Guid>("InstitutionId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<bool>("IsDeleted")
+                        .HasColumnType("bit");
+
+                    b.Property<Guid?>("LearningOutcomeId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<string>("LearningOutcomeName")
+                        .HasMaxLength(200)
+                        .HasColumnType("nvarchar(200)");
+
+                    b.Property<int>("Status")
+                        .HasColumnType("int");
+
+                    b.Property<Guid>("StudentId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<Guid?>("SubjectId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<string>("SubjectName")
+                        .HasMaxLength(200)
+                        .HasColumnType("nvarchar(200)");
+
+                    b.Property<string>("Title")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("nvarchar(200)");
+
+                    b.Property<Guid?>("TopicId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<string>("TopicName")
+                        .HasMaxLength(200)
+                        .HasColumnType("nvarchar(200)");
+
+                    b.Property<DateTimeOffset?>("UpdatedAt")
+                        .HasColumnType("datetimeoffset");
+
+                    b.Property<Guid?>("UpdatedBy")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("DueDate");
+
+                    b.HasIndex("InstitutionId");
+
+                    b.HasIndex("CoachUserId", "Status");
+
+                    b.HasIndex("StudentId", "InstitutionId");
+
+                    b.HasIndex("StudentId", "Status");
+
+                    b.HasIndex("StudentId", "Status", "DueDate");
+
+                    b.ToTable("CoachTasks", (string)null);
+                });
+
+            modelBuilder.Entity("EgitimPlatform.Modules.Planning.Entities.StudyPlan", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<DateTimeOffset?>("ActivatedAt")
+                        .HasColumnType("datetimeoffset");
+
+                    b.Property<DateTimeOffset?>("CompletedAt")
+                        .HasColumnType("datetimeoffset");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("datetimeoffset");
+
+                    b.Property<Guid?>("CreatedBy")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<int>("DailyStudyMinutes")
+                        .HasColumnType("int");
+
+                    b.Property<DateTimeOffset?>("DeletedAt")
+                        .HasColumnType("datetimeoffset");
+
+                    b.Property<Guid?>("DeletedBy")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<DateTimeOffset>("EndDate")
+                        .HasColumnType("datetimeoffset");
+
+                    b.Property<Guid>("InstitutionId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<bool>("IsDeleted")
+                        .HasColumnType("bit");
+
+                    b.Property<int>("PlanDays")
+                        .HasColumnType("int");
+
+                    b.Property<string>("RecommendationPolicyVersion")
+                        .IsRequired()
+                        .HasMaxLength(50)
+                        .HasColumnType("nvarchar(50)");
+
+                    b.Property<int>("ScheduledRecommendationCount")
+                        .HasColumnType("int");
+
+                    b.Property<int>("SessionMinutes")
+                        .HasColumnType("int");
+
+                    b.Property<int>("Source")
+                        .HasColumnType("int");
+
+                    b.Property<DateTimeOffset>("StartDate")
+                        .HasColumnType("datetimeoffset");
+
+                    b.Property<int>("Status")
+                        .HasColumnType("int");
+
+                    b.Property<Guid>("StudentId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<string>("StudyPlanPolicyVersion")
+                        .IsRequired()
+                        .HasMaxLength(50)
+                        .HasColumnType("nvarchar(50)");
+
+                    b.Property<string>("Title")
+                        .IsRequired()
+                        .HasMaxLength(250)
+                        .HasColumnType("nvarchar(250)");
+
+                    b.Property<int>("TotalAvailableMinutes")
+                        .HasColumnType("int");
+
+                    b.Property<int>("TotalPlannedMinutes")
+                        .HasColumnType("int");
+
+                    b.Property<int>("UnallocatedMinutes")
+                        .HasColumnType("int");
+
+                    b.Property<int>("UnscheduledRecommendationCount")
+                        .HasColumnType("int");
+
+                    b.Property<DateTimeOffset?>("UpdatedAt")
+                        .HasColumnType("datetimeoffset");
+
+                    b.Property<Guid?>("UpdatedBy")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<decimal>("UtilizationRate")
+                        .HasPrecision(7, 4)
+                        .HasColumnType("decimal(7,4)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("InstitutionId");
+
+                    b.HasIndex("StudentId")
+                        .IsUnique()
+                        .HasFilter("[Status] = 1 AND [IsDeleted] = 0");
+
+                    b.HasIndex("StudentId", "Status");
+
+                    b.ToTable("StudyPlans", (string)null);
+                });
+
+            modelBuilder.Entity("EgitimPlatform.Modules.Planning.Entities.StudyTask", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<int>("ClassificationStateSnapshot")
+                        .HasColumnType("int");
+
+                    b.Property<DateTimeOffset?>("CompletedAt")
+                        .HasColumnType("datetimeoffset");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("datetimeoffset");
+
+                    b.Property<Guid?>("CreatedBy")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<int>("DayIndex")
+                        .HasColumnType("int");
+
+                    b.Property<DateTimeOffset?>("DeletedAt")
+                        .HasColumnType("datetimeoffset");
+
+                    b.Property<Guid?>("DeletedBy")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<int>("DurationMinutes")
+                        .HasColumnType("int");
+
+                    b.Property<Guid>("InstitutionId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<bool>("IsCompleted")
+                        .HasColumnType("bit");
+
+                    b.Property<bool>("IsDeleted")
+                        .HasColumnType("bit");
+
+                    b.Property<Guid?>("LearningOutcomeId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<string>("LearningOutcomeName")
+                        .HasMaxLength(300)
+                        .HasColumnType("nvarchar(300)");
+
+                    b.Property<Guid>("NodeId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<int>("NodeType")
+                        .HasColumnType("int");
+
+                    b.Property<DateTimeOffset?>("PlannedDate")
+                        .HasColumnType("datetimeoffset");
+
+                    b.Property<int>("PriorityScoreSnapshot")
+                        .HasColumnType("int");
+
+                    b.Property<int>("RecommendationType")
+                        .HasColumnType("int");
+
+                    b.Property<int>("Sequence")
+                        .HasColumnType("int");
+
+                    b.Property<Guid>("StudentId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<Guid>("StudyPlanId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<Guid?>("SubTopicId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<string>("SubTopicName")
+                        .HasMaxLength(200)
+                        .HasColumnType("nvarchar(200)");
+
+                    b.Property<Guid?>("SubjectId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<string>("SubjectName")
+                        .HasMaxLength(200)
+                        .HasColumnType("nvarchar(200)");
+
+                    b.Property<string>("TitleSnapshot")
+                        .IsRequired()
+                        .HasMaxLength(250)
+                        .HasColumnType("nvarchar(250)");
+
+                    b.Property<Guid?>("TopicId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<string>("TopicName")
+                        .HasMaxLength(200)
+                        .HasColumnType("nvarchar(200)");
+
+                    b.Property<DateTimeOffset?>("UpdatedAt")
+                        .HasColumnType("datetimeoffset");
+
+                    b.Property<Guid?>("UpdatedBy")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("InstitutionId");
+
+                    b.HasIndex("StudyPlanId");
+
+                    b.HasIndex("StudentId", "PlannedDate");
+
+                    b.HasIndex("StudentId", "IsCompleted", "PlannedDate");
+
+                    b.ToTable("StudyTasks", (string)null);
+                });
+
+            modelBuilder.Entity("EgitimPlatform.Modules.Questions.Entities.Question", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<string>("Content")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("datetimeoffset");
+
+                    b.Property<Guid?>("CreatedBy")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<DateTimeOffset?>("DeletedAt")
+                        .HasColumnType("datetimeoffset");
+
+                    b.Property<Guid?>("DeletedBy")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<int>("Difficulty")
+                        .HasColumnType("int");
+
+                    b.Property<Guid?>("InstitutionId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<bool>("IsDeleted")
+                        .HasColumnType("bit");
+
+                    b.Property<Guid?>("LearningOutcomeId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<string>("MediaUrl")
+                        .HasMaxLength(1000)
+                        .HasColumnType("nvarchar(1000)");
+
+                    b.Property<int>("QuestionType")
+                        .HasColumnType("int");
+
+                    b.Property<byte[]>("RowVersion")
+                        .IsConcurrencyToken()
+                        .IsRequired()
+                        .ValueGeneratedOnAddOrUpdate()
+                        .HasColumnType("rowversion");
+
+                    b.Property<int>("SourceType")
+                        .HasColumnType("int");
+
+                    b.Property<int?>("SourceYear")
+                        .HasColumnType("int");
+
+                    b.Property<int>("Status")
+                        .HasColumnType("int");
+
+                    b.Property<Guid?>("SubTopicId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<Guid>("SubjectId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<Guid>("TopicId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<DateTimeOffset?>("UpdatedAt")
+                        .HasColumnType("datetimeoffset");
+
+                    b.Property<Guid?>("UpdatedBy")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("LearningOutcomeId");
+
+                    b.HasIndex("SubTopicId");
+
+                    b.HasIndex("TopicId");
+
+                    b.HasIndex("InstitutionId", "Status");
+
+                    b.HasIndex("SourceType", "SourceYear");
+
+                    b.HasIndex("SubjectId", "Difficulty");
+
+                    b.HasIndex("InstitutionId", "SubjectId", "TopicId");
+
+                    b.ToTable("Questions", (string)null);
+                });
+
+            modelBuilder.Entity("EgitimPlatform.Modules.Questions.Entities.QuestionOption", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<string>("Content")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("datetimeoffset");
+
+                    b.Property<bool>("IsCorrect")
+                        .HasColumnType("bit");
+
+                    b.Property<string>("OptionLabel")
+                        .IsRequired()
+                        .HasMaxLength(10)
+                        .HasColumnType("nvarchar(10)");
+
+                    b.Property<Guid>("QuestionId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<DateTimeOffset?>("UpdatedAt")
+                        .HasColumnType("datetimeoffset");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("QuestionId", "OptionLabel")
+                        .IsUnique();
+
+                    b.ToTable("QuestionOptions", (string)null);
                 });
 
             modelBuilder.Entity("EgitimPlatform.Modules.Students.Entities.Parent", b =>
@@ -1849,11 +2547,17 @@ namespace EgitimPlatform.Infrastructure.Migrations
                         .IsRequired();
                 });
 
-            modelBuilder.Entity("EgitimPlatform.Modules.Exams.Entities.ExamSection", b =>
+            modelBuilder.Entity("EgitimPlatform.Modules.Exams.Entities.ExamQuestion", b =>
                 {
-                    b.HasOne("EgitimPlatform.Modules.Academic.Entities.Subject", null)
+                    b.HasOne("EgitimPlatform.Modules.Institutions.Entities.Institution", null)
                         .WithMany()
-                        .HasForeignKey("SubjectId")
+                        .HasForeignKey("InstitutionId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("EgitimPlatform.Modules.Questions.Entities.Question", null)
+                        .WithMany()
+                        .HasForeignKey("QuestionId")
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired();
 
@@ -1863,10 +2567,45 @@ namespace EgitimPlatform.Infrastructure.Migrations
                         .HasPrincipalKey("Id", "InstitutionId")
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired();
+
+                    b.HasOne("EgitimPlatform.Modules.Exams.Entities.ExamSection", null)
+                        .WithMany()
+                        .HasForeignKey("ExamSectionId", "InstitutionId")
+                        .HasPrincipalKey("Id", "InstitutionId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+                });
+
+            modelBuilder.Entity("EgitimPlatform.Modules.Exams.Entities.ExamSection", b =>
+                {
+                    b.HasOne("EgitimPlatform.Modules.Institutions.Entities.Institution", null)
+                        .WithMany()
+                        .HasForeignKey("InstitutionId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("EgitimPlatform.Modules.Academic.Entities.Subject", null)
+                        .WithMany()
+                        .HasForeignKey("SubjectId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("EgitimPlatform.Modules.Exams.Entities.Exam", null)
+                        .WithMany("Sections")
+                        .HasForeignKey("ExamId", "InstitutionId")
+                        .HasPrincipalKey("Id", "InstitutionId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
                 });
 
             modelBuilder.Entity("EgitimPlatform.Modules.Exams.Entities.StudentExamAttempt", b =>
                 {
+                    b.HasOne("EgitimPlatform.Modules.Institutions.Entities.Institution", null)
+                        .WithMany()
+                        .HasForeignKey("InstitutionId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
                     b.HasOne("EgitimPlatform.Modules.Exams.Entities.Exam", null)
                         .WithMany()
                         .HasForeignKey("ExamId", "InstitutionId")
@@ -1882,25 +2621,66 @@ namespace EgitimPlatform.Infrastructure.Migrations
                         .IsRequired();
                 });
 
-            modelBuilder.Entity("EgitimPlatform.Modules.Exams.Entities.StudentExamSubjectResult", b =>
+            modelBuilder.Entity("EgitimPlatform.Modules.Exams.Entities.StudentExamQuestionResult", b =>
                 {
-                    b.HasOne("EgitimPlatform.Modules.Exams.Entities.ExamSection", null)
+                    b.HasOne("EgitimPlatform.Modules.Institutions.Entities.Institution", null)
                         .WithMany()
-                        .HasForeignKey("ExamSectionId", "InstitutionId", "ExamId")
-                        .HasPrincipalKey("Id", "InstitutionId", "ExamId")
+                        .HasForeignKey("InstitutionId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("EgitimPlatform.Modules.Questions.Entities.Question", null)
+                        .WithMany()
+                        .HasForeignKey("QuestionId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("EgitimPlatform.Modules.Exams.Entities.ExamQuestion", null)
+                        .WithMany()
+                        .HasForeignKey("ExamQuestionId", "InstitutionId")
+                        .HasPrincipalKey("Id", "InstitutionId")
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired();
 
                     b.HasOne("EgitimPlatform.Modules.Exams.Entities.StudentExamAttempt", null)
+                        .WithMany("QuestionResults")
+                        .HasForeignKey("StudentExamAttemptId", "InstitutionId")
+                        .HasPrincipalKey("Id", "InstitutionId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+                });
+
+            modelBuilder.Entity("EgitimPlatform.Modules.Exams.Entities.StudentExamSubjectResult", b =>
+                {
+                    b.HasOne("EgitimPlatform.Modules.Institutions.Entities.Institution", null)
                         .WithMany()
-                        .HasForeignKey("StudentExamAttemptId", "InstitutionId", "ExamId")
-                        .HasPrincipalKey("Id", "InstitutionId", "ExamId")
+                        .HasForeignKey("InstitutionId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("EgitimPlatform.Modules.Exams.Entities.ExamSection", null)
+                        .WithMany()
+                        .HasForeignKey("ExamSectionId", "InstitutionId")
+                        .HasPrincipalKey("Id", "InstitutionId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("EgitimPlatform.Modules.Exams.Entities.StudentExamAttempt", null)
+                        .WithMany("SubjectResults")
+                        .HasForeignKey("StudentExamAttemptId", "InstitutionId")
+                        .HasPrincipalKey("Id", "InstitutionId")
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired();
                 });
 
             modelBuilder.Entity("EgitimPlatform.Modules.Exams.Entities.StudentExamTopicResult", b =>
                 {
+                    b.HasOne("EgitimPlatform.Modules.Institutions.Entities.Institution", null)
+                        .WithMany()
+                        .HasForeignKey("InstitutionId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
                     b.HasOne("EgitimPlatform.Modules.Academic.Entities.Topic", null)
                         .WithMany()
                         .HasForeignKey("TopicId")
@@ -1909,15 +2689,15 @@ namespace EgitimPlatform.Infrastructure.Migrations
 
                     b.HasOne("EgitimPlatform.Modules.Exams.Entities.ExamSection", null)
                         .WithMany()
-                        .HasForeignKey("ExamSectionId", "InstitutionId", "ExamId")
-                        .HasPrincipalKey("Id", "InstitutionId", "ExamId")
+                        .HasForeignKey("ExamSectionId", "InstitutionId")
+                        .HasPrincipalKey("Id", "InstitutionId")
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired();
 
                     b.HasOne("EgitimPlatform.Modules.Exams.Entities.StudentExamAttempt", null)
-                        .WithMany()
-                        .HasForeignKey("StudentExamAttemptId", "InstitutionId", "ExamId")
-                        .HasPrincipalKey("Id", "InstitutionId", "ExamId")
+                        .WithMany("TopicResults")
+                        .HasForeignKey("StudentExamAttemptId", "InstitutionId")
+                        .HasPrincipalKey("Id", "InstitutionId")
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired();
                 });
@@ -1954,6 +2734,67 @@ namespace EgitimPlatform.Infrastructure.Migrations
                     b.Navigation("Permission");
 
                     b.Navigation("Role");
+                });
+
+            modelBuilder.Entity("EgitimPlatform.Modules.Planning.Entities.CoachTask", b =>
+                {
+                    b.HasOne("EgitimPlatform.Modules.Institutions.Entities.Institution", null)
+                        .WithMany()
+                        .HasForeignKey("InstitutionId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("EgitimPlatform.Modules.Students.Entities.Student", null)
+                        .WithMany()
+                        .HasForeignKey("StudentId", "InstitutionId")
+                        .HasPrincipalKey("Id", "InstitutionId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+                });
+
+            modelBuilder.Entity("EgitimPlatform.Modules.Planning.Entities.StudyTask", b =>
+                {
+                    b.HasOne("EgitimPlatform.Modules.Planning.Entities.StudyPlan", "StudyPlan")
+                        .WithMany("Tasks")
+                        .HasForeignKey("StudyPlanId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("StudyPlan");
+                });
+
+            modelBuilder.Entity("EgitimPlatform.Modules.Questions.Entities.Question", b =>
+                {
+                    b.HasOne("EgitimPlatform.Modules.Academic.Entities.LearningOutcome", null)
+                        .WithMany()
+                        .HasForeignKey("LearningOutcomeId")
+                        .OnDelete(DeleteBehavior.Restrict);
+
+                    b.HasOne("EgitimPlatform.Modules.Academic.Entities.SubTopic", null)
+                        .WithMany()
+                        .HasForeignKey("SubTopicId")
+                        .OnDelete(DeleteBehavior.Restrict);
+
+                    b.HasOne("EgitimPlatform.Modules.Academic.Entities.Subject", null)
+                        .WithMany()
+                        .HasForeignKey("SubjectId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("EgitimPlatform.Modules.Academic.Entities.Topic", null)
+                        .WithMany()
+                        .HasForeignKey("TopicId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+                });
+
+            modelBuilder.Entity("EgitimPlatform.Modules.Questions.Entities.QuestionOption", b =>
+                {
+                    b.HasOne("EgitimPlatform.Modules.Questions.Entities.Question", null)
+                        .WithMany("Options")
+                        .HasForeignKey("QuestionId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
                 });
 
             modelBuilder.Entity("EgitimPlatform.Modules.Students.Entities.Parent", b =>
@@ -2102,6 +2943,20 @@ namespace EgitimPlatform.Infrastructure.Migrations
                         .IsRequired();
                 });
 
+            modelBuilder.Entity("EgitimPlatform.Modules.Exams.Entities.Exam", b =>
+                {
+                    b.Navigation("Sections");
+                });
+
+            modelBuilder.Entity("EgitimPlatform.Modules.Exams.Entities.StudentExamAttempt", b =>
+                {
+                    b.Navigation("QuestionResults");
+
+                    b.Navigation("SubjectResults");
+
+                    b.Navigation("TopicResults");
+                });
+
             modelBuilder.Entity("EgitimPlatform.Modules.Identity.Entities.ApplicationRole", b =>
                 {
                     b.Navigation("RolePermissions");
@@ -2115,6 +2970,16 @@ namespace EgitimPlatform.Infrastructure.Migrations
             modelBuilder.Entity("EgitimPlatform.Modules.Identity.Entities.Permission", b =>
                 {
                     b.Navigation("RolePermissions");
+                });
+
+            modelBuilder.Entity("EgitimPlatform.Modules.Planning.Entities.StudyPlan", b =>
+                {
+                    b.Navigation("Tasks");
+                });
+
+            modelBuilder.Entity("EgitimPlatform.Modules.Questions.Entities.Question", b =>
+                {
+                    b.Navigation("Options");
                 });
 #pragma warning restore 612, 618
         }

@@ -4,28 +4,16 @@ using Microsoft.EntityFrameworkCore.Metadata.Builders;
 
 namespace EgitimPlatform.Modules.Exams.Configuration;
 
-public sealed class StudentExamSubjectResultConfiguration : IEntityTypeConfiguration<StudentExamSubjectResult>
+public class StudentExamSubjectResultConfiguration : IEntityTypeConfiguration<StudentExamSubjectResult>
 {
     public void Configure(EntityTypeBuilder<StudentExamSubjectResult> builder)
     {
-        builder.ToTable("StudentExamSubjectResults", table =>
-            table.HasCheckConstraint("CK_StudentExamSubjectResults_Counts", "[Correct] >= 0 AND [Wrong] >= 0 AND [Blank] >= 0"));
-        builder.Property(x => x.Net).HasPrecision(18, 4);
+        builder.ToTable("StudentExamSubjectResults");
+        builder.Property(x => x.Net).HasPrecision(7, 2);
 
-        builder.HasOne<StudentExamAttempt>()
-            .WithMany()
-            .HasForeignKey(x => new { x.StudentExamAttemptId, x.InstitutionId, x.ExamId })
-            .HasPrincipalKey(x => new { x.Id, x.InstitutionId, x.ExamId })
-            .OnDelete(DeleteBehavior.Restrict);
-        builder.HasOne<ExamSection>()
-            .WithMany()
-            .HasForeignKey(x => new { x.ExamSectionId, x.InstitutionId, x.ExamId })
-            .HasPrincipalKey(x => new { x.Id, x.InstitutionId, x.ExamId })
-            .OnDelete(DeleteBehavior.Restrict);
-
+        // Unique index per attempt & section
         builder.HasIndex(x => new { x.StudentExamAttemptId, x.ExamSectionId })
             .IsUnique()
             .HasFilter("[IsDeleted] = 0");
-        builder.HasIndex(x => new { x.InstitutionId, x.IsDeleted });
     }
 }

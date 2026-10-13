@@ -94,7 +94,7 @@ public class Sprint2Tests
         using var db = ModelContext(); var handler = new TaxonomyHandler(db);
         var property = typeof(TaxonomyHandler).GetProperty("Concepts", System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance)!;
         var query = (IQueryable)property.GetValue(handler)!;
-        Assert.Contains("AcademicExamTypes", query.ToQueryString());
+        Assert.Contains("AcademicConcepts", query.ToQueryString());
     }
     [Fact]
     public async Task StableTaxonomyCodeCannotBeRewritten()

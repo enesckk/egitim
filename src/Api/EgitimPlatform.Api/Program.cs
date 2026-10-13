@@ -1,13 +1,16 @@
 using EgitimPlatform.Modules.Academic.Extensions;
 using EgitimPlatform.Modules.Teachers.Extensions;
 using EgitimPlatform.Modules.Exams.Extensions;
+using EgitimPlatform.Modules.Questions.Extensions;
+using EgitimPlatform.Modules.Planning.Extensions;
 using EgitimPlatform.Api.Extensions;
 using EgitimPlatform.Api.Middleware;
 using EgitimPlatform.Infrastructure;
 using EgitimPlatform.Modules.Coaching.Extensions;
 using EgitimPlatform.Modules.Identity.Extensions;
-using EgitimPlatform.Modules.Institutions.Extensions;
 using EgitimPlatform.Modules.Students.Extensions;
+using EgitimPlatform.Modules.Communication.Extensions;
+using EgitimPlatform.Modules.AI.Extensions;
 using Microsoft.AspNetCore.HttpOverrides;
 using Microsoft.AspNetCore.RateLimiting;
 using Microsoft.EntityFrameworkCore;
@@ -38,15 +41,37 @@ try
     builder.Services.AddIdentityModule(builder.Configuration);
 
     // Domain modules
-    builder.Services.AddInstitutionsModule();
     builder.Services.AddStudentsModule();
     builder.Services.AddCoachingModule();
     builder.Services.AddAcademicModule();
     builder.Services.AddTeachersModule();
     builder.Services.AddExamsModule();
+    builder.Services.AddQuestionsModule();
+    builder.Services.AddPlanningModule();
+    builder.Services.AddCommunicationModule();
+    builder.Services.AddAiModule();
 
     // Controllers
     builder.Services.AddControllers();
+
+    // Response compression (Brotli & Gzip)
+    builder.Services.AddResponseCompression(options =>
+    {
+        options.EnableForHttps = true;
+        options.Providers.Add<Microsoft.AspNetCore.ResponseCompression.BrotliCompressionProvider>();
+        options.Providers.Add<Microsoft.AspNetCore.ResponseCompression.GzipCompressionProvider>();
+    });
+
+    // In-memory cache & Output Cache
+    builder.Services.AddMemoryCache();
+    builder.Services.AddOutputCache(options =>
+    {
+        options.AddBasePolicy(b => b.Expire(TimeSpan.FromSeconds(60)));
+        options.AddPolicy("TaxonomyCache", b => b
+            .Expire(TimeSpan.FromHours(1))
+            .SetVaryByQuery("parentId", "page", "pageSize")
+            .SetVaryByRouteValue("level"));
+    });
 
     // ProblemDetails
     builder.Services.AddProblemDetails();
@@ -195,6 +220,10 @@ try
         options.RejectionStatusCode = StatusCodes.Status429TooManyRequests;
     });
 
+    // Register Demo Showcase Seeder
+    builder.Services.Configure<EgitimPlatform.Api.Seeding.DemoSeedSettings>(builder.Configuration.GetSection(EgitimPlatform.Api.Seeding.DemoSeedSettings.SectionName));
+    builder.Services.AddScoped<EgitimPlatform.Api.Seeding.DemoDataSeeder>();
+
     var app = builder.Build();
 
     // P2-06 CLOSURE: Explicit production initialization mode.
@@ -246,9 +275,17 @@ try
     // Production: migrations must be applied via CI/CD or explicit deployment step.
     if (app.Environment.IsDevelopment() || app.Environment.EnvironmentName == "IntegrationTest" || app.Environment.EnvironmentName == "SecurityTest")
     {
-        using var scope = app.Services.CreateScope();
-        var dbContext = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
-        await dbContext.Database.MigrateAsync();
+        try
+        {
+            using var scope = app.Services.CreateScope();
+            var dbContext = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
+            await dbContext.Database.MigrateAsync();
+        }
+        catch (Exception ex)
+        {
+            Log.Error(ex, "MigrateAsync failed in Program.cs");
+            throw;
+        }
     }
 
     // P2-8: Role seeding — only in Development/test environments.
@@ -267,6 +304,14 @@ try
         await app.Services.SeedBootstrapSuperAdminAsync();
     }
 
+    // Demo Showcase Seeder — ONLY if DemoSeed:Enabled is explicitly true
+    if (app.Configuration.GetSection("DemoSeed").GetValue<bool>("Enabled"))
+    {
+        using var scope = app.Services.CreateScope();
+        var demoSeeder = scope.ServiceProvider.GetRequiredService<EgitimPlatform.Api.Seeding.DemoDataSeeder>();
+        await demoSeeder.SeedAsync();
+    }
+
     // Middleware pipeline — CorrelationId BEFORE ExceptionHandling
     // so exception logs include the correlation context.
     app.UseMiddleware<CorrelationIdMiddleware>();
@@ -279,12 +324,14 @@ try
     }
 
     app.UseHttpsRedirection();
+    app.UseResponseCompression();
     app.UseCors();
     // P2-02: CSRF origin validation — runs after CORS, before auth.
     app.UseMiddleware<CsrfOriginMiddleware>();
     app.UseSerilogRequestLogging();
     app.UseAuthentication();
     app.UseAuthorization();
+    app.UseOutputCache();
     app.UseRateLimiter();
     app.MapControllers();
 
@@ -298,6 +345,7 @@ catch (HostAbortedException)
 catch (Exception ex)
 {
     Log.Fatal(ex, "Application terminated unexpectedly");
+    throw;
 }
 finally
 {

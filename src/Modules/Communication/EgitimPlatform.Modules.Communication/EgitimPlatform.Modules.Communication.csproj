@@ -2,8 +2,10 @@
 
   <PropertyGroup>
     <TargetFramework>net10.0</TargetFramework>
-    <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <RootNamespace>EgitimPlatform.Modules.Communication</RootNamespace>
+    <AssemblyName>EgitimPlatform.Modules.Communication</AssemblyName>
   </PropertyGroup>
 
   <ItemGroup>
@@ -13,6 +15,7 @@
   <ItemGroup>
     <ProjectReference Include="..\..\..\BuildingBlocks\EgitimPlatform.BuildingBlocks\EgitimPlatform.BuildingBlocks.csproj" />
     <ProjectReference Include="..\..\Planning\EgitimPlatform.Modules.Planning\EgitimPlatform.Modules.Planning.csproj" />
+    <ProjectReference Include="..\..\Students\EgitimPlatform.Modules.Students\EgitimPlatform.Modules.Students.csproj" />
   </ItemGroup>
 
 </Project>

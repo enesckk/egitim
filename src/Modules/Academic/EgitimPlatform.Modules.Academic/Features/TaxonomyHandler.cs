@@ -6,11 +6,11 @@ namespace EgitimPlatform.Modules.Academic.Features;
 public sealed class TaxonomyHandler(IApplicationDbContext db) : IAcademicCatalog
 {
     private IQueryable<ExamType> ExamTypes => db.Set<ExamType>().AsNoTracking();
-    private IQueryable<Subject> Subjects => db.Set<Subject>().AsNoTracking().Where(x => ExamTypes.Select(p => p.Id).Contains(x.ExamTypeId));
-    private IQueryable<Topic> Topics => db.Set<Topic>().AsNoTracking().Where(x => Subjects.Select(p => p.Id).Contains(x.SubjectId));
-    private IQueryable<SubTopic> SubTopics => db.Set<SubTopic>().AsNoTracking().Where(x => Topics.Select(p => p.Id).Contains(x.TopicId));
-    private IQueryable<LearningOutcome> LearningOutcomes => db.Set<LearningOutcome>().AsNoTracking().Where(x => SubTopics.Select(p => p.Id).Contains(x.SubTopicId));
-    private IQueryable<Concept> Concepts => db.Set<Concept>().AsNoTracking().Where(x => LearningOutcomes.Select(p => p.Id).Contains(x.LearningOutcomeId));
+    private IQueryable<Subject> Subjects => db.Set<Subject>().AsNoTracking();
+    private IQueryable<Topic> Topics => db.Set<Topic>().AsNoTracking();
+    private IQueryable<SubTopic> SubTopics => db.Set<SubTopic>().AsNoTracking();
+    private IQueryable<LearningOutcome> LearningOutcomes => db.Set<LearningOutcome>().AsNoTracking();
+    private IQueryable<Concept> Concepts => db.Set<Concept>().AsNoTracking();
     public async Task<AcademicReferenceDto?> GetExamTypeAsync(Guid id, CancellationToken ct = default) =>
         await ExamTypes.Where(x => x.Id == id).Select(x => new AcademicReferenceDto(x.Id, x.Code, x.Name)).SingleOrDefaultAsync(ct);
     public async Task<IReadOnlyList<AcademicReferenceDto>> GetExamTypesAsync(IEnumerable<Guid> ids, CancellationToken ct = default)
@@ -21,20 +21,45 @@ public sealed class TaxonomyHandler(IApplicationDbContext db) : IAcademicCatalog
             .Select(x => new AcademicReferenceDto(x.Id, x.Code, x.Name)).ToListAsync(ct);
     }
     public Task<bool> SubjectExistsAsync(Guid id, CancellationToken ct = default) => Subjects.AnyAsync(x => x.Id == id, ct);
-    public async Task<IReadOnlyList<AcademicSubjectReferenceDto>> GetSubjectsAsync(IEnumerable<Guid> ids, CancellationToken ct = default)
+    public Task<bool> ValidateExamTypeSubjectAsync(Guid examTypeId, Guid subjectId, CancellationToken ct = default) =>
+        Subjects.AnyAsync(x => x.Id == subjectId && x.ExamTypeId == examTypeId, ct);
+    public async Task<bool> ValidateSubjectTopicsAsync(Guid subjectId, IEnumerable<Guid> topicIds, CancellationToken ct = default)
     {
-        var idList = ids.Distinct().ToList();
-        if (idList.Count == 0) return Array.Empty<AcademicSubjectReferenceDto>();
-        return await Subjects.Where(x => idList.Contains(x.Id)).OrderBy(x => x.Code)
-            .Select(x => new AcademicSubjectReferenceDto(x.Id, x.ExamTypeId, x.Code, x.Name)).ToListAsync(ct);
+        var idList = topicIds.Distinct().ToList();
+        if (idList.Count == 0) return true;
+        var validCount = await Topics.Where(x => x.SubjectId == subjectId && idList.Contains(x.Id)).CountAsync(ct);
+        return validCount == idList.Count;
     }
-    public async Task<IReadOnlyList<AcademicTopicReferenceDto>> GetTopicsAsync(IEnumerable<Guid> ids, CancellationToken ct = default)
+    public async Task<IReadOnlyDictionary<Guid, string>> GetSubjectNamesAsync(IEnumerable<Guid> subjectIds, CancellationToken ct = default)
     {
-        var idList = ids.Distinct().ToList();
-        if (idList.Count == 0) return Array.Empty<AcademicTopicReferenceDto>();
-        return await Topics.Where(x => idList.Contains(x.Id)).OrderBy(x => x.Code)
-            .Select(x => new AcademicTopicReferenceDto(x.Id, x.SubjectId, x.Code, x.Name)).ToListAsync(ct);
+        var idList = subjectIds.Distinct().ToList();
+        if (idList.Count == 0) return new Dictionary<Guid, string>();
+        return await Subjects.Where(x => idList.Contains(x.Id)).ToDictionaryAsync(x => x.Id, x => x.Name, ct);
     }
+    public async Task<IReadOnlyDictionary<Guid, string>> GetTopicNamesAsync(IEnumerable<Guid> topicIds, CancellationToken ct = default)
+    {
+        var idList = topicIds.Distinct().ToList();
+        if (idList.Count == 0) return new Dictionary<Guid, string>();
+        return await Topics.Where(x => idList.Contains(x.Id)).ToDictionaryAsync(x => x.Id, x => x.Name, ct);
+    }
+    public Task<bool> ValidateTopicSubTopicAsync(Guid topicId, Guid subTopicId, CancellationToken ct = default) =>
+        SubTopics.AnyAsync(x => x.Id == subTopicId && x.TopicId == topicId, ct);
+
+    public async Task<bool> ValidateLearningOutcomeHierarchyAsync(Guid subjectId, Guid topicId, Guid? subTopicId, Guid learningOutcomeId, CancellationToken ct = default)
+    {
+        if (subTopicId.HasValue)
+        {
+            var validSubTopic = await SubTopics.AnyAsync(st => st.Id == subTopicId.Value && st.TopicId == topicId, ct);
+            if (!validSubTopic) return false;
+            return await LearningOutcomes.AnyAsync(lo => lo.Id == learningOutcomeId && lo.SubTopicId == subTopicId.Value, ct);
+        }
+        else
+        {
+            var validSubTopicIds = SubTopics.Where(st => st.TopicId == topicId).Select(st => st.Id);
+            return await LearningOutcomes.AnyAsync(lo => lo.Id == learningOutcomeId && validSubTopicIds.Contains(lo.SubTopicId), ct);
+        }
+    }
+
     public async Task<IReadOnlyList<TaxonomyDto>> HandleAsync(TaxonomyQuery q, CancellationToken ct = default)
     {
         await new TaxonomyQueryValidator().ValidateAndThrowAsync(q, ct);

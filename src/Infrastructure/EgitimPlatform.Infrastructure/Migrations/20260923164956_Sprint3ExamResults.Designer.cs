@@ -12,7 +12,7 @@ using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 namespace EgitimPlatform.Infrastructure.Migrations
 {
     [DbContext(typeof(ApplicationDbContext))]
-    [Migration("20260922205401_Sprint3ExamResults")]
+    [Migration("20260923164956_Sprint3ExamResults")]
     partial class Sprint3ExamResults
     {
         /// <inheritdoc />
@@ -495,10 +495,8 @@ namespace EgitimPlatform.Infrastructure.Migrations
                         .HasColumnType("uniqueidentifier");
 
                     b.Property<decimal>("WrongAnswerPenalty")
-                        .ValueGeneratedOnAdd()
-                        .HasPrecision(9, 4)
-                        .HasColumnType("decimal(9,4)")
-                        .HasDefaultValue(4m);
+                        .HasPrecision(5, 2)
+                        .HasColumnType("decimal(5,2)");
 
                     b.HasKey("Id");
 
@@ -508,16 +506,11 @@ namespace EgitimPlatform.Infrastructure.Migrations
                         .IsUnique()
                         .HasFilter("[IsDeleted] = 0");
 
-                    b.HasIndex("InstitutionId", "IsDeleted");
-
                     b.HasIndex("InstitutionId", "ExamDate", "Id");
 
                     b.HasIndex("InstitutionId", "ExamTypeId", "ExamDate");
 
-                    b.ToTable("Exams", null, t =>
-                        {
-                            t.HasCheckConstraint("CK_Exams_WrongAnswerPenalty", "[WrongAnswerPenalty] > 0");
-                        });
+                    b.ToTable("Exams", (string)null);
                 });
 
             modelBuilder.Entity("EgitimPlatform.Modules.Exams.Entities.ExamSection", b =>
@@ -563,10 +556,12 @@ namespace EgitimPlatform.Infrastructure.Migrations
                         .HasColumnType("uniqueidentifier");
 
                     b.Property<decimal?>("WrongAnswerPenalty")
-                        .HasPrecision(9, 4)
-                        .HasColumnType("decimal(9,4)");
+                        .HasPrecision(5, 2)
+                        .HasColumnType("decimal(5,2)");
 
                     b.HasKey("Id");
+
+                    b.HasIndex("InstitutionId");
 
                     b.HasIndex("SubjectId");
 
@@ -578,16 +573,7 @@ namespace EgitimPlatform.Infrastructure.Migrations
                         .IsUnique()
                         .HasFilter("[IsDeleted] = 0");
 
-                    b.HasIndex("InstitutionId", "IsDeleted");
-
-                    b.ToTable("ExamSections", null, t =>
-                        {
-                            t.HasCheckConstraint("CK_ExamSections_DisplayOrder", "[DisplayOrder] >= 0");
-
-                            t.HasCheckConstraint("CK_ExamSections_QuestionCount", "[QuestionCount] > 0");
-
-                            t.HasCheckConstraint("CK_ExamSections_WrongAnswerPenalty", "[WrongAnswerPenalty] IS NULL OR [WrongAnswerPenalty] > 0");
-                        });
+                    b.ToTable("ExamSections", (string)null);
                 });
 
             modelBuilder.Entity("EgitimPlatform.Modules.Exams.Entities.StudentExamAttempt", b =>
@@ -624,8 +610,8 @@ namespace EgitimPlatform.Infrastructure.Migrations
                         .HasColumnType("bit");
 
                     b.Property<decimal?>("ReportedScore")
-                        .HasPrecision(12, 4)
-                        .HasColumnType("decimal(12,4)");
+                        .HasPrecision(7, 2)
+                        .HasColumnType("decimal(7,2)");
 
                     b.Property<byte[]>("RowVersion")
                         .IsConcurrencyToken()
@@ -652,8 +638,8 @@ namespace EgitimPlatform.Infrastructure.Migrations
                         .HasColumnType("int");
 
                     b.Property<decimal>("TotalNet")
-                        .HasPrecision(18, 4)
-                        .HasColumnType("decimal(18,4)");
+                        .HasPrecision(7, 2)
+                        .HasColumnType("decimal(7,2)");
 
                     b.Property<int>("TotalWrong")
                         .HasColumnType("int");
@@ -668,8 +654,6 @@ namespace EgitimPlatform.Infrastructure.Migrations
 
                     b.HasIndex("ExamId", "InstitutionId");
 
-                    b.HasIndex("InstitutionId", "IsDeleted");
-
                     b.HasIndex("StudentId", "InstitutionId");
 
                     b.HasIndex("ExamId", "StudentId", "AttemptNumber")
@@ -680,12 +664,7 @@ namespace EgitimPlatform.Infrastructure.Migrations
 
                     b.HasIndex("InstitutionId", "StudentId", "TakenAt", "Id");
 
-                    b.ToTable("StudentExamAttempts", null, t =>
-                        {
-                            t.HasCheckConstraint("CK_StudentExamAttempts_AttemptNumber", "[AttemptNumber] >= 1");
-
-                            t.HasCheckConstraint("CK_StudentExamAttempts_Totals", "[TotalCorrect] >= 0 AND [TotalWrong] >= 0 AND [TotalBlank] >= 0");
-                        });
+                    b.ToTable("StudentExamAttempts", (string)null);
                 });
 
             modelBuilder.Entity("EgitimPlatform.Modules.Exams.Entities.StudentExamSubjectResult", b =>
@@ -712,9 +691,6 @@ namespace EgitimPlatform.Infrastructure.Migrations
                     b.Property<Guid?>("DeletedBy")
                         .HasColumnType("uniqueidentifier");
 
-                    b.Property<Guid>("ExamId")
-                        .HasColumnType("uniqueidentifier");
-
                     b.Property<Guid>("ExamSectionId")
                         .HasColumnType("uniqueidentifier");
 
@@ -725,8 +701,8 @@ namespace EgitimPlatform.Infrastructure.Migrations
                         .HasColumnType("bit");
 
                     b.Property<decimal>("Net")
-                        .HasPrecision(18, 4)
-                        .HasColumnType("decimal(18,4)");
+                        .HasPrecision(7, 2)
+                        .HasColumnType("decimal(7,2)");
 
                     b.Property<Guid>("StudentExamAttemptId")
                         .HasColumnType("uniqueidentifier");
@@ -742,20 +718,17 @@ namespace EgitimPlatform.Infrastructure.Migrations
 
                     b.HasKey("Id");
 
-                    b.HasIndex("InstitutionId", "IsDeleted");
+                    b.HasIndex("InstitutionId");
+
+                    b.HasIndex("ExamSectionId", "InstitutionId");
 
                     b.HasIndex("StudentExamAttemptId", "ExamSectionId")
                         .IsUnique()
                         .HasFilter("[IsDeleted] = 0");
 
-                    b.HasIndex("ExamSectionId", "InstitutionId", "ExamId");
+                    b.HasIndex("StudentExamAttemptId", "InstitutionId");
 
-                    b.HasIndex("StudentExamAttemptId", "InstitutionId", "ExamId");
-
-                    b.ToTable("StudentExamSubjectResults", null, t =>
-                        {
-                            t.HasCheckConstraint("CK_StudentExamSubjectResults_Counts", "[Correct] >= 0 AND [Wrong] >= 0 AND [Blank] >= 0");
-                        });
+                    b.ToTable("StudentExamSubjectResults", (string)null);
                 });
 
             modelBuilder.Entity("EgitimPlatform.Modules.Exams.Entities.StudentExamTopicResult", b =>
@@ -782,9 +755,6 @@ namespace EgitimPlatform.Infrastructure.Migrations
                     b.Property<Guid?>("DeletedBy")
                         .HasColumnType("uniqueidentifier");
 
-                    b.Property<Guid>("ExamId")
-                        .HasColumnType("uniqueidentifier");
-
                     b.Property<Guid>("ExamSectionId")
                         .HasColumnType("uniqueidentifier");
 
@@ -795,8 +765,8 @@ namespace EgitimPlatform.Infrastructure.Migrations
                         .HasColumnType("bit");
 
                     b.Property<decimal>("Net")
-                        .HasPrecision(18, 4)
-                        .HasColumnType("decimal(18,4)");
+                        .HasPrecision(7, 2)
+                        .HasColumnType("decimal(7,2)");
 
                     b.Property<Guid>("StudentExamAttemptId")
                         .HasColumnType("uniqueidentifier");
@@ -815,22 +785,19 @@ namespace EgitimPlatform.Infrastructure.Migrations
 
                     b.HasKey("Id");
 
-                    b.HasIndex("InstitutionId", "IsDeleted");
+                    b.HasIndex("InstitutionId");
+
+                    b.HasIndex("ExamSectionId", "InstitutionId");
+
+                    b.HasIndex("StudentExamAttemptId", "InstitutionId");
 
                     b.HasIndex("TopicId", "StudentExamAttemptId");
-
-                    b.HasIndex("ExamSectionId", "InstitutionId", "ExamId");
 
                     b.HasIndex("StudentExamAttemptId", "ExamSectionId", "TopicId")
                         .IsUnique()
                         .HasFilter("[IsDeleted] = 0");
 
-                    b.HasIndex("StudentExamAttemptId", "InstitutionId", "ExamId");
-
-                    b.ToTable("StudentExamTopicResults", null, t =>
-                        {
-                            t.HasCheckConstraint("CK_StudentExamTopicResults_Counts", "[Correct] >= 0 AND [Wrong] >= 0 AND [Blank] >= 0");
-                        });
+                    b.ToTable("StudentExamTopicResults", (string)null);
                 });
 
             modelBuilder.Entity("EgitimPlatform.Modules.Identity.Entities.ApplicationRole", b =>
@@ -1854,6 +1821,12 @@ namespace EgitimPlatform.Infrastructure.Migrations
 
             modelBuilder.Entity("EgitimPlatform.Modules.Exams.Entities.ExamSection", b =>
                 {
+                    b.HasOne("EgitimPlatform.Modules.Institutions.Entities.Institution", null)
+                        .WithMany()
+                        .HasForeignKey("InstitutionId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
                     b.HasOne("EgitimPlatform.Modules.Academic.Entities.Subject", null)
                         .WithMany()
                         .HasForeignKey("SubjectId")
@@ -1861,7 +1834,7 @@ namespace EgitimPlatform.Infrastructure.Migrations
                         .IsRequired();
 
                     b.HasOne("EgitimPlatform.Modules.Exams.Entities.Exam", null)
-                        .WithMany()
+                        .WithMany("Sections")
                         .HasForeignKey("ExamId", "InstitutionId")
                         .HasPrincipalKey("Id", "InstitutionId")
                         .OnDelete(DeleteBehavior.Restrict)
@@ -1870,6 +1843,12 @@ namespace EgitimPlatform.Infrastructure.Migrations
 
             modelBuilder.Entity("EgitimPlatform.Modules.Exams.Entities.StudentExamAttempt", b =>
                 {
+                    b.HasOne("EgitimPlatform.Modules.Institutions.Entities.Institution", null)
+                        .WithMany()
+                        .HasForeignKey("InstitutionId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
                     b.HasOne("EgitimPlatform.Modules.Exams.Entities.Exam", null)
                         .WithMany()
                         .HasForeignKey("ExamId", "InstitutionId")
@@ -1887,23 +1866,35 @@ namespace EgitimPlatform.Infrastructure.Migrations
 
             modelBuilder.Entity("EgitimPlatform.Modules.Exams.Entities.StudentExamSubjectResult", b =>
                 {
+                    b.HasOne("EgitimPlatform.Modules.Institutions.Entities.Institution", null)
+                        .WithMany()
+                        .HasForeignKey("InstitutionId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
                     b.HasOne("EgitimPlatform.Modules.Exams.Entities.ExamSection", null)
                         .WithMany()
-                        .HasForeignKey("ExamSectionId", "InstitutionId", "ExamId")
-                        .HasPrincipalKey("Id", "InstitutionId", "ExamId")
+                        .HasForeignKey("ExamSectionId", "InstitutionId")
+                        .HasPrincipalKey("Id", "InstitutionId")
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired();
 
                     b.HasOne("EgitimPlatform.Modules.Exams.Entities.StudentExamAttempt", null)
-                        .WithMany()
-                        .HasForeignKey("StudentExamAttemptId", "InstitutionId", "ExamId")
-                        .HasPrincipalKey("Id", "InstitutionId", "ExamId")
+                        .WithMany("SubjectResults")
+                        .HasForeignKey("StudentExamAttemptId", "InstitutionId")
+                        .HasPrincipalKey("Id", "InstitutionId")
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired();
                 });
 
             modelBuilder.Entity("EgitimPlatform.Modules.Exams.Entities.StudentExamTopicResult", b =>
                 {
+                    b.HasOne("EgitimPlatform.Modules.Institutions.Entities.Institution", null)
+                        .WithMany()
+                        .HasForeignKey("InstitutionId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
                     b.HasOne("EgitimPlatform.Modules.Academic.Entities.Topic", null)
                         .WithMany()
                         .HasForeignKey("TopicId")
@@ -1912,15 +1903,15 @@ namespace EgitimPlatform.Infrastructure.Migrations
 
                     b.HasOne("EgitimPlatform.Modules.Exams.Entities.ExamSection", null)
                         .WithMany()
-                        .HasForeignKey("ExamSectionId", "InstitutionId", "ExamId")
-                        .HasPrincipalKey("Id", "InstitutionId", "ExamId")
+                        .HasForeignKey("ExamSectionId", "InstitutionId")
+                        .HasPrincipalKey("Id", "InstitutionId")
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired();
 
                     b.HasOne("EgitimPlatform.Modules.Exams.Entities.StudentExamAttempt", null)
-                        .WithMany()
-                        .HasForeignKey("StudentExamAttemptId", "InstitutionId", "ExamId")
-                        .HasPrincipalKey("Id", "InstitutionId", "ExamId")
+                        .WithMany("TopicResults")
+                        .HasForeignKey("StudentExamAttemptId", "InstitutionId")
+                        .HasPrincipalKey("Id", "InstitutionId")
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired();
                 });
@@ -2103,6 +2094,18 @@ namespace EgitimPlatform.Infrastructure.Migrations
                         .HasForeignKey("UserId")
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
+                });
+
+            modelBuilder.Entity("EgitimPlatform.Modules.Exams.Entities.Exam", b =>
+                {
+                    b.Navigation("Sections");
+                });
+
+            modelBuilder.Entity("EgitimPlatform.Modules.Exams.Entities.StudentExamAttempt", b =>
+                {
+                    b.Navigation("SubjectResults");
+
+                    b.Navigation("TopicResults");
                 });
 
             modelBuilder.Entity("EgitimPlatform.Modules.Identity.Entities.ApplicationRole", b =>
