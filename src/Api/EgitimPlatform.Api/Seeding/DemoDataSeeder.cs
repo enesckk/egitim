@@ -278,14 +278,14 @@ public class DemoDataSeeder
         }
 
         // StudentParent Link
-        if (!await _db.Set<StudentParent>().IgnoreQueryFilters().AnyAsync(sp => sp.StudentId == DemoStudentId && sp.ParentId == DemoParentUserId, ct))
+        if (!await _db.Set<StudentParent>().IgnoreQueryFilters().AnyAsync(sp => sp.StudentId == DemoStudentId && sp.ParentId == DemoParentEntityId, ct))
         {
             _db.Set<StudentParent>().Add(new StudentParent
             {
                 Id = Guid.Parse("d0000000-0000-0000-0000-00000000000b"),
                 InstitutionId = DemoInstitutionId,
                 StudentId = DemoStudentId,
-                ParentId = DemoParentUserId,
+                ParentId = DemoParentEntityId,
                 RelationshipType = "Mother",
                 IsActive = true
             });
@@ -305,14 +305,14 @@ public class DemoDataSeeder
         }
 
         // StudentCoachAssignment
-        if (!await _db.Set<StudentCoachAssignment>().IgnoreQueryFilters().AnyAsync(ca => ca.StudentId == DemoStudentId && ca.CoachId == DemoCoachUserId, ct))
+        if (!await _db.Set<StudentCoachAssignment>().IgnoreQueryFilters().AnyAsync(ca => ca.StudentId == DemoStudentId && ca.CoachId == DemoCoachEntityId, ct))
         {
             _db.Set<StudentCoachAssignment>().Add(new StudentCoachAssignment
             {
                 Id = Guid.Parse("d0000000-0000-0000-0000-00000000000c"),
                 InstitutionId = DemoInstitutionId,
                 StudentId = DemoStudentId,
-                CoachId = DemoCoachUserId,
+                CoachId = DemoCoachEntityId,
                 IsPrimary = true,
                 IsActive = true,
                 AssignedAt = DateTimeOffset.UtcNow.AddMonths(-3)
