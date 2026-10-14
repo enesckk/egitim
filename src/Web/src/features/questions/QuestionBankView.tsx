@@ -539,6 +539,20 @@ export const QuestionBankView: React.FC<QuestionBankViewProps> = ({ role }) => {
                       {q.content}
                     </p>
 
+                    {/* Style Badges */}
+                    {q.styles && q.styles.length > 0 && (
+                      <div className="flex flex-wrap items-center gap-1.5 pt-0.5">
+                        {q.styles.map((s) => (
+                          <span
+                            key={s.id}
+                            className="inline-flex items-center px-2 py-0.5 rounded text-[11px] font-medium bg-purple-50 text-purple-700 border border-purple-200"
+                          >
+                            {s.name}
+                          </span>
+                        ))}
+                      </div>
+                    )}
+
                     {/* Sub-info */}
                     <div className="flex items-center gap-4 text-xs text-neutral-400">
                       <span>{q.optionCount} Şık (A–E)</span>

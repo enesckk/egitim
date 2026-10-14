@@ -2,6 +2,7 @@ import { apiClient } from './api/apiClient';
 import {
   QuestionDto,
   QuestionDetailDto,
+  QuestionStyleDto,
   GetQuestionsParams,
   CreateQuestionPayload,
   UpdateQuestionPayload,
@@ -11,6 +12,10 @@ import {
 import { PaginatedList } from '@/types/exam';
 
 export const questionService = {
+  getQuestionStyles: (): Promise<QuestionStyleDto[]> => {
+    return apiClient.get<QuestionStyleDto[]>('/api/v1/question-styles');
+  },
+
   getQuestions: (params?: GetQuestionsParams): Promise<PaginatedList<QuestionDto>> => {
     return apiClient.get<PaginatedList<QuestionDto>>('/api/v1/questions', {
       params: params as Record<string, string | number | boolean | undefined | null>,

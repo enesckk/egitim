@@ -18,7 +18,8 @@ public record UpdateQuestionCommand(
     string Content,
     string? MediaUrl,
     List<QuestionOptionDto> Options,
-    QuestionStatus Status
+    QuestionStatus Status,
+    IReadOnlyCollection<Guid>? QuestionStyleIds = null
 );
 
 public class UpdateQuestionCommandValidator : AbstractValidator<UpdateQuestionCommand>
@@ -65,6 +66,13 @@ public class UpdateQuestionCommandValidator : AbstractValidator<UpdateQuestionCo
         RuleFor(x => x.Options)
             .Must(opts => opts != null && opts.Count(o => o.IsCorrect) == 1)
             .WithMessage("Exactly ONE option must be marked as correct.");
+
+        When(x => x.QuestionStyleIds != null && x.QuestionStyleIds.Count > 0, () =>
+        {
+            RuleFor(x => x.QuestionStyleIds)
+                .Must(ids => ids!.Distinct().Count() == ids!.Count)
+                .WithMessage("Duplicate question style IDs are not allowed.");
+        });
     }
 }
 
@@ -81,6 +89,7 @@ public class UpdateQuestionHandler(
 
         var question = await db.Set<Question>()
             .Include(q => q.Options)
+            .Include(q => q.StyleAssignments)
             .FirstOrDefaultAsync(q => q.Id == questionId, ct);
 
         if (question is null)
@@ -133,6 +142,46 @@ public class UpdateQuestionHandler(
                 throw new ValidationException($"LearningOutcome '{command.LearningOutcomeId.Value}' does not belong to the specified taxonomy hierarchy.");
         }
 
+        // Validate and update styles if specified
+        if (command.QuestionStyleIds != null)
+        {
+            var requestedStyleIds = command.QuestionStyleIds.Distinct().ToList();
+            if (requestedStyleIds.Count > 0)
+            {
+                var styles = await db.Set<QuestionStyle>()
+                    .Where(s => requestedStyleIds.Contains(s.Id))
+                    .ToListAsync(ct);
+
+                if (styles.Count != requestedStyleIds.Count)
+                {
+                    var missingIds = requestedStyleIds.Except(styles.Select(s => s.Id)).ToList();
+                    throw new ValidationException($"Question style with ID '{missingIds.First()}' does not exist.");
+                }
+
+                var inactiveStyle = styles.FirstOrDefault(s => !s.IsActive);
+                if (inactiveStyle != null)
+                {
+                    throw new ValidationException($"Question style '{inactiveStyle.Name}' ({inactiveStyle.Code}) is inactive and cannot be assigned.");
+                }
+            }
+
+            // Remove existing assignments and add new ones
+            if (question.StyleAssignments.Count > 0)
+            {
+                db.Set<QuestionStyleAssignment>().RemoveRange(question.StyleAssignments);
+                question.StyleAssignments.Clear();
+            }
+
+            foreach (var styleId in requestedStyleIds)
+            {
+                db.Set<QuestionStyleAssignment>().Add(new QuestionStyleAssignment
+                {
+                    QuestionId = question.Id,
+                    QuestionStyleId = styleId
+                });
+            }
+        }
+
         question.SubjectId = command.SubjectId;
         question.TopicId = command.TopicId;
         question.SubTopicId = command.SubTopicId;
@@ -145,15 +194,23 @@ public class UpdateQuestionHandler(
         question.Status = command.Status;
 
         // Replace options
-        question.Options.Clear();
-        question.Options.AddRange(command.Options.Select(o => new QuestionOption
+        if (question.Options.Count > 0)
         {
-            Id = Guid.NewGuid(),
-            QuestionId = question.Id,
-            OptionLabel = o.OptionLabel.Trim().ToUpperInvariant(),
-            Content = o.Content.Trim(),
-            IsCorrect = o.IsCorrect
-        }));
+            db.Set<QuestionOption>().RemoveRange(question.Options);
+            question.Options.Clear();
+        }
+
+        foreach (var o in command.Options)
+        {
+            db.Set<QuestionOption>().Add(new QuestionOption
+            {
+                Id = Guid.NewGuid(),
+                QuestionId = question.Id,
+                OptionLabel = o.OptionLabel.Trim().ToUpperInvariant(),
+                Content = o.Content.Trim(),
+                IsCorrect = o.IsCorrect
+            });
+        }
 
         if (currentUser.UserId.HasValue)
         {

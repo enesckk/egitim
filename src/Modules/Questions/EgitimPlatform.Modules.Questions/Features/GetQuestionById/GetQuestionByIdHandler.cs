@@ -1,6 +1,7 @@
 using EgitimPlatform.BuildingBlocks.Exceptions;
 using EgitimPlatform.BuildingBlocks.Interfaces;
 using EgitimPlatform.Modules.Questions.Entities;
+using EgitimPlatform.Modules.Questions.Features.GetQuestionStyles;
 using Microsoft.EntityFrameworkCore;
 
 namespace EgitimPlatform.Modules.Questions.Features.GetQuestionById;
@@ -27,6 +28,7 @@ public record QuestionDetailDto(
     string? MediaUrl,
     QuestionStatus Status,
     List<QuestionOptionDetailDto> Options,
+    List<QuestionStyleDto> Styles,
     DateTimeOffset CreatedAt
 );
 
@@ -38,6 +40,8 @@ public class GetQuestionByIdHandler(
     {
         var question = await db.Set<Question>()
             .Include(q => q.Options)
+            .Include(q => q.StyleAssignments)
+                .ThenInclude(sa => sa.QuestionStyle)
             .AsNoTracking()
             .FirstOrDefaultAsync(q => q.Id == questionId, ct);
 
@@ -76,6 +80,17 @@ public class GetQuestionByIdHandler(
                 o.Content,
                 o.IsCorrect
             )).ToList(),
+            question.StyleAssignments
+                .Where(sa => sa.QuestionStyle != null)
+                .OrderBy(sa => sa.QuestionStyle!.DisplayOrder)
+                .ThenBy(sa => sa.QuestionStyle!.Name)
+                .Select(sa => new QuestionStyleDto(
+                    sa.QuestionStyle!.Id,
+                    sa.QuestionStyle.Code,
+                    sa.QuestionStyle.Name,
+                    sa.QuestionStyle.Description,
+                    sa.QuestionStyle.DisplayOrder
+                )).ToList(),
             question.CreatedAt
         );
     }

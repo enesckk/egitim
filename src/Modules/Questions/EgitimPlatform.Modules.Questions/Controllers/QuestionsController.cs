@@ -4,6 +4,7 @@ using EgitimPlatform.Modules.Questions.Features.ArchiveQuestion;
 using EgitimPlatform.Modules.Questions.Features.CreateQuestion;
 using EgitimPlatform.Modules.Questions.Features.GetQuestionById;
 using EgitimPlatform.Modules.Questions.Features.GetQuestions;
+using EgitimPlatform.Modules.Questions.Features.GetQuestionStyles;
 using EgitimPlatform.Modules.Questions.Features.UpdateQuestion;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
@@ -14,6 +15,17 @@ namespace EgitimPlatform.Modules.Questions.Controllers;
 [Route("api/v1/questions")]
 public class QuestionsController : ControllerBase
 {
+    [HttpGet("/api/v1/question-styles")]
+    [HttpGet("styles")]
+    [Authorize(Policy = Policies.CanViewQuestions)]
+    public async Task<ActionResult<List<QuestionStyleDto>>> GetQuestionStyles(
+        [FromServices] GetQuestionStylesHandler handler,
+        CancellationToken ct)
+    {
+        var result = await handler.HandleAsync(ct);
+        return Ok(result);
+    }
+
     [HttpPost]
     [Authorize(Policy = Policies.CanManageQuestions)]
     public async Task<ActionResult<Guid>> CreateQuestion(

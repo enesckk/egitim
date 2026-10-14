@@ -31,4 +31,5 @@ public class Question : SoftDeletableEntity
     public QuestionStatus Status { get; set; } = QuestionStatus.Draft;
 
     public List<QuestionOption> Options { get; set; } = [];
+    public List<QuestionStyleAssignment> StyleAssignments { get; set; } = [];
 }

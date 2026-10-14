@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { Modal, Button, FormField, Input, Select, Alert } from '@/components/ui';
 import {
   QuestionDetailDto,
+  QuestionStyleDto,
   CreateQuestionPayload,
   UpdateQuestionPayload,
   DifficultyLevel,
@@ -10,8 +11,9 @@ import {
   QuestionType,
   TaxonomyDto,
 } from '@/types/question';
+import { questionService } from '@/services/questionService';
 import { academicService } from '@/services/academicService';
-import { HelpCircle, CheckCircle2 } from 'lucide-react';
+import { HelpCircle, CheckCircle2, Tags } from 'lucide-react';
 
 interface QuestionFormModalProps {
   isOpen: boolean;
@@ -38,6 +40,10 @@ export const QuestionFormModal: React.FC<QuestionFormModalProps> = ({
   const [subTopics, setSubTopics] = useState<TaxonomyDto[]>([]);
   const [learningOutcomes, setLearningOutcomes] = useState<TaxonomyDto[]>([]);
 
+  // Style taxonomy states
+  const [availableStyles, setAvailableStyles] = useState<QuestionStyleDto[]>([]);
+  const [selectedStyleIds, setSelectedStyleIds] = useState<string[]>([]);
+
   // Form states
   const [subjectId, setSubjectId] = useState<string>('');
   const [topicId, setTopicId] = useState<string>('');
@@ -63,13 +69,18 @@ export const QuestionFormModal: React.FC<QuestionFormModalProps> = ({
 
   const [error, setError] = useState<string | null>(null);
 
-  // Fetch subjects on mount
+  // Fetch subjects and styles on mount
   useEffect(() => {
     if (!isOpen) return;
     academicService
       .getTaxonomy('subjects')
       .then(setSubjects)
       .catch(() => setError('Ders listesi yüklenemedi.'));
+
+    questionService
+      .getQuestionStyles()
+      .then(setAvailableStyles)
+      .catch(() => {});
   }, [isOpen]);
 
   // Fetch topics when subjectId changes
@@ -147,6 +158,7 @@ export const QuestionFormModal: React.FC<QuestionFormModalProps> = ({
 
       setOptionContents(initialOpts);
       setCorrectOption(correct);
+      setSelectedStyleIds(initialData.styles ? initialData.styles.map((s) => s.id) : []);
     } else {
       // Reset form
       setSubjectId('');
@@ -161,9 +173,16 @@ export const QuestionFormModal: React.FC<QuestionFormModalProps> = ({
       setMediaUrl('');
       setOptionContents({ A: '', B: '', C: '', D: '', E: '' });
       setCorrectOption('A');
+      setSelectedStyleIds([]);
     }
     setError(null);
   }, [isOpen, initialData]);
+
+  const toggleStyle = (styleId: string) => {
+    setSelectedStyleIds((prev) =>
+      prev.includes(styleId) ? prev.filter((id) => id !== styleId) : [...prev, styleId]
+    );
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -212,6 +231,7 @@ export const QuestionFormModal: React.FC<QuestionFormModalProps> = ({
       mediaUrl: mediaUrl.trim() || null,
       status,
       options: formattedOptions,
+      questionStyleIds: selectedStyleIds,
     };
 
     try {
@@ -352,6 +372,46 @@ export const QuestionFormModal: React.FC<QuestionFormModalProps> = ({
               <option value={QuestionStatus.Published}>Yayımlandı (Kilitli)</option>
             </Select>
           </FormField>
+        </div>
+
+        {/* 2.5 Soru Tarzları Section */}
+        <div className="p-4 rounded-xl bg-purple-50/50 border border-purple-200 space-y-2">
+          <div className="flex items-center justify-between">
+            <label className="text-xs font-semibold text-purple-900 flex items-center gap-1.5">
+              <Tags className="h-3.5 w-3.5 text-purple-600" />
+              <span>Soru Tarzları</span>
+              <span className="text-[11px] font-normal text-purple-600">(Birden fazla tarz seçebilirsiniz)</span>
+            </label>
+            {selectedStyleIds.length > 0 && (
+              <span className="text-[11px] font-medium text-purple-700 bg-purple-100 px-2 py-0.5 rounded-full">
+                {selectedStyleIds.length} seçildi
+              </span>
+            )}
+          </div>
+          <div className="flex flex-wrap gap-2 pt-1">
+            {availableStyles.map((style) => {
+              const isSelected = selectedStyleIds.includes(style.id);
+              return (
+                <button
+                  key={style.id}
+                  type="button"
+                  onClick={() => toggleStyle(style.id)}
+                  title={style.description || style.name}
+                  className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition-all ${
+                    isSelected
+                      ? 'bg-purple-600 text-white shadow-sm ring-2 ring-purple-600 ring-offset-1'
+                      : 'bg-white text-neutral-700 border border-neutral-300 hover:border-purple-300 hover:bg-purple-50/50'
+                  }`}
+                >
+                  {isSelected && <CheckCircle2 className="h-3.5 w-3.5" />}
+                  <span>{style.name}</span>
+                </button>
+              );
+            })}
+            {availableStyles.length === 0 && (
+              <span className="text-xs text-neutral-400">Yüklü soru tarzı bulunamadı.</span>
+            )}
+          </div>
         </div>
 
         {/* 3. Question Content */}

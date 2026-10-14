@@ -20,6 +20,14 @@ export enum QuestionStatus {
   Archived = 2,
 }
 
+export interface QuestionStyleDto {
+  id: string;
+  code: string;
+  name: string;
+  description?: string | null;
+  displayOrder?: number;
+}
+
 export interface QuestionDto {
   id: string;
   institutionId: string | null;
@@ -35,6 +43,7 @@ export interface QuestionDto {
   mediaUrl: string | null;
   status: QuestionStatus;
   optionCount: number;
+  styles: QuestionStyleDto[];
   createdAt: string;
 }
 
@@ -60,6 +69,7 @@ export interface QuestionDetailDto {
   mediaUrl: string | null;
   status: QuestionStatus;
   options: QuestionOptionDetailDto[];
+  styles: QuestionStyleDto[];
   createdAt: string;
 }
 
@@ -74,6 +84,7 @@ export interface GetQuestionsParams {
   status?: QuestionStatus;
   searchText?: string;
   poolType?: 'all' | 'global' | 'institution';
+  questionStyleId?: string;
   page?: number;
   pageSize?: number;
 }
@@ -97,6 +108,7 @@ export interface CreateQuestionPayload {
   mediaUrl?: string | null;
   status: QuestionStatus;
   options: CreateQuestionOptionPayload[];
+  questionStyleIds?: string[];
 }
 
 export interface UpdateQuestionPayload {
@@ -112,6 +124,7 @@ export interface UpdateQuestionPayload {
   mediaUrl?: string | null;
   status: QuestionStatus;
   options: CreateQuestionOptionPayload[];
+  questionStyleIds?: string[];
 }
 
 export interface TeacherOptionDto {

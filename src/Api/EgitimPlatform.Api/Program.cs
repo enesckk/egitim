@@ -280,6 +280,7 @@ try
             using var scope = app.Services.CreateScope();
             var dbContext = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
             await dbContext.Database.MigrateAsync();
+            await EgitimPlatform.Modules.Questions.Constants.QuestionStyleDefaults.SeedInitialStylesAsync(dbContext);
         }
         catch (Exception ex)
         {

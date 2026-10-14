@@ -1,6 +1,7 @@
 using EgitimPlatform.BuildingBlocks.Interfaces;
 using EgitimPlatform.BuildingBlocks.Pagination;
 using EgitimPlatform.Modules.Questions.Entities;
+using EgitimPlatform.Modules.Questions.Features.GetQuestionStyles;
 using FluentValidation;
 using Microsoft.EntityFrameworkCore;
 
@@ -21,6 +22,7 @@ public record QuestionDto(
     string? MediaUrl,
     QuestionStatus Status,
     int OptionCount,
+    List<QuestionStyleDto> Styles,
     DateTimeOffset CreatedAt
 );
 
@@ -35,6 +37,7 @@ public record GetQuestionsQuery(
     QuestionStatus? Status = null,
     string? SearchText = null,
     string? PoolType = null, // "global", "institution", "all"
+    Guid? QuestionStyleId = null,
     int Page = 1,
     int PageSize = 20
 );
@@ -122,6 +125,9 @@ public class GetQuestionsHandler(
         if (query.Status.HasValue)
             queryable = queryable.Where(q => q.Status == query.Status.Value);
 
+        if (query.QuestionStyleId.HasValue)
+            queryable = queryable.Where(q => q.StyleAssignments.Any(sa => sa.QuestionStyleId == query.QuestionStyleId.Value));
+
         if (!string.IsNullOrWhiteSpace(query.SearchText))
         {
             var search = query.SearchText.Trim();
@@ -147,6 +153,16 @@ public class GetQuestionsHandler(
                 q.MediaUrl,
                 q.Status,
                 q.Options.Count,
+                q.StyleAssignments
+                    .OrderBy(sa => sa.QuestionStyle!.DisplayOrder)
+                    .ThenBy(sa => sa.QuestionStyle!.Name)
+                    .Select(sa => new QuestionStyleDto(
+                        sa.QuestionStyle!.Id,
+                        sa.QuestionStyle!.Code,
+                        sa.QuestionStyle!.Name,
+                        sa.QuestionStyle!.Description,
+                        sa.QuestionStyle!.DisplayOrder
+                    )).ToList(),
                 q.CreatedAt
             ));
 

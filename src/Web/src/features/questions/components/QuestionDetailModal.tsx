@@ -139,6 +139,22 @@ export const QuestionDetailModal: React.FC<QuestionDetailModalProps> = ({
           {topicName && <Badge variant="secondary">Konu: {topicName}</Badge>}
         </div>
 
+        {/* Question Styles */}
+        {question.styles && question.styles.length > 0 && (
+          <div className="flex flex-wrap items-center gap-1.5 p-2.5 rounded-lg bg-purple-50/50 border border-purple-100">
+            <span className="text-xs font-semibold text-purple-900 mr-1">Soru Tarzları:</span>
+            {question.styles.map((s) => (
+              <span
+                key={s.id}
+                title={s.description || s.name}
+                className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-purple-100 text-purple-800"
+              >
+                {s.name}
+              </span>
+            ))}
+          </div>
+        )}
+
         {/* Question Content */}
         <div className="p-4 rounded-xl bg-neutral-50 border border-neutral-200">
           <h4 className="text-xs font-semibold text-neutral-400 uppercase tracking-wider mb-2">

@@ -2,6 +2,7 @@ using EgitimPlatform.Modules.Questions.Features.ArchiveQuestion;
 using EgitimPlatform.Modules.Questions.Features.CreateQuestion;
 using EgitimPlatform.Modules.Questions.Features.GetQuestionById;
 using EgitimPlatform.Modules.Questions.Features.GetQuestions;
+using EgitimPlatform.Modules.Questions.Features.GetQuestionStyles;
 using EgitimPlatform.Modules.Questions.Features.UpdateQuestion;
 using FluentValidation;
 using Microsoft.Extensions.DependencyInjection;
@@ -16,6 +17,7 @@ public static class QuestionsServiceExtensions
         services.AddScoped<CreateQuestionHandler>();
         services.AddScoped<GetQuestionByIdHandler>();
         services.AddScoped<GetQuestionsHandler>();
+        services.AddScoped<GetQuestionStylesHandler>();
         services.AddScoped<UpdateQuestionHandler>();
         services.AddScoped<ArchiveQuestionHandler>();
 

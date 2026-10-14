@@ -1890,6 +1890,76 @@ namespace EgitimPlatform.Infrastructure.Migrations
                     b.ToTable("QuestionOptions", (string)null);
                 });
 
+            modelBuilder.Entity("EgitimPlatform.Modules.Questions.Entities.QuestionStyle", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<string>("Code")
+                        .IsRequired()
+                        .HasMaxLength(50)
+                        .HasColumnType("nvarchar(50)");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("datetimeoffset");
+
+                    b.Property<Guid?>("CreatedBy")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<string>("Description")
+                        .HasMaxLength(500)
+                        .HasColumnType("nvarchar(500)");
+
+                    b.Property<int>("DisplayOrder")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int")
+                        .HasDefaultValue(0);
+
+                    b.Property<bool>("IsActive")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bit")
+                        .HasDefaultValue(true);
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("nvarchar(100)");
+
+                    b.Property<DateTimeOffset?>("UpdatedAt")
+                        .HasColumnType("datetimeoffset");
+
+                    b.Property<Guid?>("UpdatedBy")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("Code")
+                        .IsUnique();
+
+                    b.HasIndex("IsActive", "DisplayOrder", "Name");
+
+                    b.ToTable("QuestionStyles", (string)null);
+                });
+
+            modelBuilder.Entity("EgitimPlatform.Modules.Questions.Entities.QuestionStyleAssignment", b =>
+                {
+                    b.Property<Guid>("QuestionId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<Guid>("QuestionStyleId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("datetimeoffset");
+
+                    b.HasKey("QuestionId", "QuestionStyleId");
+
+                    b.HasIndex("QuestionStyleId");
+
+                    b.ToTable("QuestionStyleAssignments", (string)null);
+                });
+
             modelBuilder.Entity("EgitimPlatform.Modules.Students.Entities.Parent", b =>
                 {
                     b.Property<Guid>("Id")
@@ -2797,6 +2867,25 @@ namespace EgitimPlatform.Infrastructure.Migrations
                         .IsRequired();
                 });
 
+            modelBuilder.Entity("EgitimPlatform.Modules.Questions.Entities.QuestionStyleAssignment", b =>
+                {
+                    b.HasOne("EgitimPlatform.Modules.Questions.Entities.Question", "Question")
+                        .WithMany("StyleAssignments")
+                        .HasForeignKey("QuestionId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.HasOne("EgitimPlatform.Modules.Questions.Entities.QuestionStyle", "QuestionStyle")
+                        .WithMany("QuestionAssignments")
+                        .HasForeignKey("QuestionStyleId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.Navigation("Question");
+
+                    b.Navigation("QuestionStyle");
+                });
+
             modelBuilder.Entity("EgitimPlatform.Modules.Students.Entities.Parent", b =>
                 {
                     b.HasOne("EgitimPlatform.Modules.Institutions.Entities.Institution", null)
@@ -2980,6 +3069,13 @@ namespace EgitimPlatform.Infrastructure.Migrations
             modelBuilder.Entity("EgitimPlatform.Modules.Questions.Entities.Question", b =>
                 {
                     b.Navigation("Options");
+
+                    b.Navigation("StyleAssignments");
+                });
+
+            modelBuilder.Entity("EgitimPlatform.Modules.Questions.Entities.QuestionStyle", b =>
+                {
+                    b.Navigation("QuestionAssignments");
                 });
 #pragma warning restore 612, 618
         }
