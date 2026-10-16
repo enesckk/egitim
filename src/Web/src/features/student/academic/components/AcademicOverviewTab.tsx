@@ -22,6 +22,7 @@ import {
 } from '../types';
 
 import { AcademicAiSummaryCard } from './AcademicAiSummaryCard';
+import { QuestionStyleAnalyticsSection } from './QuestionStyleAnalyticsSection';
 
 interface AcademicOverviewTabProps {
   studentId?: string;
@@ -118,7 +119,12 @@ export const AcademicOverviewTab: React.FC<AcademicOverviewTabProps> = ({
         </Card>
       </div>
 
-      {/* 2. Top Recommendation Callout & Proposed Plan Hero */}
+      {/* 2. Question Style Analytics Section */}
+      {studentId && (
+        <QuestionStyleAnalyticsSection studentId={studentId} />
+      )}
+
+      {/* 3. Top Recommendation Callout & Proposed Plan Hero */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
         {/* Highest Priority Recommendation Card */}
         <Card className="p-4 sm:p-5 bg-white border border-neutral-100 flex flex-col justify-between space-y-4">

@@ -22,4 +22,8 @@ public static class AcademicClassificationPolicy
     // LearningOutcome
     public const int LearningOutcomeMinObservations = 2;
     public const int LearningOutcomeMinQuestions = 3;
+
+    // QuestionStyle (Sprint B)
+    public const int QuestionStyleMinObservations = 2;
+    public const int QuestionStyleMinQuestions = 5;
 }

@@ -58,6 +58,8 @@ public static class ExamsServiceExtensions
         services.AddScoped<EgitimPlatform.Modules.Exams.Features.AcademicIntelligence.GetStudentKnowledgeMapHandler>();
         services.AddScoped<EgitimPlatform.Modules.Exams.Features.AcademicIntelligence.GetStudentAcademicRecommendationHandler>();
         services.AddScoped<EgitimPlatform.Modules.Exams.Features.AcademicIntelligence.GetStudentAcademicStudyPlanHandler>();
+        services.AddScoped<EgitimPlatform.Modules.Exams.Features.AcademicIntelligence.GetStudentQuestionStyleAnalyticsHandler>();
+        services.AddScoped<EgitimPlatform.Modules.Exams.Features.AcademicIntelligence.GetStudentQuestionStyleTrendsHandler>();
 
         return services;
     }

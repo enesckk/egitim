@@ -18,6 +18,8 @@ import {
   PersistentStudyTaskDto,
   PersistentStudyPlanDetailDto,
   AcademicAiSummaryDto,
+  StudentQuestionStyleAnalyticsDto,
+  QuestionStyleTrendDto,
 } from '@/features/student/academic/types';
 
 export interface AcademicQueryParams extends Record<string, string | number | boolean | null | undefined> {
@@ -265,6 +267,28 @@ export const academicService = {
     return apiClient.get<AcademicAiSummaryDto>(
       `/api/v1/students/${studentId}/academic-intelligence/ai-summary`,
       { params: { audience }, signal }
+    );
+  },
+
+  getQuestionStyleAnalytics: (
+    studentId: string,
+    params?: AcademicQueryParams,
+    signal?: AbortSignal
+  ): Promise<StudentQuestionStyleAnalyticsDto[]> => {
+    return apiClient.get<StudentQuestionStyleAnalyticsDto[]>(
+      `/api/v1/students/${studentId}/academic-intelligence/question-styles`,
+      { params, signal }
+    );
+  },
+
+  getQuestionStyleTrends: (
+    studentId: string,
+    params?: AcademicQueryParams,
+    signal?: AbortSignal
+  ): Promise<QuestionStyleTrendDto[]> => {
+    return apiClient.get<QuestionStyleTrendDto[]>(
+      `/api/v1/students/${studentId}/academic-intelligence/question-style-trends`,
+      { params, signal }
     );
   },
 };

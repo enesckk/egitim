@@ -218,6 +218,37 @@ public class AcademicIntelligenceController(
         var result = await studyPlanHandler.GetStudyPlanAsync(query, ct);
         return Ok(result);
     }
+
+    [HttpGet("question-styles")]
+    public async Task<ActionResult<List<StudentQuestionStyleAnalyticsDto>>> GetQuestionStyleAnalytics(
+        [FromRoute] Guid studentId,
+        [FromServices] GetStudentQuestionStyleAnalyticsHandler handler,
+        [FromQuery] Guid? examTypeId = null,
+        [FromQuery] int? window = null,
+        [FromQuery] DateTimeOffset? from = null,
+        [FromQuery] DateTimeOffset? to = null,
+        CancellationToken ct = default)
+    {
+        var query = new AcademicIntelligenceQuery(studentId, examTypeId, window, from, to);
+        var result = await handler.HandleAsync(query, ct);
+        return Ok(result);
+    }
+
+    [HttpGet("question-style-trends")]
+    public async Task<ActionResult<List<QuestionStyleTrendDto>>> GetQuestionStyleTrends(
+        [FromRoute] Guid studentId,
+        [FromServices] GetStudentQuestionStyleTrendsHandler handler,
+        [FromQuery] Guid? examTypeId = null,
+        [FromQuery] int windowSize = 2,
+        [FromQuery] int? limit = 50,
+        [FromQuery] DateTimeOffset? from = null,
+        [FromQuery] DateTimeOffset? to = null,
+        CancellationToken ct = default)
+    {
+        var query = new AcademicTrendQuery(studentId, examTypeId, windowSize, limit, from, to);
+        var result = await handler.HandleAsync(query, ct);
+        return Ok(result);
+    }
 }
 
 

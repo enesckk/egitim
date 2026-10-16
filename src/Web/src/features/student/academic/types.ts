@@ -592,3 +592,55 @@ export interface AcademicAiSummaryDto {
   isAvailable: boolean;
   generatedAt: string;
 }
+
+// --- Sprint B: Question Style Analytics & Trends ---
+
+export interface StudentQuestionStyleAnalyticsDto {
+  questionStyleId: string;
+  code: string;
+  name: string;
+  totalQuestions: number;
+  attemptedQuestions: number;
+  correctCount: number;
+  incorrectCount: number;
+  blankCount: number;
+  accuracy: number | null;
+  successRate: number | null;
+  coverage: number;
+  observationCount: number;
+  classificationState: AcademicClassificationState;
+  trendDirection?: TrendDirection | null;
+}
+
+export interface QuestionStyleObservationPointDto {
+  attemptId: string;
+  examId: string;
+  examTitle: string;
+  takenAt: string;
+  attemptNumber: number;
+  questionStyleId: string;
+  totalQuestions: number;
+  correct: number;
+  wrong: number;
+  blank: number;
+  net: number;
+  accuracy: number | null;
+  successRate: number | null;
+  coverage: number;
+}
+
+export interface QuestionStyleTrendDto {
+  questionStyleId: string;
+  code: string;
+  name: string;
+  totalObservations: number;
+  windowSize: number;
+  hasEnoughData: boolean;
+  previousWindow: TrendWindowMetricsDto | null;
+  recentWindow: TrendWindowMetricsDto | null;
+  successRateDelta: number | null;
+  accuracyDelta: number | null;
+  coverageDelta: number | null;
+  direction: TrendDirection | null;
+  timeSeries: QuestionStyleObservationPointDto[];
+}

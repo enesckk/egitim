@@ -545,6 +545,58 @@ public record AcademicStudyPlanQuery(
     DateTimeOffset? To = null
 );
 
+// --- SPRINT B: QUESTION STYLE ANALYTICS & TRENDS ---
+
+public record StudentQuestionStyleAnalyticsDto(
+    Guid QuestionStyleId,
+    string Code,
+    string Name,
+    int TotalQuestions,
+    int AttemptedQuestions,
+    int CorrectCount,
+    int IncorrectCount,
+    int BlankCount,
+    decimal? Accuracy,
+    decimal? SuccessRate,
+    decimal Coverage,
+    int ObservationCount,
+    AcademicClassificationState ClassificationState,
+    TrendDirection? TrendDirection = null
+);
+
+public record QuestionStyleObservationPointDto(
+    Guid AttemptId,
+    Guid ExamId,
+    string ExamTitle,
+    DateTimeOffset TakenAt,
+    int AttemptNumber,
+    Guid QuestionStyleId,
+    int TotalQuestions,
+    int Correct,
+    int Wrong,
+    int Blank,
+    decimal Net,
+    decimal? Accuracy,
+    decimal? SuccessRate,
+    decimal Coverage
+);
+
+public record QuestionStyleTrendDto(
+    Guid QuestionStyleId,
+    string Code,
+    string Name,
+    int TotalObservations,
+    int WindowSize,
+    bool HasEnoughData,
+    TrendWindowMetricsDto? PreviousWindow,
+    TrendWindowMetricsDto? RecentWindow,
+    decimal? SuccessRateDelta,
+    decimal? AccuracyDelta,
+    decimal? CoverageDelta,
+    TrendDirection? Direction,
+    List<QuestionStyleObservationPointDto> TimeSeries
+);
+
 
 
 

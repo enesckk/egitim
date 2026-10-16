@@ -12,6 +12,7 @@ import { AcademicStatusCard } from './components/AcademicStatusCard';
 import { UpcomingCard } from './components/UpcomingCard';
 
 import { AcademicAiSummaryCard } from '@/features/student/academic/components/AcademicAiSummaryCard';
+import { QuestionStyleAnalyticsSection } from '@/features/student/academic/components/QuestionStyleAnalyticsSection';
 
 export interface ParentSummaryViewProps {
   initialData?: ParentSummaryViewModel;
@@ -104,7 +105,16 @@ export const ParentSummaryView: React.FC<ParentSummaryViewProps> = ({
         <AcademicAiSummaryCard studentId={initialData.student.id} audience="parent" />
       )}
 
-      {/* 5. Academic Status Qualitative Cards */}
+      {/* 5. Question Style Performance for Parent (simplified read-only) */}
+      {initialData.student?.id && (
+        <QuestionStyleAnalyticsSection
+          studentId={initialData.student.id}
+          isReadOnly
+          simplified
+        />
+      )}
+
+      {/* 6. Academic Status Qualitative Cards */}
       <AcademicStatusCard items={initialData.academicStatus} />
 
       {/* 5. Upcoming Events */}
