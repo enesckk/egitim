@@ -1,8 +1,10 @@
+using EgitimPlatform.BuildingBlocks.Pagination;
 using EgitimPlatform.Integration.Fixtures;
 using EgitimPlatform.Integration.TestData;
 using EgitimPlatform.Modules.Identity.Features.Login;
 using EgitimPlatform.Modules.Students.Features;
 using EgitimPlatform.Modules.Students.Features.CreateStudent;
+using EgitimPlatform.Modules.Students.Features.UpdateAcademicProfile;
 using FluentAssertions;
 using System.Net;
 using System.Net.Http.Headers;
@@ -66,17 +68,28 @@ public class StudentTests
     }
 
     [Fact]
-    public async Task ListStudents_AsInstitutionAdmin_ReturnsPaginated()
+    public async Task ListStudents_AsInstitutionAdmin_ReturnsPaginatedWithAcademicProfileFields()
     {
         var client = await GetAuthenticatedClient("admin-a@test.local", "Test@12345");
 
-        // Create a couple of students
-        await client.PostAsJsonAsync("/api/v1/students", new CreateStudentCommand("Alice", "One", null));
-        await client.PostAsJsonAsync("/api/v1/students", new CreateStudentCommand("Bob", "Two", null));
+        // Create a student and update academic profile
+        var createRes = await client.PostAsJsonAsync("/api/v1/students", new CreateStudentCommand("Alice", "ProfileTest", null));
+        var created = await createRes.Content.ReadFromJsonAsync<StudentDto>();
 
-        var response = await client.GetAsync("/api/v1/students?page=1&pageSize=10");
+        var uniqueNumber = $"SN-{Guid.NewGuid().ToString("N")[..8]}";
+        var profileCmd = new UpdateAcademicProfileCommand(created!.Id, "Fen Lisesi", uniqueNumber, 12, DateTimeOffset.UtcNow);
+        var updateRes = await client.PutAsJsonAsync($"/api/v1/students/{created.Id}/academic-profile", profileCmd);
+        updateRes.StatusCode.Should().Be(HttpStatusCode.OK);
+
+        var response = await client.GetAsync("/api/v1/students?page=1&pageSize=50&searchTerm=ProfileTest");
 
         response.StatusCode.Should().Be(HttpStatusCode.OK);
+        var page = await response.Content.ReadFromJsonAsync<PaginatedList<StudentDto>>();
+        page.Should().NotBeNull();
+        var item = page!.Items.Should().ContainSingle(s => s.Id == created.Id).Subject;
+        item.SchoolName.Should().Be("Fen Lisesi");
+        item.GradeLevel.Should().Be(12);
+        item.StudentNumber.Should().Be(uniqueNumber);
     }
 
     [Fact]

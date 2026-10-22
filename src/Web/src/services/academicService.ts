@@ -34,6 +34,68 @@ export interface AcademicQueryParams extends Record<string, string | number | bo
   to?: string;
 }
 
+export interface StudentSummaryDto {
+  id: string;
+  firstName: string;
+  lastName: string;
+  fullName: string;
+  status: string;
+  institutionId: string;
+  createdAt: string;
+  schoolName?: string | null;
+  studentNumber?: string | null;
+  gradeLevel?: number | null;
+  enrollmentDate?: string | null;
+}
+
+export interface StudentGoalSummaryDto {
+  id: string;
+  title: string;
+  targetExamTypeId?: string | null;
+  targetScore?: number | null;
+  targetRank?: number | null;
+  targetSchoolName?: string | null;
+  effectiveDate: string;
+}
+
+export interface StudentCoachInfoDto {
+  coachId: string;
+  name: string;
+  isPrimary: boolean;
+  assignedAt: string;
+}
+
+export interface StudentParentInfoDto {
+  parentId: string;
+  name: string;
+  relationshipType: string;
+}
+
+export interface AcademicRefDto {
+  id: string;
+  code: string;
+  name: string;
+}
+
+export interface RecentExamInfoDto {
+  latestExamId: string;
+  title: string;
+  examType: string;
+  takenAt: string;
+  totalNet: number;
+  previousNet: number;
+  delta: number;
+}
+
+export interface Student360Dto {
+  student: StudentSummaryDto;
+  currentGoals: StudentGoalSummaryDto[];
+  coaches: StudentCoachInfoDto[];
+  parents: StudentParentInfoDto[];
+  examTypes: AcademicRefDto[];
+  recentExam?: RecentExamInfoDto | null;
+}
+
 export const academicService = {
   getCurrentStudentId: async (signal?: AbortSignal): Promise<string | null> => {
     try {
@@ -48,6 +110,24 @@ export const academicService = {
     } catch {
       return null;
     }
+  },
+
+  getStudents: (
+    params?: { page?: number; pageSize?: number; searchTerm?: string },
+    signal?: AbortSignal
+  ): Promise<{ items: StudentSummaryDto[]; totalCount: number; page: number; pageSize: number }> => {
+    return apiClient.get<{ items: StudentSummaryDto[]; totalCount: number; page: number; pageSize: number }>(
+      '/api/v1/students',
+      { params, signal }
+    );
+  },
+
+  getStudent: (studentId: string, signal?: AbortSignal): Promise<StudentSummaryDto> => {
+    return apiClient.get<StudentSummaryDto>(`/api/v1/students/${studentId}`, { signal });
+  },
+
+  getStudent360: (studentId: string, signal?: AbortSignal): Promise<Student360Dto> => {
+    return apiClient.get<Student360Dto>(`/api/v1/students/${studentId}/360`, { signal });
   },
 
   getTaxonomy: (level: string, parentId?: string, signal?: AbortSignal): Promise<TaxonomyDto[]> => {

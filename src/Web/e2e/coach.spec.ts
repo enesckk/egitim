@@ -29,6 +29,56 @@ test.describe('Coach Portal Quality Gate & Flow Tests', () => {
         }),
       });
     });
+
+    await page.route('**/api/v1/students?*', async (route: any) => {
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({
+          items: [
+            {
+              id: 'student-1',
+              firstName: 'Ahmet',
+              lastName: 'Yılmaz',
+              fullName: 'Ahmet Yılmaz',
+              status: 'Active',
+              institutionId: 'inst-1',
+              createdAt: new Date().toISOString(),
+              schoolName: 'Demo Anadolu Lisesi',
+              gradeLevel: 12,
+            },
+          ],
+          totalCount: 1,
+          page: 1,
+          pageSize: 50,
+        }),
+      });
+    });
+
+    await page.route('**/api/v1/students/student-1/360', async (route: any) => {
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({
+          student: {
+            id: 'student-1',
+            firstName: 'Ahmet',
+            lastName: 'Yılmaz',
+            fullName: 'Ahmet Yılmaz',
+            status: 'Active',
+            institutionId: 'inst-1',
+            createdAt: new Date().toISOString(),
+            schoolName: 'Demo Anadolu Lisesi',
+            gradeLevel: 12,
+          },
+          currentGoals: [],
+          coaches: [{ coachId: 'coach-123', name: 'Ahmet Koç', isPrimary: true, assignedAt: new Date().toISOString() }],
+          parents: [],
+          examTypes: [{ id: 'et-1', code: 'TYT', name: 'TYT' }],
+          recentExam: null,
+        }),
+      });
+    });
   };
 
   test('1. Coach login & dashboard redirection', async ({ page }) => {
@@ -40,22 +90,70 @@ test.describe('Coach Portal Quality Gate & Flow Tests', () => {
     await expect(page.locator('h1.font-serif')).toContainText('İyi günler');
   });
 
-  test('2. Assigned student list view', async ({ page }) => {
+  test('2. Assigned student list view renders real API student', async ({ page }) => {
     await setupCoachSession(page);
     await page.goto('/coach/students');
     await page.waitForLoadState('networkidle');
 
     await expect(page.locator('h1.font-serif')).toContainText('Atanmış Öğrenciler');
     await expect(page.locator('input[placeholder*="Öğrenci adı"]')).toBeVisible();
+    await expect(page.locator('text=Ahmet Yılmaz')).toBeVisible();
   });
 
-  test('3. Student detail view navigation', async ({ page }) => {
+  test('3. Student detail view navigation and real CoachStudentExamsTab', async ({ page }) => {
     await setupCoachSession(page);
-    await page.goto('/coach/students/student-1');
+
+    await page.route('**/api/v1/students/student-1/exam-results*', async (route: any) => {
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({
+          items: [
+            {
+              attemptId: 'att-c1',
+              examId: 'ex-c1',
+              examTitle: 'Demo TYT 5',
+              examTypeId: 'et-1',
+              examTypeName: 'TYT',
+              takenAt: new Date().toISOString(),
+              status: 1,
+              totalCorrect: 30,
+              totalWrong: 10,
+              totalBlank: 0,
+              totalNet: 27.5,
+              reportedScore: null,
+              scoreSource: 0,
+            },
+          ],
+          totalCount: 1,
+          page: 1,
+          pageSize: 20,
+        }),
+      });
+    });
+
+    await page.route('**/api/v1/students/student-1/exam-analysis*', async (route: any) => {
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({
+          attemptCount: 1,
+          averageTotalNet: 27.5,
+          latestTotalNet: 27.5,
+          previousTotalNet: 25.0,
+          delta: 2.5,
+          subjectAverages: [],
+          weakestTopics: [],
+        }),
+      });
+    });
+
+    await page.goto('/coach/students/student-1?tab=exams');
     await page.waitForLoadState('networkidle');
 
-    await expect(page.locator('h1.font-serif')).toBeVisible();
+    await expect(page.locator('h1.font-serif')).toContainText('Ahmet Yılmaz');
     await expect(page.locator('button:has-text("Öğrenci Listesine Dön")')).toBeVisible();
+    await expect(page.locator('text=Demo TYT 5')).toBeVisible();
   });
 
   test('4. Academic Intelligence summary in coach overview', async ({ page }) => {

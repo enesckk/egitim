@@ -328,4 +328,215 @@ test.describe('A1: Student Experience Foundation Tests', () => {
 
     expect(consoleErrors).toEqual([]);
   });
+
+  test('18. Student Exams resolves real StudentId via /api/v1/students instead of ApplicationUser.Id', async ({ page }) => {
+    let requestedStudentIdInExamsUrl = '';
+
+    await page.route('**/api/v1/students?*', async (route) => {
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({
+          items: [{ id: 'd0000000-0000-0000-0000-000000000007', firstName: 'Zeynep', lastName: 'Kaya', fullName: 'Zeynep Kaya' }],
+          totalCount: 1,
+          page: 1,
+          pageSize: 1,
+        }),
+      });
+    });
+
+    await page.route('**/api/v1/students/*/exam-results', async (route) => {
+      const url = route.request().url();
+      const match = url.match(/\/students\/([^/]+)\/exam-results/);
+      if (match) requestedStudentIdInExamsUrl = match[1];
+
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({
+          items: [
+            {
+              attemptId: 'att-real-001',
+              examId: 'exam-real-001',
+              examTitle: 'Gerçek Öğrenci TYT Denemesi',
+              examTypeId: 'type-001',
+              examTypeName: 'TYT',
+              takenAt: new Date().toISOString(),
+              status: 1,
+              totalCorrect: 95,
+              totalWrong: 8,
+              totalBlank: 17,
+              totalNet: 93.0,
+              reportedScore: 430,
+              scoreSource: 1,
+            },
+          ],
+          totalCount: 1,
+          page: 1,
+          pageSize: 20,
+        }),
+      });
+    });
+
+    await page.goto('/student/exams');
+    await page.waitForLoadState('networkidle');
+
+    expect(requestedStudentIdInExamsUrl).toBe('d0000000-0000-0000-0000-000000000007');
+    await expect(page.locator('text="Gerçek Öğrenci TYT Denemesi"')).toBeVisible();
+  });
+
+  test('19. Student Plans displays Coach Tasks even when no weekly active study plan exists', async ({ page }) => {
+    const realStudentId = 'd0000000-0000-0000-0000-000000000007';
+
+    await page.route('**/api/v1/students?*', async (route) => {
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({
+          items: [{ id: realStudentId, firstName: 'Zeynep', lastName: 'Kaya', fullName: 'Zeynep Kaya' }],
+          totalCount: 1,
+          page: 1,
+          pageSize: 1,
+        }),
+      });
+    });
+
+    await page.route(`**/api/v1/students/${realStudentId}/study-plans/active`, async (route) => {
+      await route.fulfill({ status: 404, contentType: 'application/json', body: JSON.stringify({ status: 404 }) });
+    });
+
+    await page.route(`**/api/v1/students/${realStudentId}/coach-tasks`, async (route) => {
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify([
+          {
+            id: 'ct-real-01',
+            institutionId: 'inst-001',
+            studentId: realStudentId,
+            coachUserId: 'coach-001',
+            title: 'Paragraf Tekrar Çalışması',
+            description: '30 soru çözümü',
+            durationMinutes: 45,
+            subjectName: 'Türkçe',
+            status: 0,
+            isCompleted: false,
+            createdAt: new Date().toISOString(),
+          },
+        ]),
+      });
+    });
+
+    await page.goto('/student/plans');
+    await page.waitForLoadState('networkidle');
+
+    await expect(page.locator('text="Koç Görevleri"')).toBeVisible();
+    await expect(page.locator('text="Paragraf Tekrar Çalışması"')).toBeVisible();
+  });
+
+  test('20. Student Today connects to real active study plan, coach tasks, and recommendations', async ({ page }) => {
+    const realStudentId = 'd0000000-0000-0000-0000-000000000007';
+
+    await page.route('**/api/v1/students?*', async (route) => {
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({
+          items: [{ id: realStudentId, firstName: 'Zeynep', lastName: 'Kaya', fullName: 'Zeynep Kaya' }],
+          totalCount: 1,
+          page: 1,
+          pageSize: 1,
+        }),
+      });
+    });
+
+    await page.route(`**/api/v1/students/${realStudentId}/study-plans/active`, async (route) => {
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({
+          plan: {
+            id: 'plan-real-01',
+            institutionId: 'inst-001',
+            studentId: realStudentId,
+            title: 'Haftalık Akademik Çalışma Planı',
+            startDate: new Date().toISOString(),
+            endDate: new Date(Date.now() + 7 * 86400000).toISOString(),
+            status: 'Active',
+            source: 'AcademicIntelligence',
+            planDays: 7,
+            dailyStudyMinutes: 60,
+            sessionMinutes: 30,
+            totalAvailableMinutes: 420,
+            totalPlannedMinutes: 60,
+            unallocatedMinutes: 360,
+            utilizationRate: 0.14,
+            completedTaskCount: 0,
+            totalTaskCount: 1,
+            remainingTaskCount: 1,
+            completedTaskMinutes: 0,
+            taskProgressRate: 0,
+            minuteProgressRate: 0,
+            createdAt: new Date().toISOString(),
+          },
+          tasks: [
+            {
+              id: 'task-real-01',
+              studyPlanId: 'plan-real-01',
+              studentId: realStudentId,
+              dayIndex: 1,
+              plannedDate: new Date().toISOString(),
+              sequence: 1,
+              durationMinutes: 30,
+              nodeType: 'Topic',
+              nodeId: 'top-01',
+              subjectId: 'sub-01',
+              subjectName: 'Matematik',
+              topicId: 'top-01',
+              topicName: 'Fonksiyonlar',
+              titleSnapshot: 'Fonksiyonlar Tekrar Etüdü',
+              classificationStateSnapshot: 'Weak',
+              priorityScoreSnapshot: 78,
+              recommendationType: 'StrengthenWeak',
+              isCompleted: false,
+              completedAt: null,
+            },
+          ],
+        }),
+      });
+    });
+
+    await page.route(`**/api/v1/students/${realStudentId}/coach-tasks`, async (route) => {
+      await route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify([]) });
+    });
+
+    await page.route(`**/api/v1/students/${realStudentId}/academic-intelligence/recommendations*`, async (route) => {
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify([
+          {
+            recommendationType: 'StrengthenWeak',
+            nodeType: 'Topic',
+            nodeId: 'top-01',
+            code: 'MAT-FONK',
+            name: 'Fonksiyonlar',
+            subjectId: 'sub-01',
+            subjectName: 'Matematik',
+            classificationState: 'Weak',
+            classificationBasis: 'RecentWindow',
+            observationCount: 3,
+            totalQuestions: 15,
+            priorityScore: 78,
+          },
+        ]),
+      });
+    });
+
+    await page.goto('/student/today');
+    await page.waitForLoadState('networkidle');
+
+    await expect(page.locator('text="Fonksiyonlar Tekrar Etüdü"').first()).toBeVisible();
+    await expect(page.locator('text="Sıradaki Çalışma"')).toBeVisible();
+  });
 });

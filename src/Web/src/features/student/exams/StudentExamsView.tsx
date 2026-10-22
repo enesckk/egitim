@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { Award, FileText, AlertCircle, RefreshCw } from 'lucide-react';
 import { useAuth } from '@/auth';
+import { academicService } from '@/services/academicService';
 import { examService } from '@/services/examService';
 import { Select } from '@/components/ui/Select';
 import { Button } from '@/components/ui/Button';
@@ -10,7 +11,7 @@ import { Skeleton } from '@/components/ui/Skeleton';
 import { LatestExamSummaryCard } from './components/LatestExamSummaryCard';
 import { ExamListItemCard } from './components/ExamListItemCard';
 import { ExamDetailModal } from './components/ExamDetailModal';
-import { ExamType, StudentExamItem, StudentExamsViewModel } from './types';
+import { ExamType, StudentExamItem, StudentExamsViewModel, SubjectExamResult } from './types';
 
 export interface StudentExamsViewProps {
   initialData?: StudentExamsViewModel;
@@ -30,6 +31,7 @@ export const StudentExamsView: React.FC<StudentExamsViewProps> = ({
   userRef.current = user;
 
   const [data, setData] = useState<StudentExamsViewModel | undefined>(initialData);
+  const [resolvedStudentId, setResolvedStudentId] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState<boolean>(propIsLoading || (!initialData && !propErrorMessage));
   const [errorMessage, setErrorMessage] = useState<string | undefined>(propErrorMessage);
 
@@ -43,28 +45,68 @@ export const StudentExamsView: React.FC<StudentExamsViewProps> = ({
     setIsLoading(true);
     setErrorMessage(undefined);
 
-    const studentId = userRef.current?.id || 'me';
-
     try {
-      const res = await examService.getStudentExamResults(studentId, {
-        examTypeId: examTypeFilter || undefined,
-      });
+      const realStudentId = await academicService.getCurrentStudentId();
+      const studentId = realStudentId || userRef.current?.id || 'me';
+      setResolvedStudentId(studentId);
+
+      const res = await examService.getStudentExamResults(studentId);
 
       if (res && res.items && res.items.length > 0) {
-        const mappedExams: StudentExamItem[] = res.items.map((item) => {
+        const mappedExams: StudentExamItem[] = res.items.map((item, idx) => {
           const typeStr = (item.examTypeName || 'TYT').toUpperCase();
           const type: ExamType = typeStr.includes('AYT') ? 'AYT' : typeStr.includes('BRANŞ') || typeStr.includes('BRANS') ? 'BRANS' : 'TYT';
+          const prevItem = res.items.slice(idx + 1).find((prev) => {
+            const pStr = (prev.examTypeName || 'TYT').toUpperCase();
+            const pType: ExamType = pStr.includes('AYT') ? 'AYT' : pStr.includes('BRANŞ') || pStr.includes('BRANS') ? 'BRANS' : 'TYT';
+            return pType === type;
+          });
+          const currentNet = item.totalNet ?? 0;
+          const prevNet = prevItem ? (prevItem.totalNet ?? 0) : currentNet;
+          const netChange = prevItem ? Math.round((currentNet - prevNet) * 100) / 100 : 0;
+
           return {
             id: item.attemptId || item.examId,
+            attemptId: item.attemptId,
             title: item.examTitle,
             type,
             date: item.takenAt ? new Date(item.takenAt).toLocaleDateString('tr-TR') : '',
-            totalNet: item.totalNet ?? 0,
+            totalNet: currentNet,
             maxTotalNet: type === 'AYT' ? 80 : 120,
-            netChange: 0,
+            netChange,
             subjects: [],
           };
         });
+
+        // Enrich latest exam with subject breakdown if available
+        if (mappedExams[0]?.attemptId) {
+          try {
+            const detail = await examService.getStudentExamResultDetail(studentId, mappedExams[0].attemptId);
+            if (detail?.subjectResults) {
+              const subjects: SubjectExamResult[] = detail.subjectResults.map((sr) => ({
+                subjectName: sr.subjectName,
+                correct: sr.correct,
+                wrong: sr.wrong,
+                empty: sr.blank,
+                net: sr.net,
+                maxNet: sr.correct + sr.wrong + sr.blank || 40,
+              }));
+              const weakTopics = detail.subjectResults
+                .flatMap((sr) => sr.topics || [])
+                .filter((t) => t.wrong > t.correct)
+                .map((t) => t.topicName)
+                .slice(0, 4);
+              mappedExams[0] = {
+                ...mappedExams[0],
+                subjects,
+                focusWeakTopics: weakTopics.length > 0 ? weakTopics : undefined,
+                isRawAvailable: detail.isRawAvailable,
+              };
+            }
+          } catch {
+            // Detail enrichment is optional
+          }
+        }
 
         const tytExams = mappedExams.filter((e) => e.type === 'TYT');
         const aytExams = mappedExams.filter((e) => e.type === 'AYT');
@@ -102,7 +144,7 @@ export const StudentExamsView: React.FC<StudentExamsViewProps> = ({
     } finally {
       setIsLoading(false);
     }
-  }, [initialData, examTypeFilter]);
+  }, [initialData]);
 
   useEffect(() => {
     if (initialData) {
@@ -113,9 +155,48 @@ export const StudentExamsView: React.FC<StudentExamsViewProps> = ({
     }
   }, [initialData, fetchExamData]);
 
-  const handleOpenDetail = (exam: StudentExamItem) => {
+  const handleOpenDetail = async (exam: StudentExamItem) => {
     setSelectedExam(exam);
     setIsDetailOpen(true);
+
+    if (exam.subjects.length === 0 && resolvedStudentId && (exam.attemptId || exam.id)) {
+      try {
+        const detail = await examService.getStudentExamResultDetail(resolvedStudentId, exam.attemptId || exam.id);
+        if (detail?.subjectResults) {
+          const subjects: SubjectExamResult[] = detail.subjectResults.map((sr) => ({
+            subjectName: sr.subjectName,
+            correct: sr.correct,
+            wrong: sr.wrong,
+            empty: sr.blank,
+            net: sr.net,
+            maxNet: sr.correct + sr.wrong + sr.blank || 40,
+          }));
+          const weakTopics = detail.subjectResults
+            .flatMap((sr) => sr.topics || [])
+            .filter((t) => t.wrong > t.correct)
+            .map((t) => t.topicName)
+            .slice(0, 4);
+          const enriched: StudentExamItem = {
+            ...exam,
+            subjects,
+            focusWeakTopics: weakTopics.length > 0 ? weakTopics : exam.focusWeakTopics,
+            isRawAvailable: detail.isRawAvailable,
+          };
+          setSelectedExam(enriched);
+          setData((prev) =>
+            prev
+              ? {
+                  ...prev,
+                  latestExam: prev.latestExam?.id === exam.id ? enriched : prev.latestExam,
+                  exams: prev.exams.map((e) => (e.id === exam.id ? enriched : e)),
+                }
+              : prev
+          );
+        }
+      } catch {
+        // Ignore detail fetch error
+      }
+    }
   };
 
   const handleRetry = () => {
@@ -264,9 +345,17 @@ export const StudentExamsView: React.FC<StudentExamsViewProps> = ({
 
         <div className="bg-white rounded-2xl border border-neutral-100 p-3">
           <span className="text-xs text-neutral-400">Genel Net Artışı</span>
-          <p className="font-mono text-lg sm:text-xl font-bold text-success mt-0.5">
-            +7.75 Net
-          </p>
+          {(() => {
+            const overallDelta =
+              activeData.exams.length > 1
+                ? Math.round((activeData.exams[0].totalNet - activeData.exams[activeData.exams.length - 1].totalNet) * 100) / 100
+                : activeData.latestExam?.netChange ?? 0;
+            return (
+              <p className={`font-mono text-lg sm:text-xl font-bold mt-0.5 ${overallDelta >= 0 ? 'text-success' : 'text-danger'}`}>
+                {overallDelta >= 0 ? `+${overallDelta}` : overallDelta} Net
+              </p>
+            );
+          })()}
           <span className="text-[10px] text-neutral-400">Başlangıçtan bu yana</span>
         </div>
       </div>

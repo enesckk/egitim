@@ -1,18 +1,25 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { useParams, useNavigate, useSearchParams } from 'react-router-dom';
 import { ArrowLeft, MessageSquare, AlertCircle, RefreshCw, CheckCircle2, AlertTriangle, XCircle } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { academicService } from '@/services/academicService';
+import { coachTaskService, CoachTaskStatus } from '@/services/coachTaskService';
+import { examService } from '@/services/examService';
 import { Button } from '@/components/ui/Button';
 import { Tabs } from '@/components/ui/Tabs';
 import { Alert } from '@/components/ui/Alert';
 import { Skeleton } from '@/components/ui/Skeleton';
+import { CoachStudentExamsTab } from '@/components/coach/CoachStudentExamsTab';
 import { StudentOverviewTab } from './components/StudentOverviewTab';
 import { StudentPlanTab } from './components/StudentPlanTab';
 import { CoachTasksTab } from './components/CoachTasksTab';
-import { StudentExamsTab } from './components/StudentExamsTab';
 import { CoachPrivateNotesTab } from './components/CoachPrivateNotesTab';
-import { initialCoachStudentsData } from './mockData';
-import { AssignedStudentDetail, CoachPrivateNote, StudentStatus } from './types';
+import {
+  AssignedStudentDetail,
+  CoachPrivateNote,
+  StudentPlanTaskReview,
+  StudentStatus,
+} from './types';
 
 export interface CoachStudentDetailViewProps {
   initialStudents?: AssignedStudentDetail[];
@@ -20,6 +27,8 @@ export interface CoachStudentDetailViewProps {
   errorMessage?: string;
   onRetry?: () => void;
 }
+
+const DAY_NAMES_FULL_TR = ['Pazar', 'Pazartesi', 'Salı', 'Çarşamba', 'Perşembe', 'Cuma', 'Cumartesi'];
 
 const STATUS_MAP: Record<
   StudentStatus,
@@ -43,9 +52,9 @@ const STATUS_MAP: Record<
 };
 
 export const CoachStudentDetailView: React.FC<CoachStudentDetailViewProps> = ({
-  initialStudents = initialCoachStudentsData.students,
-  isLoading = false,
-  errorMessage,
+  initialStudents,
+  isLoading: propIsLoading = false,
+  errorMessage: propErrorMessage,
   onRetry,
 }) => {
   const { studentId } = useParams<{ studentId: string }>();
@@ -54,9 +63,172 @@ export const CoachStudentDetailView: React.FC<CoachStudentDetailViewProps> = ({
   const initialTab = searchParams.get('tab') || 'overview';
 
   const [activeTab, setActiveTab] = useState(initialTab);
-  const [students, setStudents] = useState<AssignedStudentDetail[]>(initialStudents);
+  const [student, setStudent] = useState<AssignedStudentDetail | null>(
+    () => initialStudents?.find((s) => s.id === studentId) || null
+  );
+  const [examCount, setExamCount] = useState<number | undefined>(undefined);
+  const [isLoading, setIsLoading] = useState<boolean>(
+    propIsLoading || (!initialStudents && !propErrorMessage)
+  );
+  const [errorMessage, setErrorMessage] = useState<string | undefined>(propErrorMessage);
 
-  const student = students.find((s) => s.id === studentId);
+  const fetchStudentDetail = useCallback(async () => {
+    if (initialStudents) {
+      setStudent(initialStudents.find((s) => s.id === studentId) || null);
+      setIsLoading(false);
+      return;
+    }
+
+    if (!studentId) {
+      setStudent(null);
+      setIsLoading(false);
+      return;
+    }
+
+    setIsLoading(true);
+    setErrorMessage(undefined);
+
+    try {
+      let baseStudentDto = null;
+      let goalExamName = 'TYT / AYT';
+
+      try {
+        const s360 = await academicService.getStudent360(studentId);
+        baseStudentDto = s360.student;
+        if (s360.examTypes && s360.examTypes.length > 0) {
+          goalExamName = s360.examTypes.map((e) => e.name).join(' / ');
+        } else if (s360.recentExam?.examType) {
+          goalExamName = s360.recentExam.examType;
+        }
+      } catch {
+        baseStudentDto = await academicService.getStudent(studentId);
+      }
+
+      if (!baseStudentDto || !baseStudentDto.id) {
+        setStudent(null);
+        setIsLoading(false);
+        return;
+      }
+
+      const [activePlanRes, coachTasksRes, examsRes] = await Promise.allSettled([
+        academicService.getActiveStudyPlan(studentId),
+        coachTaskService.getCoachTasks(studentId),
+        examService.getStudentExamResults(studentId),
+      ]);
+
+      const activePlan = activePlanRes.status === 'fulfilled' ? activePlanRes.value : null;
+      const coachTasks =
+        coachTasksRes.status === 'fulfilled' && Array.isArray(coachTasksRes.value)
+          ? coachTasksRes.value
+          : [];
+      const examsTotal =
+        examsRes.status === 'fulfilled' && examsRes.value?.items
+          ? examsRes.value.items.length
+          : undefined;
+      setExamCount(examsTotal);
+
+      const weeklyPlanTasks: StudentPlanTaskReview[] = [];
+      let adherence = 100;
+      let weeklyHours = 0;
+      let hasPlanMetrics = false;
+
+      if (activePlan && activePlan.tasks?.length > 0) {
+        hasPlanMetrics = true;
+        adherence = Math.round((activePlan.plan.taskProgressRate || 0) * 100);
+        weeklyHours = Math.round(((activePlan.plan.completedTaskMinutes || 0) / 60) * 10) / 10;
+        const startObj = activePlan.plan.startDate ? new Date(activePlan.plan.startDate) : new Date();
+
+        for (const t of activePlan.tasks) {
+          const dObj = t.plannedDate
+            ? new Date(t.plannedDate)
+            : new Date(startObj.getTime() + (t.dayIndex - 1) * 86400000);
+          weeklyPlanTasks.push({
+            id: t.id,
+            dayName: DAY_NAMES_FULL_TR[dObj.getDay()] || `${t.dayIndex}. Gün`,
+            subject: t.subjectName || (t.nodeType === 'QuestionStyle' ? 'Soru Stili' : 'Genel Çalışma'),
+            topic: t.titleSnapshot || t.topicName || t.learningOutcomeName || 'Çalışma Görevi',
+            durationMinutes: t.durationMinutes,
+            status: t.isCompleted ? 'completed' : 'pending',
+            isCoachAssigned: false,
+          });
+        }
+      } else if (coachTasks.length > 0) {
+        const nonCancelled = coachTasks.filter((c) => c.status !== CoachTaskStatus.Cancelled);
+        if (nonCancelled.length > 0) {
+          hasPlanMetrics = true;
+          const doneCount = nonCancelled.filter(
+            (c) => c.isCompleted || c.status === CoachTaskStatus.Completed
+          ).length;
+          adherence = Math.round((doneCount / nonCancelled.length) * 100);
+          const doneMins = nonCancelled
+            .filter((c) => c.isCompleted || c.status === CoachTaskStatus.Completed)
+            .reduce((sum, c) => sum + (c.durationMinutes || 30), 0);
+          weeklyHours = Math.round((doneMins / 60) * 10) / 10;
+        }
+      }
+
+      for (const ct of coachTasks.filter((c) => c.status !== CoachTaskStatus.Cancelled)) {
+        const dObj = ct.dueDate ? new Date(ct.dueDate) : new Date(ct.createdAt);
+        weeklyPlanTasks.push({
+          id: ct.id,
+          dayName: DAY_NAMES_FULL_TR[dObj.getDay()] || 'Haftalık',
+          subject: ct.subjectName || 'Koç Görevi',
+          topic: ct.title,
+          durationMinutes: ct.durationMinutes || 30,
+          status: ct.isCompleted || ct.status === CoachTaskStatus.Completed ? 'completed' : 'pending',
+          isCoachAssigned: true,
+          coachNote: ct.description || undefined,
+        });
+      }
+
+      let status: StudentStatus = 'takipte';
+      if (hasPlanMetrics) {
+        if (adherence < 40) status = 'kritik';
+        else if (adherence < 70) status = 'dikkat';
+      }
+
+      const fullName =
+        baseStudentDto.fullName ||
+        `${baseStudentDto.firstName || ''} ${baseStudentDto.lastName || ''}`.trim() ||
+        'Öğrenci';
+      const initials =
+        `${baseStudentDto.firstName?.[0] || ''}${baseStudentDto.lastName?.[0] || ''}`.toUpperCase() ||
+        fullName
+          .split(' ')
+          .filter(Boolean)
+          .map((p) => p[0])
+          .join('')
+          .toUpperCase()
+          .slice(0, 2) ||
+        'ÖĞ';
+
+      setStudent((prev) => ({
+        id: baseStudentDto.id,
+        name: fullName,
+        initials,
+        grade: baseStudentDto.gradeLevel ? `${baseStudentDto.gradeLevel}. Sınıf` : '12. Sınıf',
+        field: baseStudentDto.schoolName || 'Genel Alan',
+        exam: goalExamName,
+        status,
+        planAdherence: adherence,
+        weeklyStudyHours: weeklyHours,
+        lastActivity: baseStudentDto.createdAt
+          ? new Date(baseStudentDto.createdAt).toLocaleDateString('tr-TR')
+          : 'Aktif',
+        privateNotes: prev?.id === baseStudentDto.id ? prev.privateNotes : [],
+        weeklyPlanTasks,
+        recentExams: [],
+      }));
+    } catch {
+      setStudent(null);
+    } finally {
+      setIsLoading(false);
+    }
+  }, [initialStudents, studentId]);
+
+  useEffect(() => {
+    fetchStudentDetail();
+  }, [fetchStudentDetail]);
 
   const handleAddPrivateNote = (newNoteData: Omit<CoachPrivateNote, 'id' | 'createdAt'>) => {
     const newNote: CoachPrivateNote = {
@@ -66,23 +238,16 @@ export const CoachStudentDetailView: React.FC<CoachStudentDetailViewProps> = ({
       content: newNoteData.content,
     };
 
-    setStudents((prev) =>
-      prev.map((s) => {
-        if (s.id === student?.id) {
-          return {
-            ...s,
-            privateNotes: [newNote, ...s.privateNotes],
-          };
-        }
-        return s;
-      })
-    );
+    setStudent((prev) => (prev ? { ...prev, privateNotes: [newNote, ...prev.privateNotes] } : prev));
   };
 
+  const activeLoading = propIsLoading || isLoading;
+  const activeError = propErrorMessage || errorMessage;
+
   // Loading State
-  if (isLoading) {
+  if (activeLoading) {
     return (
-      <div className="max-w-5xl mx-auto space-y-4 select-none">
+      <div className="max-w-5xl mx-auto space-y-4 select-none" data-testid="coach-student-detail-loading">
         <Skeleton className="h-10 w-32 rounded-xl" />
         <Skeleton className="h-32 w-full rounded-2xl" />
         <Skeleton className="h-12 w-full rounded-xl" />
@@ -92,11 +257,11 @@ export const CoachStudentDetailView: React.FC<CoachStudentDetailViewProps> = ({
   }
 
   // Error State
-  if (errorMessage || !student) {
+  if (activeError || !student) {
     return (
-      <div className="max-w-5xl mx-auto py-8 space-y-4 select-none">
+      <div className="max-w-5xl mx-auto py-8 space-y-4 select-none" data-testid="coach-student-detail-error">
         <Alert variant="danger" icon={<AlertCircle className="h-5 w-5" />} title="Öğrenci Bulunamadı">
-          {errorMessage || 'İstenen öğrenci kaydına ulaşılamadı veya yetkiniz bulunmuyor.'}
+          {activeError || 'İstenen öğrenci kaydına ulaşılamadı veya yetkiniz bulunmuyor.'}
         </Alert>
         <div className="flex justify-center gap-2 pt-2">
           {onRetry && (
@@ -118,12 +283,12 @@ export const CoachStudentDetailView: React.FC<CoachStudentDetailViewProps> = ({
     { id: 'overview', label: 'Özet', count: undefined },
     { id: 'tasks', label: 'Görevler', count: undefined },
     { id: 'plan', label: 'Plan İnceleme', count: student.weeklyPlanTasks.length },
-    { id: 'exams', label: 'Denemeler', count: student.recentExams.length },
+    { id: 'exams', label: 'Denemeler', count: examCount ?? student.recentExams.length },
     { id: 'notes', label: '🔒 Koça Özel Notlar', count: student.privateNotes.length },
   ];
 
   return (
-    <div className="max-w-5xl mx-auto select-none space-y-4 sm:space-y-6">
+    <div className="max-w-5xl mx-auto select-none space-y-4 sm:space-y-6" data-testid="coach-student-detail-view">
       {/* Back Button */}
       <div>
         <button
@@ -192,7 +357,7 @@ export const CoachStudentDetailView: React.FC<CoachStudentDetailViewProps> = ({
           <StudentPlanTab tasks={student.weeklyPlanTasks} studentName={student.name} />
         )}
         {activeTab === 'exams' && (
-          <StudentExamsTab exams={student.recentExams} studentName={student.name} />
+          <CoachStudentExamsTab studentId={student.id} />
         )}
         {activeTab === 'notes' && (
           <CoachPrivateNotesTab

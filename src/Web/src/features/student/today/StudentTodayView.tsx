@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
   CalendarDays,
@@ -11,6 +11,9 @@ import {
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useAuth } from '@/auth';
+import { academicService } from '@/services/academicService';
+import { coachTaskService, CoachTaskStatus } from '@/services/coachTaskService';
+import { getRecommendationTypeLabel } from '@/features/student/academic/types';
 import { Alert } from '@/components/ui/Alert';
 import { Button } from '@/components/ui/Button';
 import { Skeleton } from '@/components/ui/Skeleton';
@@ -20,7 +23,17 @@ import { WeeklyProgressTab } from './components/WeeklyProgressTab';
 import { RecommendationCard } from './components/RecommendationCard';
 import { UpcomingCard } from './components/UpcomingCard';
 import { MonthlyStatsCard } from './components/MonthlyStatsCard';
-import { StudentTodayViewModel, TodayPlanItem } from './types';
+import {
+  DayStreakItem,
+  MonthlyStatItem,
+  NextStudyItem,
+  RecommendationItem,
+  StudentTodayViewModel,
+  SubjectHourBreakdown,
+  TodayPlanItem,
+  UpcomingEventItem,
+  WeeklyProgressData,
+} from './types';
 
 export interface StudentTodayViewProps {
   initialData?: StudentTodayViewModel;
@@ -31,10 +44,17 @@ export interface StudentTodayViewProps {
   onRecommendationAction?: (topic: string) => void;
 }
 
+type TaskBackendRef =
+  | { kind: 'plan'; studentId: string; planId: string; taskId: string }
+  | { kind: 'coach'; studentId: string; taskId: string };
+
+const DAY_LABELS_TR = ['Paz', 'Pzt', 'Sal', 'Çar', 'Per', 'Cum', 'Cmt'];
+const BAR_COLORS = ['bg-primary-500', 'bg-success', 'bg-warning', 'bg-attention', 'bg-info'];
+
 export const StudentTodayView: React.FC<StudentTodayViewProps> = ({
   initialData,
-  isLoading = false,
-  errorMessage,
+  isLoading: propIsLoading = false,
+  errorMessage: propErrorMessage,
   onRetry,
   onStartStudy,
   onRecommendationAction,
@@ -43,9 +63,254 @@ export const StudentTodayView: React.FC<StudentTodayViewProps> = ({
   const { user } = useAuth();
 
   const [activeTab, setActiveTab] = useState<'plan' | 'progress'>('plan');
+  const [viewData, setViewData] = useState<StudentTodayViewModel | undefined>(initialData);
   const [plans, setPlans] = useState<TodayPlanItem[]>(initialData?.todayPlans || []);
+  const [taskRefs, setTaskRefs] = useState<Record<number, TaskBackendRef>>({});
+  const [isLoading, setIsLoading] = useState<boolean>(propIsLoading);
+  const [errorMessage, setErrorMessage] = useState<string | undefined>(propErrorMessage);
 
-  const studentDisplayName = user?.name || user?.email?.split('@')[0] || initialData?.studentName || 'Öğrenci';
+  const fetchTodayData = useCallback(async () => {
+    if (initialData) return;
+
+    setIsLoading(true);
+    setErrorMessage(undefined);
+
+    try {
+      const studentId = await academicService.getCurrentStudentId();
+      if (!studentId) {
+        setViewData(undefined);
+        setPlans([]);
+        return;
+      }
+
+      const [activePlanRes, coachTasksRes, recsRes, student360Res] = await Promise.allSettled([
+        academicService.getActiveStudyPlan(studentId),
+        coachTaskService.getCoachTasks(studentId),
+        academicService.getRecommendations(studentId, { recommendationLimit: 1 }),
+        academicService.getStudent360(studentId),
+      ]);
+
+      const activePlan = activePlanRes.status === 'fulfilled' ? activePlanRes.value : null;
+      const coachTasks =
+        coachTasksRes.status === 'fulfilled' && Array.isArray(coachTasksRes.value)
+          ? coachTasksRes.value.filter((t) => t.status !== CoachTaskStatus.Cancelled)
+          : [];
+      const topRec =
+        recsRes.status === 'fulfilled' && Array.isArray(recsRes.value) && recsRes.value.length > 0
+          ? recsRes.value[0]
+          : null;
+      const student360 = student360Res.status === 'fulfilled' ? student360Res.value : null;
+
+      const todayIso = new Date().toISOString().split('T')[0];
+      const nextRefs: Record<number, TaskBackendRef> = {};
+      const todayItems: TodayPlanItem[] = [];
+      let itemCounter = 1;
+      let assignedActive = false;
+
+      if (activePlan && activePlan.tasks?.length > 0) {
+        const hasTodayDateMatch = activePlan.tasks.some(
+          (t) => t.plannedDate && t.plannedDate.startsWith(todayIso)
+        );
+        const firstIncompleteDay =
+          activePlan.tasks.find((t) => !t.isCompleted)?.dayIndex ?? activePlan.tasks[0].dayIndex;
+        const targetDayTasks = hasTodayDateMatch
+          ? activePlan.tasks.filter((t) => t.plannedDate && t.plannedDate.startsWith(todayIso))
+          : activePlan.tasks.filter((t) => t.dayIndex === firstIncompleteDay);
+
+        for (const t of targetDayTasks) {
+          const isDone = t.isCompleted;
+          let status: TodayPlanItem['status'] = 'upcoming';
+          if (isDone) {
+            status = 'completed';
+          } else if (!assignedActive) {
+            status = 'active';
+            assignedActive = true;
+          }
+
+          const numericId = itemCounter++;
+          nextRefs[numericId] = {
+            kind: 'plan',
+            studentId,
+            planId: activePlan.plan.id,
+            taskId: t.id,
+          };
+
+          todayItems.push({
+            id: numericId,
+            subject: t.subjectName || (t.nodeType === 'QuestionStyle' ? 'Soru Stili' : 'Genel Çalışma'),
+            topic: t.titleSnapshot || t.topicName || t.learningOutcomeName || 'Çalışma Görevi',
+            durationMinutes: t.durationMinutes,
+            status,
+            completedAt: t.completedAt
+              ? new Date(t.completedAt).toLocaleTimeString('tr-TR', { hour: '2-digit', minute: '2-digit' })
+              : undefined,
+          });
+        }
+      }
+
+      for (const ct of coachTasks) {
+        const isDone = ct.isCompleted || ct.status === CoachTaskStatus.Completed;
+        let status: TodayPlanItem['status'] = 'upcoming';
+        if (isDone) {
+          status = 'completed';
+        } else if (!assignedActive) {
+          status = 'active';
+          assignedActive = true;
+        }
+
+        const numericId = itemCounter++;
+        nextRefs[numericId] = {
+          kind: 'coach',
+          studentId,
+          taskId: ct.id,
+        };
+
+        todayItems.push({
+          id: numericId,
+          subject: ct.subjectName || 'Koç Görevi',
+          topic: ct.title,
+          durationMinutes: ct.durationMinutes || 30,
+          status,
+          completedAt: ct.completedAt
+            ? new Date(ct.completedAt).toLocaleTimeString('tr-TR', { hour: '2-digit', minute: '2-digit' })
+            : undefined,
+        });
+      }
+
+      const activeCandidate = todayItems.find((i) => i.status !== 'completed') || todayItems[0];
+      const nextStudy: NextStudyItem = activeCandidate
+        ? {
+            title: `${activeCandidate.subject} — ${activeCandidate.topic}`,
+            topic: activeCandidate.topic,
+            durationMinutes: activeCandidate.durationMinutes,
+            subject: activeCandidate.subject,
+          }
+        : {
+            title: 'Günlük Çalışma',
+            topic: 'Akademik Tekrar',
+            durationMinutes: 30,
+            subject: 'Genel',
+          };
+
+      let weeklyProgress: WeeklyProgressData | undefined;
+      if (activePlan && activePlan.tasks?.length > 0) {
+        const totalDays = Math.min(Math.max(activePlan.plan.planDays || 7, 1), 7);
+        const startObj = activePlan.plan.startDate ? new Date(activePlan.plan.startDate) : new Date();
+        const days: DayStreakItem[] = [];
+
+        for (let d = 1; d <= totalDays; d++) {
+          const dTasks = activePlan.tasks.filter((t) => t.dayIndex === d);
+          const dObj = new Date(startObj.getTime() + (d - 1) * 86400000);
+          const dIso = dObj.toISOString().split('T')[0];
+          days.push({
+            label: DAY_LABELS_TR[dObj.getDay()] || `${d}.G`,
+            done: dTasks.length > 0 && dTasks.every((t) => t.isCompleted),
+            today: dIso === todayIso,
+          });
+        }
+
+        const completedHours = Math.round(((activePlan.plan.completedTaskMinutes || 0) / 60) * 10) / 10;
+        const targetHours = Math.round(((activePlan.plan.totalPlannedMinutes || 0) / 60) * 10) / 10;
+        const remainingHours = Math.max(0, Math.round((targetHours - completedHours) * 10) / 10);
+        const adherencePercentage = Math.round((activePlan.plan.taskProgressRate || 0) * 100);
+
+        const subjMinutes = new Map<string, number>();
+        for (const t of activePlan.tasks) {
+          const sName = t.subjectName || (t.nodeType === 'QuestionStyle' ? 'Soru Stili' : 'Genel');
+          subjMinutes.set(sName, (subjMinutes.get(sName) || 0) + t.durationMinutes);
+        }
+
+        const subjects: SubjectHourBreakdown[] = Array.from(subjMinutes.entries()).map(([subject, mins], idx) => ({
+          subject,
+          hours: Math.round((mins / 60) * 10) / 10,
+          colorClass: BAR_COLORS[idx % BAR_COLORS.length],
+        }));
+
+        weeklyProgress = {
+          days,
+          completedHours,
+          targetHours,
+          remainingHours,
+          adherencePercentage,
+          subjects,
+        };
+      }
+
+      const recommendation: RecommendationItem | undefined = topRec
+        ? {
+            topic: topRec.name,
+            message: `${getRecommendationTypeLabel(topRec.recommendationType)}: ${
+              topRec.subjectName ? `${topRec.subjectName} — ` : ''
+            }${topRec.name} (Öncelik Puanı: ${Math.round(topRec.priorityScore)})`,
+            actionLabel: 'Akademik Analizi İncele',
+          }
+        : undefined;
+
+      const upcomingEvents: UpcomingEventItem[] = [];
+      coachTasks
+        .filter((ct) => !ct.isCompleted && ct.dueDate)
+        .slice(0, 3)
+        .forEach((ct, idx) => {
+          upcomingEvents.push({
+            id: idx + 1,
+            date: new Date(ct.dueDate!).toLocaleDateString('tr-TR', { day: 'numeric', month: 'long' }),
+            label: ct.title,
+            type: 'session',
+          });
+        });
+
+      const monthlyStats: MonthlyStatItem[] = [];
+      if (student360?.recentExam) {
+        monthlyStats.push({
+          label: 'Son Deneme Neti',
+          value: `${student360.recentExam.totalNet}`,
+          type: 'exam',
+        });
+      }
+      if (activePlan) {
+        monthlyStats.push({
+          label: 'Plan Uyumu',
+          value: `%${Math.round((activePlan.plan.taskProgressRate || 0) * 100)}`,
+          type: 'award',
+        });
+      }
+
+      setTaskRefs(nextRefs);
+      setPlans(todayItems);
+      setViewData({
+        studentName: student360?.student?.fullName || user?.name || 'Öğrenci',
+        dateString: new Date().toLocaleDateString('tr-TR'),
+        nextStudy,
+        todayPlans: todayItems,
+        weeklyProgress: weeklyProgress as WeeklyProgressData,
+        recommendation: recommendation as RecommendationItem,
+        upcomingEvents,
+        monthlyStats,
+      });
+    } catch {
+      setViewData(undefined);
+      setPlans([]);
+    } finally {
+      setIsLoading(false);
+    }
+  }, [initialData, user?.name]);
+
+  useEffect(() => {
+    if (initialData) {
+      setViewData(initialData);
+      setPlans(initialData.todayPlans || []);
+      setIsLoading(false);
+    } else {
+      fetchTodayData();
+    }
+  }, [initialData, fetchTodayData]);
+
+  const activeData = viewData || initialData;
+  const activeLoading = propIsLoading || isLoading;
+  const activeError = propErrorMessage || errorMessage;
+
+  const studentDisplayName =
+    user?.name || activeData?.studentName || user?.email?.split('@')[0] || 'Öğrenci';
   const currentDateFormatted = new Date().toLocaleDateString('tr-TR', {
     weekday: 'long',
     day: 'numeric',
@@ -53,7 +318,7 @@ export const StudentTodayView: React.FC<StudentTodayViewProps> = ({
   });
 
   // Loading State
-  if (isLoading) {
+  if (activeLoading) {
     return (
       <div className="max-w-5xl mx-auto space-y-4 select-none" data-testid="student-today-loading">
         <div className="space-y-2">
@@ -75,25 +340,59 @@ export const StudentTodayView: React.FC<StudentTodayViewProps> = ({
   }
 
   // Error State
-  if (errorMessage) {
+  if (activeError) {
     return (
       <div className="max-w-5xl mx-auto py-8 space-y-4" data-testid="student-today-error">
         <Alert variant="danger" icon={<AlertCircle className="h-5 w-5" />} title="Sayfa Yüklenemedi">
-          {errorMessage}
+          {activeError}
         </Alert>
-        {onRetry && (
-          <div className="text-center pt-2">
-            <Button variant="primary" size="sm" onClick={onRetry} leftIcon={<RefreshCw className="h-4 w-4" />}>
-              Tekrar Dene
-            </Button>
-          </div>
-        )}
+        <div className="text-center pt-2">
+          <Button
+            variant="primary"
+            size="sm"
+            onClick={() => (onRetry ? onRetry() : fetchTodayData())}
+            leftIcon={<RefreshCw className="h-4 w-4" />}
+          >
+            Tekrar Dene
+          </Button>
+        </div>
       </div>
     );
   }
 
-  // Local interaction: toggle status (completed <-> active <-> upcoming) when plans exist
-  const handleTogglePlanStatus = (id: number) => {
+  // Toggle status (persisted to backend when backed by taskRefs, or local when initialData is used)
+  const handleTogglePlanStatus = async (id: number) => {
+    const target = plans.find((p) => p.id === id);
+    if (!target) return;
+
+    const ref = taskRefs[id];
+    if (ref && !initialData) {
+      const nextCompleted = target.status !== 'completed';
+      try {
+        if (ref.kind === 'plan') {
+          await academicService.updateTaskCompletion(ref.studentId, ref.planId, ref.taskId, nextCompleted);
+        } else {
+          await coachTaskService.toggleTaskCompletion(ref.studentId, ref.taskId, nextCompleted);
+        }
+        setPlans((prev) =>
+          prev.map((item) =>
+            item.id === id
+              ? {
+                  ...item,
+                  status: nextCompleted ? 'completed' : 'active',
+                  completedAt: nextCompleted
+                    ? new Date().toLocaleTimeString('tr-TR', { hour: '2-digit', minute: '2-digit' })
+                    : undefined,
+                }
+              : item
+          )
+        );
+        return;
+      } catch {
+        // Fall through to local state toggle if API call fails
+      }
+    }
+
     setPlans((prev) =>
       prev.map((item) => {
         if (item.id === id) {
@@ -119,8 +418,12 @@ export const StudentTodayView: React.FC<StudentTodayViewProps> = ({
 
   const handleContinuePlan = (id: number) => {
     const plan = plans.find((p) => p.id === id);
-    if (plan && onStartStudy) {
-      onStartStudy(plan.topic);
+    if (plan) {
+      if (onStartStudy) {
+        onStartStudy(plan.topic);
+      } else {
+        navigate('/student/plans');
+      }
     }
   };
 
@@ -153,12 +456,14 @@ export const StudentTodayView: React.FC<StudentTodayViewProps> = ({
         /* Real Plans Layout (When plans exist) */
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-3.5 sm:gap-4">
           <div className="lg:col-span-2 space-y-3.5 sm:space-y-4">
-            {initialData?.nextStudy && (
+            {activeData?.nextStudy && (
               <NextStudyCard
-                nextStudy={initialData.nextStudy}
+                nextStudy={activeData.nextStudy}
                 completedCount={completedCount}
                 totalCount={plans.length}
-                onStartStudy={() => onStartStudy?.(initialData.nextStudy.title)}
+                onStartStudy={() =>
+                  onStartStudy ? onStartStudy(activeData.nextStudy.title) : navigate('/student/plans')
+                }
               />
             )}
 
@@ -176,7 +481,7 @@ export const StudentTodayView: React.FC<StudentTodayViewProps> = ({
                 >
                   Bugünkü Plan
                 </button>
-                {initialData?.weeklyProgress && (
+                {activeData?.weeklyProgress && (
                   <button
                     type="button"
                     onClick={() => setActiveTab('progress')}
@@ -198,29 +503,33 @@ export const StudentTodayView: React.FC<StudentTodayViewProps> = ({
                   onTogglePlanStatus={handleTogglePlanStatus}
                   onContinuePlan={handleContinuePlan}
                 />
-              ) : initialData?.weeklyProgress ? (
-                <WeeklyProgressTab progressData={initialData.weeklyProgress} />
+              ) : activeData?.weeklyProgress ? (
+                <WeeklyProgressTab progressData={activeData.weeklyProgress} />
               ) : null}
             </div>
           </div>
 
           <div className="space-y-3.5 sm:space-y-4">
-            {initialData?.recommendation && (
+            {activeData?.recommendation && (
               <RecommendationCard
-                recommendation={initialData.recommendation}
-                onAction={() => onRecommendationAction?.(initialData.recommendation.topic)}
+                recommendation={activeData.recommendation}
+                onAction={() =>
+                  onRecommendationAction
+                    ? onRecommendationAction(activeData.recommendation.topic)
+                    : navigate('/student/academic')
+                }
               />
             )}
-            {initialData?.upcomingEvents && initialData.upcomingEvents.length > 0 && (
-              <UpcomingCard events={initialData.upcomingEvents} />
+            {activeData?.upcomingEvents && activeData.upcomingEvents.length > 0 && (
+              <UpcomingCard events={activeData.upcomingEvents} />
             )}
-            {initialData?.monthlyStats && initialData.monthlyStats.length > 0 && (
-              <MonthlyStatsCard stats={initialData.monthlyStats} />
+            {activeData?.monthlyStats && activeData.monthlyStats.length > 0 && (
+              <MonthlyStatsCard stats={activeData.monthlyStats} />
             )}
           </div>
         </div>
       ) : (
-        /* Honest Calm Academic Shell (When no planning backend exists yet) */
+        /* Honest Calm Academic Shell (When no active plan tasks exist yet) */
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-3.5 sm:gap-5">
           {/* Main 2-column Focus Card */}
           <div className="lg:col-span-2 space-y-4">
@@ -308,8 +617,19 @@ export const StudentTodayView: React.FC<StudentTodayViewProps> = ({
             </div>
           </div>
 
-          {/* Right Column: Institutional Status Summary */}
+          {/* Right Column: Institutional Status Summary & Academic Recommendations */}
           <div className="space-y-4">
+            {activeData?.recommendation && (
+              <RecommendationCard
+                recommendation={activeData.recommendation}
+                onAction={() =>
+                  onRecommendationAction
+                    ? onRecommendationAction(activeData.recommendation.topic)
+                    : navigate('/student/academic')
+                }
+              />
+            )}
+
             <div className="bg-white rounded-2xl border border-neutral-200/80 p-5 shadow-soft-sm space-y-4">
               <div className="flex items-center gap-2 text-xs font-semibold text-neutral-500 uppercase tracking-wide">
                 <Sparkles className="h-3.5 w-3.5 text-primary-600" />
@@ -332,6 +652,10 @@ export const StudentTodayView: React.FC<StudentTodayViewProps> = ({
                 </div>
               </div>
             </div>
+
+            {activeData?.monthlyStats && activeData.monthlyStats.length > 0 && (
+              <MonthlyStatsCard stats={activeData.monthlyStats} />
+            )}
           </div>
         </div>
       )}
