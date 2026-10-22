@@ -10,9 +10,10 @@ public class GetStudentQuestionStyleAnalyticsHandler(
     IApplicationDbContext db,
     IExamResourceAccess resourceAccess)
 {
-    public async Task<List<StudentQuestionStyleAnalyticsDto>> HandleAsync(
+    public virtual async Task<List<StudentQuestionStyleAnalyticsDto>> HandleAsync(
         AcademicIntelligenceQuery query,
-        CancellationToken ct = default)
+        CancellationToken ct = default,
+        int trendWindowSize = 2)
     {
         await resourceAccess.ValidateStudentReadAccessAsync(query.StudentId, ct);
 
@@ -70,7 +71,7 @@ public class GetStudentQuestionStyleAnalyticsHandler(
 
         if (attempts.Count == 0)
         {
-            return QuestionStyleAnalyticsCalculator.CalculateAnalytics(activeStyles, []);
+            return QuestionStyleAnalyticsCalculator.CalculateAnalytics(activeStyles, [], trendWindowSize);
         }
 
         var attemptIds = attempts.Select(a => a.Id).ToList();
@@ -91,7 +92,7 @@ public class GetStudentQuestionStyleAnalyticsHandler(
 
         if (rawResults.Count == 0)
         {
-            return QuestionStyleAnalyticsCalculator.CalculateAnalytics(activeStyles, []);
+            return QuestionStyleAnalyticsCalculator.CalculateAnalytics(activeStyles, [], trendWindowSize);
         }
 
         // Distinct question IDs to find style assignments
@@ -141,6 +142,6 @@ public class GetStudentQuestionStyleAnalyticsHandler(
             ));
         }
 
-        return QuestionStyleAnalyticsCalculator.CalculateAnalytics(activeStyles, observations);
+        return QuestionStyleAnalyticsCalculator.CalculateAnalytics(activeStyles, observations, trendWindowSize);
     }
 }

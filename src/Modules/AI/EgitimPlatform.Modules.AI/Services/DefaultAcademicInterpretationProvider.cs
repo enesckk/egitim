@@ -15,19 +15,33 @@ public class DefaultAcademicInterpretationProvider(IConfiguration configuration)
         }
 
         var audience = (factPackage.Audience ?? "student").ToLowerInvariant();
+        var questionStyles = factPackage.QuestionStyles ?? [];
+
         var strengths = factPackage.Classifications
             .Where(c => c.ClassificationState.Equals("Strong", StringComparison.OrdinalIgnoreCase))
             .Select(c => c.TopicName)
+            .Concat(questionStyles
+                .Where(s => s.ClassificationState.Equals("Strong", StringComparison.OrdinalIgnoreCase))
+                .Select(s => $"{s.Name} (Soru Tarzı)"))
             .ToList();
 
         var improvementAreas = factPackage.Classifications
             .Where(c => c.ClassificationState.Equals("Critical", StringComparison.OrdinalIgnoreCase) ||
                         c.ClassificationState.Equals("Weak", StringComparison.OrdinalIgnoreCase))
             .Select(c => c.TopicName)
+            .Concat(questionStyles
+                .Where(s => s.ClassificationState.Equals("Critical", StringComparison.OrdinalIgnoreCase) ||
+                            s.ClassificationState.Equals("Weak", StringComparison.OrdinalIgnoreCase))
+                .Select(s => $"{s.Name} (Soru Tarzı)"))
             .ToList();
 
         var trendNotes = factPackage.Trends
             .Select(t => $"{t.SubjectName}: {t.Message}")
+            .Concat(questionStyles
+                .Where(s => s.TrendDirection != null &&
+                            (s.TrendDirection.Equals("Increasing", StringComparison.OrdinalIgnoreCase) ||
+                             s.TrendDirection.Equals("Decreasing", StringComparison.OrdinalIgnoreCase)))
+                .Select(s => $"{s.Name} (Soru Tarzı): {s.TrendDirection}"))
             .ToList();
 
         var suggestedFocus = factPackage.Recommendations

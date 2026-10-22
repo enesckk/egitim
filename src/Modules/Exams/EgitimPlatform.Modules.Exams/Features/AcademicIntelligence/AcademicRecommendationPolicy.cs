@@ -24,6 +24,7 @@ public static class AcademicRecommendationPolicy
     // Specificity Level Bonuses (Tie-breaker)
     public const int SpecificityBonusLearningOutcome = 3;
     public const int SpecificityBonusTopic = 2;
+    public const int SpecificityBonusQuestionStyle = 2;
     public const int SpecificityBonusSubject = 1;
 
     // Maximum Bonus for Low Success Rate

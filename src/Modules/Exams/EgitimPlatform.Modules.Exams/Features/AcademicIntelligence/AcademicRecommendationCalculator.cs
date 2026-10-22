@@ -39,6 +39,7 @@ public static class AcademicRecommendationCalculator
         {
             RecommendationNodeType.LearningOutcome => AcademicRecommendationPolicy.SpecificityBonusLearningOutcome,
             RecommendationNodeType.Topic => AcademicRecommendationPolicy.SpecificityBonusTopic,
+            RecommendationNodeType.QuestionStyle => AcademicRecommendationPolicy.SpecificityBonusQuestionStyle,
             RecommendationNodeType.Subject => AcademicRecommendationPolicy.SpecificityBonusSubject,
             _ => 0
         };
@@ -79,8 +80,9 @@ public static class AcademicRecommendationCalculator
 
     private static int GetNodeTypePriority(RecommendationNodeType nodeType) => nodeType switch
     {
-        RecommendationNodeType.LearningOutcome => 3,
-        RecommendationNodeType.Topic => 2,
+        RecommendationNodeType.LearningOutcome => 4,
+        RecommendationNodeType.Topic => 3,
+        RecommendationNodeType.QuestionStyle => 2,
         RecommendationNodeType.Subject => 1,
         _ => 0
     };

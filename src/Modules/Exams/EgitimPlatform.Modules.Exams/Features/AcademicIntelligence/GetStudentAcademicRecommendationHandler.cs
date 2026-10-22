@@ -1,13 +1,33 @@
 using EgitimPlatform.BuildingBlocks.Interfaces;
 using EgitimPlatform.Modules.Exams.Services;
 using FluentValidation;
+using Microsoft.Extensions.DependencyInjection;
 
 namespace EgitimPlatform.Modules.Exams.Features.AcademicIntelligence;
 
-public class GetStudentAcademicRecommendationHandler(
-    IExamResourceAccess resourceAccess,
-    GetStudentKnowledgeMapHandler knowledgeMapHandler)
+public class GetStudentAcademicRecommendationHandler
 {
+    private readonly IExamResourceAccess _resourceAccess;
+    private readonly GetStudentKnowledgeMapHandler _knowledgeMapHandler;
+    private readonly GetStudentQuestionStyleAnalyticsHandler? _questionStyleAnalyticsHandler;
+
+    public GetStudentAcademicRecommendationHandler(
+        IExamResourceAccess resourceAccess,
+        GetStudentKnowledgeMapHandler knowledgeMapHandler)
+        : this(resourceAccess, knowledgeMapHandler, null)
+    {
+    }
+
+    [ActivatorUtilitiesConstructor]
+    public GetStudentAcademicRecommendationHandler(
+        IExamResourceAccess resourceAccess,
+        GetStudentKnowledgeMapHandler knowledgeMapHandler,
+        GetStudentQuestionStyleAnalyticsHandler? questionStyleAnalyticsHandler)
+    {
+        _resourceAccess = resourceAccess;
+        _knowledgeMapHandler = knowledgeMapHandler;
+        _questionStyleAnalyticsHandler = questionStyleAnalyticsHandler;
+    }
     private static void ValidateQueryParameters(AcademicRecommendationQuery query)
     {
         if (query.RecommendationLimit < AcademicRecommendationPolicy.MinRecommendationLimit ||
@@ -31,7 +51,7 @@ public class GetStudentAcademicRecommendationHandler(
         CancellationToken ct = default)
     {
         ValidateQueryParameters(query);
-        await resourceAccess.ValidateStudentReadAccessAsync(query.StudentId, ct);
+        await _resourceAccess.ValidateStudentReadAccessAsync(query.StudentId, ct);
 
         var classificationQuery = new AcademicClassificationQuery(
             query.StudentId,
@@ -42,7 +62,7 @@ public class GetStudentAcademicRecommendationHandler(
             query.To
         );
 
-        var knowledgeMap = await knowledgeMapHandler.GetKnowledgeMapAsync(classificationQuery, ct);
+        var knowledgeMap = await _knowledgeMapHandler.GetKnowledgeMapAsync(classificationQuery, ct);
 
         List<AcademicRecommendationDto> loCandidates = [];
         List<AcademicRecommendationDto> topicCandidates = [];
@@ -207,8 +227,71 @@ public class GetStudentAcademicRecommendationHandler(
             .Where(s => !topicParentSubjectIds.Contains(s.NodeId))
             .ToList();
 
+        List<AcademicRecommendationDto> questionStyleCandidates = [];
+        if (_questionStyleAnalyticsHandler != null)
+        {
+            var styleQuery = new AcademicIntelligenceQuery(
+                query.StudentId,
+                query.ExamTypeId,
+                query.Limit,
+                query.From,
+                query.To
+            );
+
+            var styleAnalytics = await _questionStyleAnalyticsHandler.HandleAsync(
+                styleQuery,
+                ct,
+                trendWindowSize: query.WindowSize
+            );
+
+            foreach (var style in styleAnalytics)
+            {
+                bool hasEvidence = style.ObservationCount > 0 && style.TotalQuestions > 0;
+                var styleRecType = DetermineRecommendationType(style.ClassificationState, style.TrendDirection, hasEvidence);
+                if (styleRecType.HasValue)
+                {
+                    int score = AcademicRecommendationCalculator.CalculatePriorityScore(
+                        style.ClassificationState,
+                        style.TrendDirection,
+                        style.SuccessRate,
+                        RecommendationNodeType.QuestionStyle
+                    );
+
+                    questionStyleCandidates.Add(new AcademicRecommendationDto(
+                        styleRecType.Value,
+                        RecommendationNodeType.QuestionStyle,
+                        style.QuestionStyleId,
+                        style.Code,
+                        style.Name,
+                        null,
+                        null,
+                        null,
+                        null,
+                        null,
+                        null,
+                        null,
+                        null,
+                        style.ClassificationState,
+                        ClassificationBasis.OverallHistory,
+                        style.SuccessRate,
+                        style.Accuracy,
+                        style.Coverage,
+                        style.TrendDirection,
+                        null,
+                        style.ObservationCount,
+                        style.TotalQuestions,
+                        score,
+                        AcademicClassificationPolicy.CurrentPolicyVersion,
+                        AcademicRecommendationPolicy.CurrentRecommendationPolicyVersion,
+                        IsOrphaned: false
+                    ));
+                }
+            }
+        }
+
         var allCandidates = loCandidates
             .Concat(filteredTopicCandidates)
+            .Concat(questionStyleCandidates)
             .Concat(filteredSubjectCandidates);
 
         return AcademicRecommendationCalculator.SortAndLimitRecommendations(allCandidates, query.RecommendationLimit);

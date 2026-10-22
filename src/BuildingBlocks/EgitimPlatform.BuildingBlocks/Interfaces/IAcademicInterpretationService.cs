@@ -27,6 +27,15 @@ public record AcademicFactPlanSummary(
     decimal UtilizationRate
 );
 
+public record AcademicFactQuestionStyle(
+    Guid QuestionStyleId,
+    string Code,
+    string Name,
+    string ClassificationState,
+    decimal? SuccessRate,
+    string? TrendDirection
+);
+
 public record AcademicFactPackage(
     Guid StudentId,
     string Audience,
@@ -34,7 +43,8 @@ public record AcademicFactPackage(
     IReadOnlyList<AcademicFactTrend> Trends,
     IReadOnlyList<AcademicFactRecommendation> Recommendations,
     AcademicFactPlanSummary? PlanSummary,
-    string FactFingerprint
+    string FactFingerprint,
+    IReadOnlyList<AcademicFactQuestionStyle>? QuestionStyles = null
 );
 
 public record AcademicAiSummaryDto(

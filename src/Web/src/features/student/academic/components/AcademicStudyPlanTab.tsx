@@ -450,7 +450,9 @@ export const AcademicStudyPlanTab: React.FC<AcademicStudyPlanTabProps> = ({
                                 </span>
                               </div>
                               <p className="text-xs text-neutral-500 mt-0.5">
-                                {[session.subjectName, session.topicName, session.subTopicName].filter(Boolean).join(' → ')}
+                                {session.nodeType === 'QuestionStyle'
+                                  ? 'Soru Tarzı Odağı'
+                                  : [session.subjectName, session.topicName, session.subTopicName].filter(Boolean).join(' → ')}
                               </p>
                             </div>
                           </div>
@@ -689,7 +691,9 @@ export const AcademicStudyPlanTab: React.FC<AcademicStudyPlanTabProps> = ({
                                     </span>
                                   </div>
                                   <p className="text-xs text-neutral-500 mt-0.5">
-                                    {[task.subjectName, task.topicName, task.learningOutcomeName].filter(Boolean).join(' → ')}
+                                    {task.nodeType === 'QuestionStyle'
+                                      ? 'Soru Tarzı Odağı'
+                                      : [task.subjectName, task.topicName, task.learningOutcomeName].filter(Boolean).join(' → ')}
                                   </p>
                                 </div>
                               </div>

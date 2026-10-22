@@ -442,7 +442,8 @@ public enum RecommendationNodeType
 {
     Subject,
     Topic,
-    LearningOutcome
+    LearningOutcome,
+    QuestionStyle
 }
 
 public record AcademicRecommendationQuery(

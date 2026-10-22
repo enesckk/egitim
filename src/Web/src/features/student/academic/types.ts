@@ -15,7 +15,7 @@ export type AcademicRecommendationType =
   | 'ReinforceDeveloping'
   | 'MonitorDeclining';
 
-export type RecommendationNodeType = 'Subject' | 'Topic' | 'LearningOutcome';
+export type RecommendationNodeType = 'Subject' | 'Topic' | 'LearningOutcome' | 'QuestionStyle';
 
 export interface StudentSubjectPerformanceDto {
   subjectId: string;

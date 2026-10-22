@@ -65,9 +65,12 @@ export const AcademicPrioritiesTab: React.FC<AcademicPrioritiesTabProps> = ({
       {/* Recommendations List */}
       <div className="space-y-3">
         {recommendations.map((rec, index) => {
-          const breadcrumb = [rec.subjectName, rec.topicName, rec.subTopicName]
-            .filter(Boolean)
-            .join(' → ');
+          const breadcrumb =
+            rec.nodeType === 'QuestionStyle'
+              ? 'Soru Tarzı Odağı'
+              : [rec.subjectName, rec.topicName, rec.subTopicName]
+                  .filter(Boolean)
+                  .join(' → ');
 
           return (
             <Card
