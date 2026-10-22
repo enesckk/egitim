@@ -3,8 +3,17 @@ namespace EgitimPlatform.Modules.Students.Features.ManageParents;
 public record CreateParentCommand(Guid InstitutionId, Guid? UserId, string FirstName, string LastName, string? Phone = null, string? Email = null);
 public record LinkParentCommand(Guid StudentId, Guid ParentId, string RelationshipType);
 public record SetParentRelationshipCommand(Guid RelationshipId, bool IsActive);
-public record ParentDto(Guid Id, string FirstName, string LastName);
-public record StudentParentDto(Guid Id, Guid StudentId, Guid ParentId, string RelationshipType, bool IsActive);
+public record ListParentsQuery(int Page = 1, int PageSize = 50);
+public record ParentDto(Guid Id, string FirstName, string LastName, Guid? UserId = null, string? Phone = null, string? Email = null);
+public record StudentParentDto(Guid Id, Guid StudentId, Guid ParentId, string RelationshipType, bool IsActive, string? ParentFullName = null);
+public class ListParentsQueryValidator : AbstractValidator<ListParentsQuery>
+{
+    public ListParentsQueryValidator()
+    {
+        RuleFor(x => x.Page).InclusiveBetween(1, 100000);
+        RuleFor(x => x.PageSize).InclusiveBetween(1, 200);
+    }
+}
 public class CreateParentValidator : AbstractValidator<CreateParentCommand>
 {
     public CreateParentValidator()

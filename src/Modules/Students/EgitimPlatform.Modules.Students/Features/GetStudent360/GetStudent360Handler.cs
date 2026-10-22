@@ -10,12 +10,13 @@ public class GetStudent360Validator : AbstractValidator<GetStudent360Query>
     public GetStudent360Validator() => RuleFor(x => x.StudentId).NotEmpty();
 }
 public class GetStudent360Handler(IApplicationDbContext db, ICurrentUser user, ICoachStudentQuery assignments,
-    IStudentCoachSummaryQuery coaches, IAcademicCatalog academic, IExamSummaryQuery? examSummary = null)
+    IStudentCoachSummaryQuery coaches, IAcademicCatalog academic, IExamSummaryQuery? examSummary = null,
+    ITeacherStudentQuery? teacherStudentQuery = null)
 {
     public async Task<Student360Dto> HandleAsync(GetStudent360Query query, CancellationToken ct = default)
     {
         await new GetStudent360Validator().ValidateAndThrowAsync(query, ct);
-        var student = await StudentReadAccess.GetAsync(db, user, assignments, query.StudentId, ct);
+        var student = await StudentReadAccess.GetAsync(db, user, assignments, query.StudentId, ct, teacherStudentQuery);
         var goals = await db.Set<StudentGoal>().AsNoTracking()
             .Where(x => x.StudentId == student.Id && x.InstitutionId == student.InstitutionId && x.IsActive)
             .OrderByDescending(x => x.EffectiveDate).ThenBy(x => x.Id)

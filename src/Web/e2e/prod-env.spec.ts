@@ -4,6 +4,7 @@ import fs from 'fs';
 import path from 'path';
 
 test.describe('P1-01: Mandatory Real Vite Production Bundle Environment Tests', () => {
+  test.describe.configure({ mode: 'serial' });
   const webRoot = process.cwd();
 
   test('CASE A: Missing VITE_API_BASE_URL in production build fails closed with zero localhost fallback', () => {

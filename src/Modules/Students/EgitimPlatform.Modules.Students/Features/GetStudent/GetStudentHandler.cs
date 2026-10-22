@@ -12,21 +12,24 @@ public class GetStudentHandler
     private readonly IApplicationDbContext _dbContext;
     private readonly ICurrentUser _currentUser;
     private readonly ICoachStudentQuery _coachStudentQuery;
+    private readonly ITeacherStudentQuery? _teacherStudentQuery;
 
     public GetStudentHandler(
         IApplicationDbContext dbContext,
         ICurrentUser currentUser,
-        ICoachStudentQuery coachStudentQuery)
+        ICoachStudentQuery coachStudentQuery,
+        ITeacherStudentQuery? teacherStudentQuery = null)
     {
         _dbContext = dbContext;
         _currentUser = currentUser;
         _coachStudentQuery = coachStudentQuery;
+        _teacherStudentQuery = teacherStudentQuery;
     }
 
     public async Task<StudentDto> HandleAsync(Guid studentId, CancellationToken ct = default)
     {
         var student = await EgitimPlatform.Modules.Students.Services.StudentReadAccess.GetAsync(
-            _dbContext, _currentUser, _coachStudentQuery, studentId, ct);
+            _dbContext, _currentUser, _coachStudentQuery, studentId, ct, _teacherStudentQuery);
 
         return student.ToDto();
     }

@@ -76,6 +76,7 @@ const StudentDirectoryView = lazy(() => import('@/features/admin/students').then
 const AdminCoachesView = lazy(() => import('@/features/admin/coaches').then((m) => ({ default: m.AdminCoachesView })));
 const AdminTeachersView = lazy(() => import('@/features/admin/teachers').then((m) => ({ default: m.AdminTeachersView })));
 const AdminClassesView = lazy(() => import('@/features/admin/classes').then((m) => ({ default: m.AdminClassesView })));
+const AdminExamsView = lazy(() => import('@/features/admin/exams').then((m) => ({ default: m.AdminExamsView })));
 const AdminReportsView = lazy(() => import('@/features/admin/reports').then((m) => ({ default: m.AdminReportsView })));
 
 
@@ -228,6 +229,12 @@ const ADMIN_NAV_ITEMS: PortalNavItem[] = [
     path: '/admin/classes',
     label: 'Sınıflar',
     icon: <Building2 className="h-5 w-5" />,
+  },
+  {
+    id: 'exams',
+    path: '/admin/exams',
+    label: 'Deneme Sınavları',
+    icon: <FileText className="h-5 w-5" />,
   },
   {
     id: 'questions',
@@ -538,6 +545,7 @@ const AdminPortalLayout: React.FC = () => {
           <Route path="/coaches" element={<AdminCoachesView />} />
           <Route path="/teachers" element={<AdminTeachersView />} />
           <Route path="/classes" element={<AdminClassesView />} />
+          <Route path="/exams" element={<AdminExamsView />} />
           <Route path="/questions" element={<QuestionBankView role="admin" />} />
           <Route path="/exams/:examId/questions" element={<ExamQuestionAssemblyView />} />
           <Route path="/exams/:examId/results/entry" element={<ExamResultEntryView portalRole="admin" />} />

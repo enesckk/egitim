@@ -17,5 +17,21 @@ public class CreateStudentValidator : AbstractValidator<CreateStudentCommand>
         RuleFor(x => x.Email)
             .EmailAddress().When(x => !string.IsNullOrEmpty(x.Email))
             .WithMessage("A valid email is required.");
+
+        RuleFor(x => x.Password)
+            .MinimumLength(8).When(x => !string.IsNullOrEmpty(x.Password))
+            .WithMessage("Password must be at least 8 characters.");
+
+        RuleFor(x => x.UserId)
+            .NotEqual(Guid.Empty).When(x => x.UserId.HasValue);
+
+        RuleFor(x => x.SchoolName)
+            .MaximumLength(200).When(x => !string.IsNullOrEmpty(x.SchoolName));
+
+        RuleFor(x => x.StudentNumber)
+            .MaximumLength(50).When(x => !string.IsNullOrEmpty(x.StudentNumber));
+
+        RuleFor(x => x.GradeLevel)
+            .InclusiveBetween(1, 13).When(x => x.GradeLevel.HasValue);
     }
 }

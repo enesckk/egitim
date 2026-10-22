@@ -19,7 +19,8 @@ public class ExamResourceAccess(
     IApplicationDbContext db,
     ICurrentUser user,
     IStudentDirectory studentDirectory,
-    ICoachStudentQuery coachQuery) : IExamResourceAccess
+    ICoachStudentQuery coachQuery,
+    ITeacherStudentQuery? teacherQuery = null) : IExamResourceAccess
 {
     public async Task<StudentReferenceDto> ValidateStudentReadAccessAsync(Guid studentId, CancellationToken ct = default)
     {
@@ -36,9 +37,14 @@ public class ExamResourceAccess(
                 throw new NotFoundException("Student", studentId); // foreign tenant = 404
         }
 
-        // Teacher role is FAIL CLOSED for student exam results
+        // Teacher role is FAIL CLOSED unless actively assigned via classroom
         if (user.IsInRole(Roles.Teacher) && !user.IsSuperAdmin && !user.IsInRole(Roles.InstitutionAdmin))
-            throw new ForbiddenException("Teacher role cannot access student exam results.");
+        {
+            var teacherInstId = (await user.GetInstitutionIdAsync())!.Value;
+            if (teacherQuery is null || !await teacherQuery.HasActiveAssignmentAsync(user.UserId.Value, teacherInstId, student.Id, ct))
+                throw new ForbiddenException("Teacher role cannot access student exam results.");
+            return student;
+        }
 
         if (user.IsSuperAdmin) return student;
 

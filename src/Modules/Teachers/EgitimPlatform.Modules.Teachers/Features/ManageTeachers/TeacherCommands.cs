@@ -1,11 +1,23 @@
 using FluentValidation;
 namespace EgitimPlatform.Modules.Teachers.Features.ManageTeachers;
-public record CreateTeacherCommand(Guid InstitutionId, Guid UserId, string FirstName, string LastName, string? Title = null);
+public record CreateTeacherCommand(Guid InstitutionId, Guid? UserId, string FirstName, string LastName, string? Title = null, string? Email = null, string? Password = null);
 public record TeacherSubjectCommand(Guid TeacherId, Guid SubjectId);
 public record TeacherDto(Guid Id, string FirstName, string LastName);
 public record TeacherDetailDto(Guid Id, Guid UserId, string FirstName, string LastName, string? Title);
 public record TeacherListDto(Guid Id, string FirstName, string LastName, string? Title);
 public record TeacherSubjectDto(Guid Id, Guid TeacherId, Guid SubjectId);
+public record TeacherSubjectDetailDto(Guid Id, Guid SubjectId, string SubjectName);
+public record TeacherMeDto(
+    Guid Id,
+    Guid UserId,
+    string FirstName,
+    string LastName,
+    string FullName,
+    string? Title,
+    Guid InstitutionId,
+    IReadOnlyList<TeacherSubjectDetailDto> Subjects,
+    int AssignedClassroomCount,
+    int AssignedStudentCount);
 public record ListTeachersQuery(int Page = 1, int PageSize = 50);
 public class ListTeachersQueryValidator : AbstractValidator<ListTeachersQuery>
 {
@@ -19,8 +31,12 @@ public class CreateTeacherValidator : AbstractValidator<CreateTeacherCommand>
 {
     public CreateTeacherValidator()
     {
-        RuleFor(x => x.InstitutionId).NotEmpty(); RuleFor(x => x.UserId).NotEmpty();
-        RuleFor(x => x.FirstName).NotEmpty().MaximumLength(100); RuleFor(x => x.LastName).NotEmpty().MaximumLength(100);
+        RuleFor(x => x.InstitutionId).NotEmpty();
+        RuleFor(x => x.UserId).NotEmpty().When(x => string.IsNullOrEmpty(x.Email));
+        RuleFor(x => x.Email).EmailAddress().When(x => !string.IsNullOrEmpty(x.Email));
+        RuleFor(x => x.Password).MinimumLength(8).When(x => !string.IsNullOrEmpty(x.Password));
+        RuleFor(x => x.FirstName).NotEmpty().MaximumLength(100);
+        RuleFor(x => x.LastName).NotEmpty().MaximumLength(100);
         RuleFor(x => x.Title).MaximumLength(50);
     }
 }

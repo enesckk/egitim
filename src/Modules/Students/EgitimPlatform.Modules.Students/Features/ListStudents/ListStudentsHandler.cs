@@ -13,15 +13,18 @@ public class ListStudentsHandler
     private readonly IApplicationDbContext _dbContext;
     private readonly ICurrentUser _currentUser;
     private readonly ICoachStudentQuery _coachStudentQuery;
+    private readonly ITeacherStudentQuery? _teacherStudentQuery;
 
     public ListStudentsHandler(
         IApplicationDbContext dbContext,
         ICurrentUser currentUser,
-        ICoachStudentQuery coachStudentQuery)
+        ICoachStudentQuery coachStudentQuery,
+        ITeacherStudentQuery? teacherStudentQuery = null)
     {
         _dbContext = dbContext;
         _currentUser = currentUser;
         _coachStudentQuery = coachStudentQuery;
+        _teacherStudentQuery = teacherStudentQuery;
     }
 
     public async Task<PaginatedList<StudentDto>> HandleAsync(ListStudentsQuery query, CancellationToken ct = default)
@@ -69,8 +72,16 @@ public class ListStudentsHandler
         }
         else if (_currentUser.IsInRole(Roles.Teacher))
         {
-            // Teacher/Parent: no relationship defined yet (Sprint 2) — default deny
-            throw new ForbiddenException("Access not yet available for this role.");
+            if (_currentUser.UserId is null || !institutionId.HasValue)
+                throw new ForbiddenException("Teacher must have an institution context.");
+
+            if (_teacherStudentQuery is null)
+                throw new ForbiddenException("Access not yet available for this role.");
+
+            var assignedIds = await _teacherStudentQuery.GetActiveAssignedStudentIdsAsync(
+                _currentUser.UserId.Value, institutionId.Value, ct);
+
+            source = source.Where(s => s.InstitutionId == institutionId.Value && assignedIds.Contains(s.Id));
         }
         else
         {

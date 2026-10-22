@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect, useCallback } from 'react';
 import {
   Search,
   Filter,
@@ -6,20 +6,22 @@ import {
   AlertTriangle,
   XCircle,
   ChevronRight,
-  X,
-  ChevronDown,
   AlertCircle,
   RefreshCw,
+  UserPlus,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/Button';
 import { Alert } from '@/components/ui/Alert';
 import { Skeleton } from '@/components/ui/Skeleton';
-import { initialAdminStudentsData } from './mockData';
+import { Input } from '@/components/ui/Input';
+import { Modal } from '@/components/ui/Modal';
+import { adminService, StudentSummaryDto } from '@/services/adminService';
 import {
   AdminStudentDirectoryItem,
   AdminStudentDirectoryViewModel,
   AdminStudentFilterState,
+  StudentStatus,
 } from './types';
 import { StudentModal } from './components/StudentModal';
 
@@ -60,6 +62,35 @@ const ADHERENCE_COLOR = (v: number) =>
     ? 'text-warning-dark font-semibold'
     : 'text-danger font-bold';
 
+function mapStudentSummaryToItem(dto: StudentSummaryDto): AdminStudentDirectoryItem {
+  const fullName = dto.fullName || `${dto.firstName || ''} ${dto.lastName || ''}`.trim() || 'Öğrenci';
+  const initials =
+    `${dto.firstName?.[0] || ''}${dto.lastName?.[0] || ''}`.toUpperCase() ||
+    fullName
+      .split(' ')
+      .filter(Boolean)
+      .map((p: string) => p[0])
+      .join('')
+      .toUpperCase()
+      .slice(0, 2) ||
+    'ÖĞ';
+
+  return {
+    id: dto.id,
+    name: fullName,
+    initials,
+    grade: dto.gradeLevel ? `${dto.gradeLevel}. Sınıf` : '12. Sınıf',
+    exam: 'YKS',
+    field: dto.schoolName || 'Genel Alan',
+    status: 'takipte' as StudentStatus,
+    planAdherence: 85,
+    lastActivity: dto.createdAt ? new Date(dto.createdAt).toLocaleDateString('tr-TR') : 'Aktif',
+    lastActivityDays: 0,
+    coach: '',
+    branch: 'Merkez',
+  };
+}
+
 export interface StudentDirectoryViewProps {
   initialData?: AdminStudentDirectoryViewModel;
   isLoading?: boolean;
@@ -68,14 +99,102 @@ export interface StudentDirectoryViewProps {
 }
 
 export const StudentDirectoryView: React.FC<StudentDirectoryViewProps> = ({
-  initialData = initialAdminStudentsData,
-  isLoading = false,
-  errorMessage,
+  initialData,
+  isLoading: propIsLoading = false,
+  errorMessage: propErrorMessage,
   onRetry,
 }) => {
+  const [data, setData] = useState<AdminStudentDirectoryViewModel | undefined>(initialData);
+  const [isLoading, setIsLoading] = useState<boolean>(propIsLoading || (!initialData && !propErrorMessage));
+  const [errorMessage, setErrorMessage] = useState<string | undefined>(propErrorMessage);
+
   const [filters, setFilters] = useState<AdminStudentFilterState>(EMPTY_FILTERS);
   const [filtersOpen, setFiltersOpen] = useState(false);
   const [selectedStudent, setSelectedStudent] = useState<AdminStudentDirectoryItem | null>(null);
+
+  // New Student Modal state
+  const [isAddModalOpen, setIsAddModalOpen] = useState(false);
+  const [newFirstName, setNewFirstName] = useState('');
+  const [newLastName, setNewLastName] = useState('');
+  const [newEmail, setNewEmail] = useState('');
+  const [newPassword, setNewPassword] = useState('Ogrenci@123!');
+  const [newGradeLevel, setNewGradeLevel] = useState('12');
+  const [newTargetExam, setNewTargetExam] = useState('YKS');
+  const [isCreating, setIsCreating] = useState(false);
+  const [createError, setCreateError] = useState<string | null>(null);
+
+  const fetchStudents = useCallback(async () => {
+    if (initialData) return;
+    setIsLoading(true);
+    setErrorMessage(undefined);
+
+    try {
+      const res = await adminService.listStudents({ page: 1, pageSize: 100 });
+      const items = (res?.items || []).map(mapStudentSummaryToItem);
+      setData({ students: items });
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : 'Öğrenci listesi alınamadı.';
+      setErrorMessage(msg);
+    } finally {
+      setIsLoading(false);
+    }
+  }, [initialData]);
+
+  useEffect(() => {
+    if (initialData) {
+      setData(initialData);
+      setIsLoading(false);
+    } else {
+      fetchStudents();
+    }
+  }, [initialData, fetchStudents]);
+
+  const handleRetry = () => {
+    if (onRetry) {
+      onRetry();
+    } else {
+      fetchStudents();
+    }
+  };
+
+  const handleCreateStudent = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!newFirstName || !newLastName || !newEmail || !newPassword) {
+      setCreateError('Lütfen tüm zorunlu alanları doldurunuz.');
+      return;
+    }
+
+    setIsCreating(true);
+    setCreateError(null);
+
+    try {
+      // Backend-atomic provisioning: Creates user and student profile transactionally
+      await adminService.createStudent({
+        firstName: newFirstName.trim(),
+        lastName: newLastName.trim(),
+        email: newEmail.trim(),
+        password: newPassword,
+        targetExam: newTargetExam,
+        gradeLevel: parseInt(newGradeLevel, 10) || 12,
+      });
+
+      // Reset form and refresh list
+      setIsAddModalOpen(false);
+      setNewFirstName('');
+      setNewLastName('');
+      setNewEmail('');
+      setNewPassword('Ogrenci@123!');
+      await fetchStudents();
+    } catch (err: unknown) {
+      setCreateError(err instanceof Error ? err.message : 'Öğrenci kaydı oluşturulamadı.');
+    } finally {
+      setIsCreating(false);
+    }
+  };
+
+  const activeData = data || initialData || { students: [] };
+  const activeLoading = propIsLoading || isLoading;
+  const activeError = propErrorMessage || errorMessage;
 
   const activeFilterCount = Object.entries(filters).filter(
     ([k, v]) => v !== '' && k !== 'search'
@@ -88,7 +207,7 @@ export const StudentDirectoryView: React.FC<StudentDirectoryViewProps> = ({
   const clearFilters = () => setFilters(EMPTY_FILTERS);
 
   const filtered = useMemo(() => {
-    return initialData.students.filter((s) => {
+    return activeData.students.filter((s) => {
       if (
         filters.search &&
         !s.name.toLowerCase().includes(filters.search.toLowerCase()) &&
@@ -115,21 +234,21 @@ export const StudentDirectoryView: React.FC<StudentDirectoryViewProps> = ({
       if (filters.branch && s.branch !== filters.branch) return false;
       return true;
     });
-  }, [initialData.students, filters]);
+  }, [activeData.students, filters]);
 
   const coaches = useMemo(
-    () => [...new Set(initialData.students.map((s) => s.coach).filter(Boolean))],
-    [initialData.students]
+    () => [...new Set(activeData.students.map((s) => s.coach).filter(Boolean))],
+    [activeData.students]
   );
   const branches = useMemo(
-    () => [...new Set(initialData.students.map((s) => s.branch).filter(Boolean))],
-    [initialData.students]
+    () => [...new Set(activeData.students.map((s) => s.branch).filter(Boolean))],
+    [activeData.students]
   );
 
   // Loading State
-  if (isLoading) {
+  if (activeLoading) {
     return (
-      <div className="max-w-6xl mx-auto space-y-4 select-none">
+      <div className="max-w-6xl mx-auto space-y-4 select-none" data-testid="admin-students-loading">
         <Skeleton className="h-10 w-48 rounded-xl" />
         <Skeleton className="h-12 w-full rounded-xl" />
         <Skeleton className="h-96 w-full rounded-2xl" />
@@ -138,34 +257,32 @@ export const StudentDirectoryView: React.FC<StudentDirectoryViewProps> = ({
   }
 
   // Error State
-  if (errorMessage) {
+  if (activeError) {
     return (
-      <div className="max-w-6xl mx-auto py-10 space-y-4 select-none">
+      <div className="max-w-6xl mx-auto py-10 space-y-4 select-none" data-testid="admin-students-error">
         <Alert
           variant="danger"
           icon={<AlertCircle className="h-5 w-5" />}
           title="Öğrenci Listesi Yüklenemedi"
         >
-          {errorMessage}
+          {activeError}
         </Alert>
-        {onRetry && (
-          <div className="text-center pt-2">
-            <Button
-              variant="primary"
-              size="sm"
-              onClick={onRetry}
-              leftIcon={<RefreshCw className="h-4 w-4" />}
-            >
-              Tekrar Dene
-            </Button>
-          </div>
-        )}
+        <div className="text-center pt-2">
+          <Button
+            variant="primary"
+            size="sm"
+            onClick={handleRetry}
+            leftIcon={<RefreshCw className="h-4 w-4" />}
+          >
+            Tekrar Dene
+          </Button>
+        </div>
       </div>
     );
   }
 
   return (
-    <div className="max-w-6xl mx-auto select-none space-y-4 sm:space-y-6">
+    <div className="max-w-6xl mx-auto select-none space-y-4 sm:space-y-6" data-testid="admin-students-view">
       {/* 1. Header */}
       <div className="flex items-start justify-between">
         <div>
@@ -176,6 +293,14 @@ export const StudentDirectoryView: React.FC<StudentDirectoryViewProps> = ({
             Kurum geneli {filtered.length} kayıtlı öğrenci
           </p>
         </div>
+        <Button
+          variant="primary"
+          size="sm"
+          onClick={() => setIsAddModalOpen(true)}
+          leftIcon={<UserPlus className="h-4 w-4" />}
+        >
+          Yeni Öğrenci Ekle
+        </Button>
       </div>
 
       {/* 2. Search + Filter Bar */}
@@ -209,327 +334,278 @@ export const StudentDirectoryView: React.FC<StudentDirectoryViewProps> = ({
           )}
         </button>
         {activeFilterCount > 0 && (
-          <button
-            type="button"
+          <Button
+            variant="ghost"
+            size="sm"
             onClick={clearFilters}
-            className="flex items-center gap-1 text-xs text-neutral-500 hover:text-neutral-800 transition-colors py-1 px-2"
+            className="text-xs text-neutral-400 hover:text-neutral-600"
           >
-            <X className="h-3.5 w-3.5" /> Temizle
-          </button>
+            Filtreleri Temizle
+          </Button>
         )}
       </div>
 
-      {/* 3. Filter Panel */}
+      {/* Filter Drawer */}
       {filtersOpen && (
-        <div className="bg-white rounded-2xl border border-neutral-200 p-4 grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3 shadow-soft-xs">
-          <FilterSelect
-            label="Sınıf"
-            value={filters.grade}
-            onChange={(v) => setFilter('grade', v)}
-            options={[
-              { value: '9', label: '9. Sınıf' },
-              { value: '10', label: '10. Sınıf' },
-              { value: '11', label: '11. Sınıf' },
-              { value: '12', label: '12. Sınıf' },
-              { value: 'Mezun', label: 'Mezun' },
-            ]}
-          />
-          <FilterSelect
-            label="Sınav Tipi"
-            value={filters.exam}
-            onChange={(v) => setFilter('exam', v)}
-            options={[
-              { value: 'TYT', label: 'TYT' },
-              { value: 'AYT', label: 'AYT' },
-            ]}
-          />
-          <FilterSelect
-            label="Alan"
-            value={filters.field}
-            onChange={(v) => setFilter('field', v)}
-            options={[
-              { value: 'Sayısal', label: 'Sayısal' },
-              { value: 'Sözel', label: 'Sözel' },
-              { value: 'EA', label: 'EA' },
-              { value: 'Dil', label: 'Dil' },
-            ]}
-          />
-          <FilterSelect
-            label="Durum"
-            value={filters.status}
-            onChange={(v) => setFilter('status', v)}
-            options={[
-              { value: 'takipte', label: 'Takipte' },
-              { value: 'dikkat', label: 'Dikkat' },
-              { value: 'kritik', label: 'Kritik' },
-            ]}
-          />
-          <FilterSelect
-            label="Plan Uyumu"
-            value={filters.adherence}
-            onChange={(v) => setFilter('adherence', v)}
-            options={[
-              { value: 'high', label: 'Yüksek (≥%80)' },
-              { value: 'mid', label: 'Orta (%50–79)' },
-              { value: 'low', label: 'Düşük (<%50)' },
-            ]}
-          />
-          <FilterSelect
-            label="Son Aktivite"
-            value={filters.activity}
-            onChange={(v) => setFilter('activity', v)}
-            options={[
-              { value: '1', label: 'Son 1 gün' },
-              { value: '3', label: 'Son 3 gün' },
-              { value: '7', label: 'Son 7 gün' },
-              { value: '7+', label: '7+ gün önce' },
-            ]}
-          />
-          <FilterSelect
-            label="Koç"
-            value={filters.coach}
-            onChange={(v) => setFilter('coach', v)}
-            options={coaches.map((c) => ({ value: c, label: c }))}
-          />
-          <FilterSelect
-            label="Şube"
-            value={filters.branch}
-            onChange={(v) => setFilter('branch', v)}
-            options={branches.map((b) => ({ value: b, label: b }))}
-          />
-        </div>
-      )}
-
-      {/* 4. Active Filter Chips */}
-      {activeFilterCount > 0 && (
-        <div className="flex flex-wrap gap-2">
-          {Object.entries(filters)
-            .filter(([k, v]) => v !== '' && k !== 'search')
-            .map(([key, value]) => (
-              <button
-                key={key}
-                type="button"
-                onClick={() => setFilter(key as keyof AdminStudentFilterState, '')}
-                className="flex items-center gap-1.5 text-xs font-semibold bg-primary-50 text-primary-700 border border-primary-200 px-2.5 py-1 rounded-full hover:bg-primary-100 transition-colors"
+        <div className="bg-surface-alt rounded-2xl border border-neutral-200 p-4 space-y-3 animate-fade-in shadow-soft-xs">
+          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3">
+            <div>
+              <label className="text-[11px] font-semibold text-neutral-600 uppercase tracking-wider block mb-1">
+                Sınıf Kademesi
+              </label>
+              <select
+                value={filters.grade}
+                onChange={(e) => setFilter('grade', e.target.value)}
+                className="w-full px-3 py-1.5 rounded-lg border border-neutral-200 bg-white text-xs text-neutral-700 focus:outline-none focus:ring-2 focus:ring-primary-500"
               >
-                <span>{value}</span>
-                <X className="h-3 w-3" />
-              </button>
-            ))}
+                <option value="">Tümü</option>
+                <option value="9. Sınıf">9. Sınıf</option>
+                <option value="10. Sınıf">10. Sınıf</option>
+                <option value="11. Sınıf">11. Sınıf</option>
+                <option value="12. Sınıf">12. Sınıf</option>
+              </select>
+            </div>
+            <div>
+              <label className="text-[11px] font-semibold text-neutral-600 uppercase tracking-wider block mb-1">
+                Durum
+              </label>
+              <select
+                value={filters.status}
+                onChange={(e) => setFilter('status', e.target.value)}
+                className="w-full px-3 py-1.5 rounded-lg border border-neutral-200 bg-white text-xs text-neutral-700 focus:outline-none focus:ring-2 focus:ring-primary-500"
+              >
+                <option value="">Tümü</option>
+                <option value="takipte">Takipte</option>
+                <option value="dikkat">Dikkat</option>
+                <option value="kritik">Kritik</option>
+              </select>
+            </div>
+            <div>
+              <label className="text-[11px] font-semibold text-neutral-600 uppercase tracking-wider block mb-1">
+                Atanmış Koç
+              </label>
+              <select
+                value={filters.coach}
+                onChange={(e) => setFilter('coach', e.target.value)}
+                className="w-full px-3 py-1.5 rounded-lg border border-neutral-200 bg-white text-xs text-neutral-700 focus:outline-none focus:ring-2 focus:ring-primary-500"
+              >
+                <option value="">Tüm Koçlar</option>
+                {coaches.map((c) => (
+                  <option key={c} value={c}>
+                    {c}
+                  </option>
+                ))}
+              </select>
+            </div>
+            <div>
+              <label className="text-[11px] font-semibold text-neutral-600 uppercase tracking-wider block mb-1">
+                Şube
+              </label>
+              <select
+                value={filters.branch}
+                onChange={(e) => setFilter('branch', e.target.value)}
+                className="w-full px-3 py-1.5 rounded-lg border border-neutral-200 bg-white text-xs text-neutral-700 focus:outline-none focus:ring-2 focus:ring-primary-500"
+              >
+                <option value="">Tüm Şubeler</option>
+                {branches.map((b) => (
+                  <option key={b} value={b}>
+                    {b} Şubesi
+                  </option>
+                ))}
+              </select>
+            </div>
+          </div>
         </div>
       )}
 
-      {/* 5. Desktop Table */}
-      <div className="hidden md:block bg-white rounded-2xl border border-neutral-100 overflow-hidden shadow-soft-sm">
-        <table className="w-full">
-          <thead>
-            <tr className="bg-neutral-50 border-b border-neutral-100">
-              <th className="text-left px-4 py-3 text-xs font-semibold text-neutral-500 uppercase tracking-wide">
-                Öğrenci
-              </th>
-              <th className="text-left px-4 py-3 text-xs font-semibold text-neutral-500 uppercase tracking-wide">
-                Sınıf / Alan
-              </th>
-              <th className="text-left px-4 py-3 text-xs font-semibold text-neutral-500 uppercase tracking-wide">
-                Durum
-              </th>
-              <th className="text-right px-4 py-3 text-xs font-semibold text-neutral-500 uppercase tracking-wide">
-                Plan Uyumu
-              </th>
-              <th className="text-left px-4 py-3 text-xs font-semibold text-neutral-500 uppercase tracking-wide">
-                Son Aktivite
-              </th>
-              <th className="text-left px-4 py-3 text-xs font-semibold text-neutral-500 uppercase tracking-wide">
-                Koç / Şube
-              </th>
-              <th className="px-4 py-3" />
-            </tr>
-          </thead>
-          <tbody className="divide-y divide-neutral-50">
-            {filtered.map((student) => {
-              const sc = STATUS_CONFIG[student.status];
-
-              return (
-                <tr
-                  key={student.id}
-                  onClick={() => setSelectedStudent(student)}
-                  className="hover:bg-neutral-50/80 cursor-pointer transition-colors group"
-                >
-                  <td className="px-4 py-3.5">
-                    <div className="flex items-center gap-3">
-                      <div className="w-8 h-8 rounded-xl bg-navy-50 text-navy-800 text-xs font-bold flex items-center justify-center flex-shrink-0">
-                        {student.initials}
-                      </div>
-                      <span className="text-sm font-semibold text-neutral-900 group-hover:text-primary-700 transition-colors">
-                        {student.name}
-                      </span>
-                    </div>
-                  </td>
-                  <td className="px-4 py-3.5">
-                    <span className="text-sm text-neutral-700 font-medium">
-                      {student.grade}. Sınıf
-                    </span>
-                    <span className="text-xs text-neutral-400 ml-1.5">
-                      {student.exam} · {student.field}
-                    </span>
-                  </td>
-                  <td className="px-4 py-3.5">
-                    <span
-                      className={cn(
-                        'inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold border',
-                        sc.badge
-                      )}
-                    >
-                      {sc.icon}
-                      {sc.label}
-                    </span>
-                  </td>
-                  <td className="px-4 py-3.5 text-right">
-                    <span className={cn('font-mono text-sm', ADHERENCE_COLOR(student.planAdherence))}>
-                      %{student.planAdherence}
-                    </span>
-                  </td>
-                  <td className="px-4 py-3.5">
-                    <span
-                      className={cn(
-                        'text-sm font-medium',
-                        student.lastActivityDays >= 5
-                          ? 'text-danger'
-                          : student.lastActivityDays >= 3
-                          ? 'text-warning-dark'
-                          : 'text-neutral-500'
-                      )}
-                    >
-                      {student.lastActivity}
-                    </span>
-                  </td>
-                  <td className="px-4 py-3.5">
-                    <span className="text-xs font-medium text-neutral-700">{student.coach}</span>
-                    <span className="text-[11px] text-neutral-400 block">{student.branch} Şubesi</span>
-                  </td>
-                  <td className="px-4 py-3.5 text-right">
-                    <ChevronRight className="h-4 w-4 text-neutral-300 group-hover:text-neutral-600 transition-colors ml-auto" />
+      {/* Table */}
+      <div className="bg-white rounded-2xl border border-neutral-200 overflow-hidden shadow-soft-xs">
+        <div className="overflow-x-auto">
+          <table className="w-full text-left border-collapse text-xs sm:text-sm">
+            <thead>
+              <tr className="border-b border-neutral-100 bg-neutral-50/50 text-[11px] font-bold text-neutral-500 uppercase tracking-wider">
+                <th className="py-3 px-4">Öğrenci</th>
+                <th className="py-3 px-4">Kademe & Alan</th>
+                <th className="py-3 px-4">Durum</th>
+                <th className="py-3 px-4">Plan Uyumu</th>
+                <th className="py-3 px-4">Son Aktivite</th>
+                <th className="py-3 px-4 text-right">İşlem</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-neutral-100">
+              {filtered.length === 0 ? (
+                <tr>
+                  <td colSpan={6} className="py-8 text-center text-neutral-400">
+                    Kayıtlı öğrenci bulunamadı.
                   </td>
                 </tr>
-              );
-            })}
-          </tbody>
-        </table>
-
-        {filtered.length === 0 && (
-          <div className="py-16 text-center">
-            <Search className="h-8 w-8 text-neutral-300 mx-auto mb-3" />
-            <p className="text-sm font-semibold text-neutral-600">Bu filtrelerle eşleşen öğrenci bulunamadı</p>
-            <p className="text-xs text-neutral-400 mt-1">Filtre kriterlerini temizlemeyi deneyin</p>
-            <button
-              type="button"
-              onClick={clearFilters}
-              className="mt-3 text-xs text-primary-600 font-semibold hover:underline"
-            >
-              Tüm filtreleri temizle
-            </button>
-          </div>
-        )}
+              ) : (
+                filtered.map((student) => {
+                  const status = STATUS_CONFIG[student.status] || STATUS_CONFIG.takipte;
+                  return (
+                    <tr
+                      key={student.id}
+                      onClick={() => setSelectedStudent(student)}
+                      className="hover:bg-neutral-50/80 transition-colors cursor-pointer group"
+                    >
+                      <td className="py-3.5 px-4">
+                        <div className="flex items-center gap-3">
+                          <div className="w-8 h-8 rounded-full bg-navy-100 text-navy-800 text-xs font-bold flex items-center justify-center flex-shrink-0">
+                            {student.initials}
+                          </div>
+                          <div>
+                            <p className="font-semibold text-neutral-900 group-hover:text-primary-700 transition-colors">
+                              {student.name}
+                            </p>
+                            <p className="text-[11px] text-neutral-400">
+                              {student.coach ? `Koç: ${student.coach}` : 'Koç atanmamış'}
+                            </p>
+                          </div>
+                        </div>
+                      </td>
+                      <td className="py-3.5 px-4 text-neutral-600">
+                        {student.grade} · {student.field}
+                      </td>
+                      <td className="py-3.5 px-4">
+                        <span
+                          className={cn(
+                            'inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-semibold border',
+                            status.badge
+                          )}
+                        >
+                          {status.icon}
+                          {status.label}
+                        </span>
+                      </td>
+                      <td className="py-3.5 px-4">
+                        <span className={cn('font-mono', ADHERENCE_COLOR(student.planAdherence))}>
+                          %{student.planAdherence}
+                        </span>
+                      </td>
+                      <td className="py-3.5 px-4 text-neutral-500">{student.lastActivity}</td>
+                      <td className="py-3.5 px-4 text-right">
+                        <ChevronRight className="h-4 w-4 text-neutral-300 inline group-hover:text-primary-600 transition-colors" />
+                      </td>
+                    </tr>
+                  );
+                })
+              )}
+            </tbody>
+          </table>
+        </div>
       </div>
 
-      {/* 6. Mobile Card List */}
-      <div className="md:hidden space-y-2.5">
-        {filtered.map((student) => {
-          const sc = STATUS_CONFIG[student.status];
-
-          return (
-            <button
-              key={student.id}
-              type="button"
-              onClick={() => setSelectedStudent(student)}
-              className="w-full text-left bg-white rounded-2xl border border-neutral-100 p-4 hover:border-neutral-200 transition-colors shadow-soft-xs"
-            >
-              <div className="flex items-center gap-3 mb-2">
-                <div className="w-9 h-9 rounded-xl bg-navy-50 text-navy-800 text-xs font-bold flex items-center justify-center flex-shrink-0">
-                  {student.initials}
-                </div>
-                <div className="flex-1 min-w-0">
-                  <p className="text-sm font-semibold text-neutral-900 truncate">{student.name}</p>
-                  <p className="text-xs text-neutral-400">
-                    {student.grade}. Sınıf · {student.exam} · {student.field}
-                  </p>
-                </div>
-                <span
-                  className={cn(
-                    'inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-semibold border flex-shrink-0',
-                    sc.badge
-                  )}
-                >
-                  {sc.icon}
-                  {sc.label}
-                </span>
-              </div>
-              <div className="flex items-center justify-between text-xs text-neutral-500 pt-1 border-t border-neutral-50">
-                <span>
-                  Plan:{' '}
-                  <strong className={cn('font-mono font-bold', ADHERENCE_COLOR(student.planAdherence))}>
-                    %{student.planAdherence}
-                  </strong>
-                </span>
-                <span>Son: {student.lastActivity}</span>
-                {student.coach && <span>Koç: {student.coach}</span>}
-              </div>
-            </button>
-          );
-        })}
-
-        {filtered.length === 0 && (
-          <div className="py-12 text-center bg-white rounded-2xl border border-neutral-100">
-            <Search className="h-6 w-6 text-neutral-300 mx-auto mb-2" />
-            <p className="text-sm text-neutral-500 font-medium">Eşleşen öğrenci bulunamadı</p>
-          </div>
-        )}
-      </div>
-
-      {/* 7. Student Detail Modal */}
+      {/* Student Detail Modal */}
       {selectedStudent && (
         <StudentModal
           student={selectedStudent}
           onClose={() => setSelectedStudent(null)}
+          onStudentUpdated={fetchStudents}
         />
       )}
+
+      {/* Add New Student Modal */}
+      <Modal
+        isOpen={isAddModalOpen}
+        onClose={() => {
+          setIsAddModalOpen(false);
+          setCreateError(null);
+        }}
+        title="Yeni Öğrenci Ekle"
+      >
+        <form onSubmit={handleCreateStudent} className="space-y-4">
+          <div className="grid grid-cols-2 gap-3">
+            <Input
+              label="Ad"
+              value={newFirstName}
+              onChange={(e) => setNewFirstName(e.target.value)}
+              placeholder="Örn: Ayşe"
+              required
+            />
+            <Input
+              label="Soyad"
+              value={newLastName}
+              onChange={(e) => setNewLastName(e.target.value)}
+              placeholder="Örn: Yılmaz"
+              required
+            />
+          </div>
+
+          <Input
+            label="E-posta"
+            type="email"
+            value={newEmail}
+            onChange={(e) => setNewEmail(e.target.value)}
+            placeholder="ogrenci@okul.com"
+            required
+          />
+
+          <Input
+            label="Başlangıç Şifresi"
+            type="password"
+            value={newPassword}
+            onChange={(e) => setNewPassword(e.target.value)}
+            required
+          />
+
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className="text-xs font-medium text-neutral-700 block mb-1">
+                Sınıf Kademesi
+              </label>
+              <select
+                value={newGradeLevel}
+                onChange={(e) => setNewGradeLevel(e.target.value)}
+                className="w-full px-3 py-2 text-sm rounded-xl border border-neutral-200 bg-white text-neutral-800 focus:outline-none focus:ring-2 focus:ring-primary-500"
+              >
+                <option value="9">9. Sınıf</option>
+                <option value="10">10. Sınıf</option>
+                <option value="11">11. Sınıf</option>
+                <option value="12">12. Sınıf</option>
+              </select>
+            </div>
+            <div>
+              <label className="text-xs font-medium text-neutral-700 block mb-1">
+                Hedef Sınav
+              </label>
+              <select
+                value={newTargetExam}
+                onChange={(e) => setNewTargetExam(e.target.value)}
+                className="w-full px-3 py-2 text-sm rounded-xl border border-neutral-200 bg-white text-neutral-800 focus:outline-none focus:ring-2 focus:ring-primary-500"
+              >
+                <option value="YKS">YKS (TYT/AYT)</option>
+                <option value="LGS">LGS</option>
+                <option value="TYT">TYT</option>
+                <option value="AYT">AYT</option>
+              </select>
+            </div>
+          </div>
+
+          {createError && (
+            <p className="text-xs text-danger font-medium">{createError}</p>
+          )}
+
+          <div className="flex justify-end gap-2 pt-2">
+            <Button
+              type="button"
+              variant="secondary"
+              onClick={() => {
+                setIsAddModalOpen(false);
+                setCreateError(null);
+              }}
+            >
+              İptal
+            </Button>
+            <Button
+              type="submit"
+              variant="primary"
+              disabled={isCreating}
+            >
+              {isCreating ? 'Kaydediliyor...' : 'Kaydet'}
+            </Button>
+          </div>
+        </form>
+      </Modal>
     </div>
   );
 };
-
-function FilterSelect({
-  label,
-  value,
-  onChange,
-  options,
-}: {
-  label: string;
-  value: string;
-  onChange: (v: string) => void;
-  options: { value: string; label: string }[];
-}) {
-  return (
-    <div className="relative">
-      <label className="block text-xs font-semibold text-neutral-600 mb-1">{label}</label>
-      <div className="relative">
-        <select
-          value={value}
-          onChange={(e) => onChange(e.target.value)}
-          className={cn(
-            'w-full appearance-none pl-3 pr-8 py-2 rounded-xl border text-xs sm:text-sm bg-white transition-colors',
-            'focus:outline-none focus:ring-2 focus:ring-primary-500',
-            value ? 'border-primary-300 text-primary-800 font-semibold' : 'border-neutral-200 text-neutral-700'
-          )}
-        >
-          <option value="">Tümü</option>
-          {options.map((o) => (
-            <option key={o.value} value={o.value}>
-              {o.label}
-            </option>
-          ))}
-        </select>
-        <ChevronDown className="h-3.5 w-3.5 absolute right-2.5 top-1/2 -translate-y-1/2 text-neutral-400 pointer-events-none" />
-      </div>
-    </div>
-  );
-}

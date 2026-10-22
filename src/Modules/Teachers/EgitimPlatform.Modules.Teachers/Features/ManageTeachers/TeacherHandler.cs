@@ -6,7 +6,7 @@ using EgitimPlatform.Modules.Teachers.Entities;
 using FluentValidation;
 using Microsoft.EntityFrameworkCore;
 namespace EgitimPlatform.Modules.Teachers.Features.ManageTeachers;
-public class TeacherHandler(IApplicationDbContext db, ICurrentUser user, IUserDirectory users, IAcademicCatalog academic, IAuditService audit)
+public class TeacherHandler(IApplicationDbContext db, ICurrentUser user, IUserDirectory users, IAcademicCatalog academic, IAuditService audit, IUserProvisioner? userProvisioner = null)
 {
     public async Task<TeacherDetailDto> GetAsync(Guid teacherId, CancellationToken ct)
     {
@@ -22,6 +22,55 @@ public class TeacherHandler(IApplicationDbContext db, ICurrentUser user, IUserDi
             .Select(x => new TeacherDetailDto(x.Id, x.UserId, x.FirstName, x.LastName, x.Title))
             .SingleOrDefaultAsync(ct) ?? throw new NotFoundException("Teacher", teacherId);
         return teacher;
+    }
+    public async Task<TeacherMeDto> GetMeAsync(CancellationToken ct = default)
+    {
+        if (!user.IsAuthenticated || user.UserId is null)
+            throw new ForbiddenException("Access denied.");
+
+        var institutionId = await user.GetInstitutionIdAsync();
+        if (!institutionId.HasValue)
+            throw new ForbiddenException("Institution context required.");
+
+        var teacher = await db.Set<Teacher>().AsNoTracking()
+            .FirstOrDefaultAsync(t => t.UserId == user.UserId.Value && t.InstitutionId == institutionId.Value && !t.IsDeleted, ct)
+            ?? throw new NotFoundException("Teacher profile not found for user.");
+
+        var subjects = await db.Set<TeacherSubject>().AsNoTracking()
+            .Where(ts => ts.TeacherId == teacher.Id && ts.InstitutionId == teacher.InstitutionId && !ts.IsDeleted)
+            .ToListAsync(ct);
+
+        var subjectIds = subjects.Select(s => s.SubjectId).Distinct().ToList();
+        var subjectNames = await academic.GetSubjectNamesAsync(subjectIds, ct);
+
+        var subjectDtos = subjects.Select(s => new TeacherSubjectDetailDto(
+            s.Id,
+            s.SubjectId,
+            subjectNames.GetValueOrDefault(s.SubjectId, "Unknown Subject"))).ToList();
+
+        var classroomIds = await db.Set<ClassroomTeacher>().AsNoTracking()
+            .Where(ctLink => ctLink.TeacherId == teacher.Id && ctLink.InstitutionId == teacher.InstitutionId && !ctLink.IsDeleted)
+            .Select(ctLink => ctLink.ClassroomId)
+            .Distinct()
+            .ToListAsync(ct);
+
+        var studentCount = await db.Set<ClassroomStudent>().AsNoTracking()
+            .Where(cs => classroomIds.Contains(cs.ClassroomId) && cs.InstitutionId == teacher.InstitutionId && !cs.IsDeleted)
+            .Select(cs => cs.StudentId)
+            .Distinct()
+            .CountAsync(ct);
+
+        return new TeacherMeDto(
+            teacher.Id,
+            teacher.UserId,
+            teacher.FirstName,
+            teacher.LastName,
+            $"{teacher.FirstName} {teacher.LastName}",
+            teacher.Title,
+            teacher.InstitutionId,
+            subjectDtos,
+            classroomIds.Count,
+            studentCount);
     }
     public async Task<IReadOnlyList<TeacherListDto>> ListAsync(ListTeachersQuery q, CancellationToken ct)
     {
@@ -61,13 +110,65 @@ public class TeacherHandler(IApplicationDbContext db, ICurrentUser user, IUserDi
     {
         await new CreateTeacherValidator().ValidateAndThrowAsync(c, ct);
         await InstitutionManagement.DemandAsync(user, c.InstitutionId);
-        if (!await users.IsActiveInInstitutionAsync(c.UserId, c.InstitutionId, Roles.Teacher, ct))
-            throw new ValidationException("Teacher account must be active in the same institution with the Teacher role.");
-        var teacher = new Teacher { InstitutionId = c.InstitutionId, UserId = c.UserId, FirstName = c.FirstName, LastName = c.LastName, Title = c.Title, CreatedBy = user.UserId };
-        db.Set<Teacher>().Add(teacher);
-        await audit.AddPendingLogAsync(user.UserId!.Value, "Teacher.Created", "Teacher", teacher.Id.ToString(), teacher.InstitutionId);
-        await db.SaveChangesAsync(ct);
-        return new(teacher.Id, teacher.FirstName, teacher.LastName);
+
+        Guid targetUserId;
+        Guid? provisionedUserId = null;
+
+        await using var transaction = await db.BeginTransactionAsync(ct);
+        try
+        {
+            if (c.UserId.HasValue)
+            {
+                if (!await users.IsActiveInInstitutionAsync(c.UserId.Value, c.InstitutionId, Roles.Teacher, ct))
+                    throw new ValidationException("Teacher account must be active in the same institution with the Teacher role.");
+                targetUserId = c.UserId.Value;
+            }
+            else if (!string.IsNullOrWhiteSpace(c.Email) && !string.IsNullOrWhiteSpace(c.Password))
+            {
+                if (userProvisioner is null)
+                    throw new InvalidOperationException("User provisioning service is unavailable.");
+
+                provisionedUserId = await userProvisioner.ProvisionUserAsync(
+                    c.Email,
+                    c.Password,
+                    c.FirstName,
+                    c.LastName,
+                    Roles.Teacher,
+                    c.InstitutionId,
+                    ct);
+
+                targetUserId = provisionedUserId.Value;
+            }
+            else
+            {
+                throw new ValidationException("Either UserId or Email and Password must be provided.");
+            }
+
+            var teacher = new Teacher { InstitutionId = c.InstitutionId, UserId = targetUserId, FirstName = c.FirstName, LastName = c.LastName, Title = c.Title, CreatedBy = user.UserId };
+            db.Set<Teacher>().Add(teacher);
+            await audit.AddPendingLogAsync(user.UserId!.Value, "Teacher.Created", "Teacher", teacher.Id.ToString(), teacher.InstitutionId);
+
+            await db.SaveChangesAsync(ct);
+            await transaction.CommitAsync(ct);
+
+            return new(teacher.Id, teacher.FirstName, teacher.LastName);
+        }
+        catch
+        {
+            await transaction.RollbackAsync(ct);
+            if (provisionedUserId.HasValue && userProvisioner is not null)
+            {
+                try
+                {
+                    await userProvisioner.DeleteProvisionedUserAsync(provisionedUserId.Value, ct);
+                }
+                catch
+                {
+                    // Secondary cleanup attempt; DB transaction rollback already guaranteed database consistency.
+                }
+            }
+            throw;
+        }
     }
     public async Task<TeacherSubjectDto> SetSubjectAsync(TeacherSubjectCommand c, bool remove, CancellationToken ct)
     {

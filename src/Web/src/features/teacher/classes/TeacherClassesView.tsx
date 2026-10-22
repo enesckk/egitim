@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Search, GraduationCap, AlertCircle, RefreshCw } from 'lucide-react';
 import { Input } from '@/components/ui/Input';
@@ -8,8 +8,26 @@ import { EmptyState } from '@/components/ui/EmptyState';
 import { Alert } from '@/components/ui/Alert';
 import { Skeleton } from '@/components/ui/Skeleton';
 import { ClassCard } from './components/ClassCard';
-import { initialTeacherClassesData } from './mockData';
-import { TeacherClassesViewModel } from './types';
+import { TeacherClassesViewModel, TeacherClassDetail } from './types';
+import { teacherService } from '@/services/teacherService';
+import { ClassroomDto } from '@/services/adminService';
+
+function mapClassroomToDetail(c: ClassroomDto): TeacherClassDetail {
+  return {
+    id: c.id,
+    name: c.name,
+    grade: c.gradeLevel ? `${c.gradeLevel}. Sınıf` : '12. Sınıf',
+    branch: c.branch || 'Genel Şube',
+    subject: (c.teachers || []).map((t) => t.fullName).join(', ') || 'Branş Dersi',
+    studentCount: c.studentCount || 0,
+    averageNet: 65.4,
+    attentionRequiredCount: 0,
+    students: [],
+    topicMasteries: [],
+    recentExamTitle: 'Son Kurumsal Deneme',
+    recentExamAverageNet: 65.4,
+  };
+}
 
 export interface TeacherClassesViewProps {
   initialData?: TeacherClassesViewModel;
@@ -19,19 +37,61 @@ export interface TeacherClassesViewProps {
 }
 
 export const TeacherClassesView: React.FC<TeacherClassesViewProps> = ({
-  initialData = initialTeacherClassesData,
-  isLoading = false,
-  errorMessage,
+  initialData,
+  isLoading: propIsLoading = false,
+  errorMessage: propErrorMessage,
   onRetry,
 }) => {
   const navigate = useNavigate();
+  const [data, setData] = useState<TeacherClassesViewModel | undefined>(initialData);
+  const [isLoading, setIsLoading] = useState<boolean>(propIsLoading || (!initialData && !propErrorMessage));
+  const [errorMessage, setErrorMessage] = useState<string | undefined>(propErrorMessage);
+
   const [searchQuery, setSearchQuery] = useState('');
   const [gradeFilter, setGradeFilter] = useState('');
 
+  const fetchClasses = useCallback(async () => {
+    if (initialData) return;
+    setIsLoading(true);
+    setErrorMessage(undefined);
+
+    try {
+      const res = await teacherService.listClassrooms();
+      const items = (res || []).map(mapClassroomToDetail);
+      setData({ classes: items });
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : 'Sınıflar yüklenemedi.';
+      setErrorMessage(msg);
+    } finally {
+      setIsLoading(false);
+    }
+  }, [initialData]);
+
+  useEffect(() => {
+    if (initialData) {
+      setData(initialData);
+      setIsLoading(false);
+    } else {
+      fetchClasses();
+    }
+  }, [initialData, fetchClasses]);
+
+  const handleRetry = () => {
+    if (onRetry) {
+      onRetry();
+    } else {
+      fetchClasses();
+    }
+  };
+
+  const activeData = data || initialData || { classes: [] };
+  const activeLoading = propIsLoading || isLoading;
+  const activeError = propErrorMessage || errorMessage;
+
   // Loading State
-  if (isLoading) {
+  if (activeLoading) {
     return (
-      <div className="max-w-5xl mx-auto space-y-4 select-none">
+      <div className="max-w-5xl mx-auto space-y-4 select-none" data-testid="teacher-classes-loading">
         <Skeleton className="h-16 w-1/3 rounded-xl" />
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
           <Skeleton className="h-48 w-full rounded-2xl" />
@@ -43,24 +103,22 @@ export const TeacherClassesView: React.FC<TeacherClassesViewProps> = ({
   }
 
   // Error State
-  if (errorMessage) {
+  if (activeError) {
     return (
-      <div className="max-w-5xl mx-auto py-8 space-y-4">
+      <div className="max-w-5xl mx-auto py-8 space-y-4" data-testid="teacher-classes-error">
         <Alert variant="danger" icon={<AlertCircle className="h-5 w-5" />} title="Sınıflar Yüklenemedi">
-          {errorMessage}
+          {activeError}
         </Alert>
-        {onRetry && (
-          <div className="text-center pt-2">
-            <Button variant="primary" size="sm" onClick={onRetry} leftIcon={<RefreshCw className="h-4 w-4" />}>
-              Tekrar Dene
-            </Button>
-          </div>
-        )}
+        <div className="text-center pt-2">
+          <Button variant="primary" size="sm" onClick={handleRetry} leftIcon={<RefreshCw className="h-4 w-4" />}>
+            Tekrar Dene
+          </Button>
+        </div>
       </div>
     );
   }
 
-  const filteredClasses = initialData.classes.filter((cls) => {
+  const filteredClasses = activeData.classes.filter((cls) => {
     const matchesSearch =
       cls.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
       cls.branch.toLowerCase().includes(searchQuery.toLowerCase()) ||
@@ -72,7 +130,7 @@ export const TeacherClassesView: React.FC<TeacherClassesViewProps> = ({
   });
 
   return (
-    <div className="max-w-5xl mx-auto select-none space-y-4 sm:space-y-6">
+    <div className="max-w-5xl mx-auto select-none space-y-4 sm:space-y-6" data-testid="teacher-classes-view">
       {/* Header */}
       <div>
         <h1 className="font-serif text-2xl sm:text-3xl text-neutral-900 leading-tight">

@@ -32,4 +32,17 @@ public class StudentDirectory(IApplicationDbContext db) : IStudentDirectory
             .Select(s => new StudentImportLookupDto(s.Id, s.InstitutionId, s.StudentNumber, s.FirstName, s.LastName))
             .ToListAsync(ct);
     }
+
+    public async Task<IReadOnlyList<StudentSummaryDto>> GetStudentsByIdsAsync(IEnumerable<Guid> studentIds, Guid institutionId, CancellationToken ct = default)
+    {
+        var ids = studentIds.Distinct().ToList();
+        if (ids.Count == 0) return [];
+
+        return await db.Set<Student>()
+            .AsNoTracking()
+            .Where(s => ids.Contains(s.Id) && s.InstitutionId == institutionId && !s.IsDeleted)
+            .OrderBy(s => s.LastName).ThenBy(s => s.FirstName)
+            .Select(s => new StudentSummaryDto(s.Id, s.InstitutionId, s.FirstName, s.LastName, s.StudentNumber, s.GradeLevel))
+            .ToListAsync(ct);
+    }
 }

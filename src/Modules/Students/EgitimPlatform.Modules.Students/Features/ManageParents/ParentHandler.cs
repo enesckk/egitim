@@ -18,7 +18,24 @@ public class ParentHandler(IApplicationDbContext db, ICurrentUser user, IUserDir
         db.Set<Parent>().Add(parent);
         await audit.AddPendingLogAsync(user.UserId!.Value, "Parent.Created", "Parent", parent.Id.ToString(), parent.InstitutionId);
         await db.SaveChangesAsync(ct);
-        return new(parent.Id, parent.FirstName, parent.LastName);
+        return new(parent.Id, parent.FirstName, parent.LastName, parent.UserId, parent.Phone, parent.Email);
+    }
+    public async Task<IReadOnlyList<ParentDto>> ListAsync(ListParentsQuery q, CancellationToken ct = default)
+    {
+        await new ListParentsQueryValidator().ValidateAndThrowAsync(q, ct);
+        var institutionId = await user.GetInstitutionIdAsync();
+        if (!user.IsSuperAdmin && !institutionId.HasValue)
+            throw new ForbiddenException("Access denied.");
+
+        var parents = db.Set<Parent>().AsNoTracking().Where(x => !x.IsDeleted);
+        if (!user.IsSuperAdmin)
+            parents = parents.Where(x => x.InstitutionId == institutionId!.Value);
+
+        return await parents
+            .OrderBy(x => x.LastName).ThenBy(x => x.FirstName).ThenBy(x => x.Id)
+            .Skip((q.Page - 1) * q.PageSize).Take(q.PageSize)
+            .Select(x => new ParentDto(x.Id, x.FirstName, x.LastName, x.UserId, x.Phone, x.Email))
+            .ToListAsync(ct);
     }
     public async Task<ParentDto> GetAsync(Guid parentId, CancellationToken ct)
     {
@@ -31,7 +48,7 @@ public class ParentHandler(IApplicationDbContext db, ICurrentUser user, IUserDir
             parents = parents.Where(x => x.InstitutionId == institutionId!.Value);
 
         return await parents
-            .Select(x => new ParentDto(x.Id, x.FirstName, x.LastName))
+            .Select(x => new ParentDto(x.Id, x.FirstName, x.LastName, x.UserId, x.Phone, x.Email))
             .SingleOrDefaultAsync(ct) ?? throw new NotFoundException("Parent", parentId);
     }
     public async Task<IReadOnlyList<StudentParentDto>> ListForStudentAsync(Guid studentId, CancellationToken ct)
@@ -47,10 +64,17 @@ public class ParentHandler(IApplicationDbContext db, ICurrentUser user, IUserDir
         var student = await students.SingleOrDefaultAsync(ct)
             ?? throw new NotFoundException("Student", studentId);
 
-        return await db.Set<StudentParent>().AsNoTracking()
-            .Where(x => x.StudentId == studentId && x.InstitutionId == student.InstitutionId)
-            .OrderBy(x => x.CreatedAt).ThenBy(x => x.Id)
-            .Select(x => new StudentParentDto(x.Id, x.StudentId, x.ParentId, x.RelationshipType, x.IsActive))
+        return await (from link in db.Set<StudentParent>().AsNoTracking()
+                      join parent in db.Set<Parent>().AsNoTracking() on link.ParentId equals parent.Id
+                      where link.StudentId == studentId && link.InstitutionId == student.InstitutionId && parent.InstitutionId == student.InstitutionId
+                      orderby link.CreatedAt, link.Id
+                      select new StudentParentDto(
+                          link.Id,
+                          link.StudentId,
+                          link.ParentId,
+                          link.RelationshipType,
+                          link.IsActive,
+                          parent.FirstName + " " + parent.LastName))
             .ToListAsync(ct);
     }
     public async Task<StudentParentDto> LinkAsync(LinkParentCommand c, CancellationToken ct)

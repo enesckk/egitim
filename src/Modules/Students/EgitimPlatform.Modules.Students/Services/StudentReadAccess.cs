@@ -7,11 +7,23 @@ namespace EgitimPlatform.Modules.Students.Services;
 public static class StudentReadAccess
 {
     public static bool IsParentOnly(ICurrentUser user) => user.IsInRole(Roles.Parent) && !user.IsSuperAdmin && !user.IsInRole(Roles.InstitutionAdmin) && !user.IsInRole(Roles.Coach) && !user.IsInRole(Roles.Student);
-    public static async Task<Student> GetAsync(IApplicationDbContext db, ICurrentUser user, ICoachStudentQuery coaches, Guid studentId, CancellationToken ct)
+    public static async Task<Student> GetAsync(IApplicationDbContext db, ICurrentUser user, ICoachStudentQuery coaches, Guid studentId, CancellationToken ct, ITeacherStudentQuery? teacherQuery = null)
     {
         var student = await GoalAuthorizationHelper.FetchStudentForReadOrThrowAsync(db, user, studentId, ct);
-        if (!IsParentOnly(user)) { await GoalAuthorizationHelper.AuthorizeForStudentAsync(student, user, coaches, ct); return student; }
         var institution = await user.GetInstitutionIdAsync();
+
+        if (user.IsInRole(Roles.Teacher) && !user.IsSuperAdmin && !user.IsInRole(Roles.InstitutionAdmin))
+        {
+            if (!user.IsAuthenticated || user.UserId is null || institution is null || institution != student.InstitutionId)
+                throw new ForbiddenException("Access denied.");
+
+            if (teacherQuery is null || !await teacherQuery.HasActiveAssignmentAsync(user.UserId.Value, institution.Value, student.Id, ct))
+                throw new ForbiddenException("Access denied.");
+
+            return student;
+        }
+
+        if (!IsParentOnly(user)) { await GoalAuthorizationHelper.AuthorizeForStudentAsync(student, user, coaches, ct); return student; }
         if (!user.IsAuthenticated || user.UserId is null || institution is null || institution != student.InstitutionId)
             throw new ForbiddenException("Access denied.");
         var related = await (from link in db.Set<StudentParent>()

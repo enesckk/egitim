@@ -1,5 +1,6 @@
 using EgitimPlatform.BuildingBlocks.Constants;
 using EgitimPlatform.Modules.Coaching.Features.AssignCoach;
+using EgitimPlatform.Modules.Coaching.Features.ManageCoaches;
 using FluentValidation;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Http;
@@ -15,13 +16,56 @@ public class CoachingController : ControllerBase
 {
     private readonly AssignCoachHandler _assignHandler;
     private readonly IValidator<AssignCoachCommand> _assignValidator;
+    private readonly CoachManagementHandler? _coachManagementHandler;
+    private readonly EgitimPlatform.BuildingBlocks.Interfaces.ICurrentUser _currentUser;
 
     public CoachingController(
         AssignCoachHandler assignHandler,
-        IValidator<AssignCoachCommand> assignValidator)
+        IValidator<AssignCoachCommand> assignValidator,
+        EgitimPlatform.BuildingBlocks.Interfaces.ICurrentUser currentUser,
+        CoachManagementHandler? coachManagementHandler = null)
     {
         _assignHandler = assignHandler;
         _assignValidator = assignValidator;
+        _currentUser = currentUser;
+        _coachManagementHandler = coachManagementHandler;
+    }
+
+    [HttpGet("coaches")]
+    [Authorize(Policy = Policies.CanAssignCoach)]
+    [ProducesResponseType(typeof(IReadOnlyList<CoachSummaryDto>), StatusCodes.Status200OK)]
+    public async Task<ActionResult<IReadOnlyList<CoachSummaryDto>>> ListCoaches(
+        [FromQuery] ListCoachesQuery query,
+        CancellationToken ct)
+    {
+        if (_coachManagementHandler is null)
+            return StatusCode(StatusCodes.Status503ServiceUnavailable);
+
+        var result = await _coachManagementHandler.ListAsync(query, ct);
+        return Ok(result);
+    }
+
+    [HttpPost("coaches")]
+    [Authorize(Policy = Policies.CanAssignCoach)]
+    [ProducesResponseType(typeof(CoachSummaryDto), StatusCodes.Status201Created)]
+    public async Task<ActionResult<CoachSummaryDto>> CreateCoach(
+        [FromBody] CreateCoachCommand command,
+        CancellationToken ct)
+    {
+        if (_coachManagementHandler is null)
+            return StatusCode(StatusCodes.Status503ServiceUnavailable);
+
+        if (command.InstitutionId == Guid.Empty)
+        {
+            var userInstId = await _currentUser.GetInstitutionIdAsync();
+            if (userInstId.HasValue)
+            {
+                command = command with { InstitutionId = userInstId.Value };
+            }
+        }
+
+        var result = await _coachManagementHandler.CreateAsync(command, ct);
+        return StatusCode(StatusCodes.Status201Created, result);
     }
 
     [HttpPost("assign")]

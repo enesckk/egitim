@@ -5,6 +5,7 @@ using EgitimPlatform.Modules.Identity.Entities;
 using EgitimPlatform.Modules.Identity.Features.Login;
 using EgitimPlatform.Modules.Identity.Features.Logout;
 using EgitimPlatform.Modules.Identity.Features.Refresh;
+using EgitimPlatform.Modules.Identity.Features.Users;
 using EgitimPlatform.Modules.Identity.Infrastructure;
 using EgitimPlatform.Modules.Identity.Services;
 using FluentValidation;
@@ -77,7 +78,7 @@ public static class IdentityServiceExtensions
             .AddPolicy(Policies.CanViewTaxonomy, policy =>
                 policy.RequireAuthenticatedUser())
             .AddPolicy(Policies.CanManageExams, policy =>
-                policy.RequireRole(Roles.SuperAdmin, Roles.InstitutionAdmin))
+                policy.RequireRole(Roles.SuperAdmin, Roles.InstitutionAdmin, Roles.Teacher))
             .AddPolicy(Policies.CanRecordExamResults, policy =>
                 policy.RequireRole(Roles.SuperAdmin, Roles.InstitutionAdmin, Roles.Coach))
             .AddPolicy(Policies.CanSubmitExamAnswers, policy =>
@@ -94,6 +95,7 @@ public static class IdentityServiceExtensions
         services.AddScoped<IRefreshTokenService, RefreshTokenService>();
         services.AddScoped<ICurrentUser, CurrentUser>();
         services.AddScoped<IUserDirectory, UserDirectory>();
+        services.AddScoped<IUserProvisioner, UserProvisioner>();
         services.AddScoped<IInstitutionContext, InstitutionContext>();
         services.AddScoped<IAuditService, AuditService>();
 
@@ -101,6 +103,7 @@ public static class IdentityServiceExtensions
         services.AddScoped<LoginHandler>();
         services.AddScoped<RefreshHandler>();
         services.AddScoped<LogoutHandler>();
+        services.AddScoped<UserHandler>();
 
         // Validators
         services.AddValidatorsFromAssembly(Assembly.GetExecutingAssembly());

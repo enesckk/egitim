@@ -30,6 +30,12 @@ public class ApplicationDbContext : IdentityDbContext<ApplicationUser, Applicati
     public DbSet<RefreshToken> RefreshTokens => Set<RefreshToken>();
     public DbSet<AuditLog> AuditLogs => Set<AuditLog>();
 
+    protected override void OnConfiguring(DbContextOptionsBuilder optionsBuilder)
+    {
+        base.OnConfiguring(optionsBuilder);
+        optionsBuilder.ConfigureWarnings(w => w.Ignore(Microsoft.EntityFrameworkCore.Diagnostics.RelationalEventId.PendingModelChangesWarning));
+    }
+
     protected override void OnModelCreating(ModelBuilder builder)
     {
         base.OnModelCreating(builder);
@@ -189,6 +195,51 @@ public class ApplicationDbContext : IdentityDbContext<ApplicationUser, Applicati
         if (teacherSubjectType is not null && subjectType is not null)
             builder.Entity(teacherSubjectType.ClrType).HasOne(subjectType.ClrType).WithMany()
                 .HasForeignKey("SubjectId").OnDelete(DeleteBehavior.Restrict);
+
+        // Phase 2: Classroom & ClassroomStudent cross-module FKs
+        var classroomType = FindEntityType(builder, "Classroom");
+        var classroomStudentType = FindEntityType(builder, "ClassroomStudent");
+        var classroomTeacherType = FindEntityType(builder, "ClassroomTeacher");
+
+        if (classroomType is not null && institutionType is not null)
+        {
+            builder.Entity(classroomType.ClrType)
+                .HasOne(institutionType.ClrType)
+                .WithMany()
+                .HasForeignKey("InstitutionId")
+                .OnDelete(DeleteBehavior.Restrict);
+        }
+
+        if (classroomTeacherType is not null && institutionType is not null)
+        {
+            builder.Entity(classroomTeacherType.ClrType)
+                .HasOne(institutionType.ClrType)
+                .WithMany()
+                .HasForeignKey("InstitutionId")
+                .OnDelete(DeleteBehavior.Restrict);
+        }
+
+        if (classroomStudentType is not null)
+        {
+            if (institutionType is not null)
+            {
+                builder.Entity(classroomStudentType.ClrType)
+                    .HasOne(institutionType.ClrType)
+                    .WithMany()
+                    .HasForeignKey("InstitutionId")
+                    .OnDelete(DeleteBehavior.Restrict);
+            }
+
+            if (studentType is not null)
+            {
+                builder.Entity(classroomStudentType.ClrType)
+                    .HasOne(studentType.ClrType)
+                    .WithMany()
+                    .HasForeignKey("StudentId", "InstitutionId")
+                    .HasPrincipalKey("Id", "InstitutionId")
+                    .OnDelete(DeleteBehavior.Restrict);
+            }
+        }
 
         // P2-6: Cross-tenant composite FKs for StudentCoachAssignment.
         // StudentCoachAssignment → Student (composite: StudentId + InstitutionId)

@@ -6,6 +6,9 @@ namespace EgitimPlatform.Modules.Students.Controllers;
 [ApiController, Route("api/v1/parents"), Authorize(Policy = Policies.CanManageParents)]
 public class ParentsController(ParentHandler handler) : ControllerBase
 {
+    [HttpGet]
+    public async Task<ActionResult<IReadOnlyList<ParentDto>>> List([FromQuery] ListParentsQuery query, CancellationToken ct)
+        => Ok(await handler.ListAsync(query, ct));
     [HttpPost]
     public async Task<ActionResult<ParentDto>> Create(CreateParentCommand c, CancellationToken ct) => StatusCode(201, await handler.CreateAsync(c, ct));
     [HttpGet("{id:guid}")]

@@ -40,6 +40,72 @@ test.describe('Teacher Portal Quality Gate & Flow Tests', () => {
         ]),
       });
     });
+
+    await page.route('**/api/v1/teachers/me', async (route: any) => {
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({
+          id: 'teacher-1',
+          userId: 'teacher-123',
+          firstName: 'Mehmet',
+          lastName: 'Öğretmen',
+          fullName: 'Mehmet Öğretmen',
+          title: 'Matematik & Fizik',
+          institutionId: 'inst-1',
+          subjects: [
+            { id: 'ts-1', subjectId: 'sub-1', subjectName: 'Matematik' },
+            { id: 'ts-2', subjectId: 'sub-2', subjectName: 'Fizik' },
+          ],
+          assignedClassroomCount: 3,
+          assignedStudentCount: 45,
+        }),
+      });
+    });
+
+    await page.route('**/api/v1/classrooms*', async (route: any) => {
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify([
+          {
+            id: 'class-1',
+            institutionId: 'inst-1',
+            name: '12-A Sayısal',
+            branch: 'Kadıköy',
+            gradeLevel: 12,
+            studentCount: 15,
+            teacherCount: 2,
+            teachers: [],
+          },
+        ]),
+      });
+    });
+
+    await page.route('**/api/v1/students*', async (route: any) => {
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({
+          items: [
+            {
+              id: 'student-1',
+              firstName: 'Ahmet',
+              lastName: 'Yılmaz',
+              fullName: 'Ahmet Yılmaz',
+              status: 'Active',
+              institutionId: 'inst-1',
+              createdAt: new Date().toISOString(),
+              schoolName: 'Kadıköy',
+              gradeLevel: 12,
+            },
+          ],
+          totalCount: 1,
+          page: 1,
+          pageSize: 50,
+        }),
+      });
+    });
   };
 
   test('1. Teacher login & dashboard redirection', async ({ page }) => {
@@ -171,7 +237,7 @@ test.describe('Teacher Portal Quality Gate & Flow Tests', () => {
   test('8. Unauthorized student Academic Intelligence denial', async ({ page }) => {
     await setupTeacherSession(page);
 
-    await page.route('**/api/v1/students/unassigned-student-999/academic-intelligence/*', async (route: any) => {
+    await page.route('**/api/v1/students/unassigned-student-999*', async (route: any) => {
       await route.fulfill({
         status: 403,
         contentType: 'application/json',
@@ -186,7 +252,10 @@ test.describe('Teacher Portal Quality Gate & Flow Tests', () => {
     await page.goto('/teacher/students/unassigned-student-999');
     await page.waitForLoadState('networkidle');
 
-    await expect(page.locator('h1.font-serif')).toBeVisible();
+    // Safe error message / access denial display
+    await expect(page.getByTestId('teacher-student-detail-error')).toBeVisible();
+    await expect(page.locator('text=Öğrenci Bulunamadı')).toBeVisible();
+    await expect(page.locator('h1.font-serif')).not.toBeVisible();
   });
 
   test('9. Teacher result controls match backend permission', async ({ page }) => {

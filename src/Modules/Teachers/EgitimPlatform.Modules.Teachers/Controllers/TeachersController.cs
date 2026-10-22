@@ -4,12 +4,17 @@ using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 namespace EgitimPlatform.Modules.Teachers.Controllers;
 [ApiController, Route("api/v1/teachers"), Authorize]
-public class TeachersController(TeacherHandler handler) : ControllerBase
+public class TeachersController(TeacherHandler handler, EgitimPlatform.BuildingBlocks.Interfaces.ICurrentUser currentUser) : ControllerBase
 {
     [HttpGet]
     [Authorize(Policy = Policies.CanManageTeachers)]
     public async Task<ActionResult<IReadOnlyList<TeacherListDto>>> List([FromQuery] ListTeachersQuery query, CancellationToken ct)
         => Ok(await handler.ListAsync(query, ct));
+
+    [HttpGet("me")]
+    public async Task<ActionResult<TeacherMeDto>> GetMe(CancellationToken ct)
+        => Ok(await handler.GetMeAsync(ct));
+
     [HttpGet("{teacherId:guid}")]
     [Authorize(Policy = Policies.CanManageTeachers)]
     public async Task<ActionResult<TeacherDetailDto>> Get(Guid teacherId, CancellationToken ct)
@@ -18,7 +23,18 @@ public class TeachersController(TeacherHandler handler) : ControllerBase
     public async Task<ActionResult<IReadOnlyList<TeacherSubjectDto>>> Subjects(Guid teacherId, CancellationToken ct) => Ok(await handler.GetSubjectsAsync(teacherId, ct));
     [Authorize(Policy = Policies.CanManageTeachers)]
     [HttpPost]
-    public async Task<ActionResult<TeacherDto>> Create(CreateTeacherCommand c, CancellationToken ct) => StatusCode(201, await handler.CreateAsync(c, ct));
+    public async Task<ActionResult<TeacherDto>> Create(CreateTeacherCommand c, CancellationToken ct)
+    {
+        if (c.InstitutionId == Guid.Empty)
+        {
+            var userInstId = await currentUser.GetInstitutionIdAsync();
+            if (userInstId.HasValue)
+            {
+                c = c with { InstitutionId = userInstId.Value };
+            }
+        }
+        return StatusCode(201, await handler.CreateAsync(c, ct));
+    }
     [Authorize(Policy = Policies.CanManageTeachers)]
     [HttpPost("{teacherId:guid}/subjects/{subjectId:guid}")]
     public async Task<ActionResult<TeacherSubjectDto>> Assign(Guid teacherId, Guid subjectId, CancellationToken ct) => StatusCode(201, await handler.SetSubjectAsync(new(teacherId, subjectId), false, ct));
