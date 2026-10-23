@@ -5,9 +5,12 @@ using EgitimPlatform.Modules.Academic.Entities;
 using EgitimPlatform.Modules.Coaching.Entities;
 using EgitimPlatform.Modules.Communication.Entities;
 using EgitimPlatform.Modules.Exams.Entities;
+using EgitimPlatform.Modules.Exams.Features.AcademicIntelligence;
 using EgitimPlatform.Modules.Identity.Entities;
 using EgitimPlatform.Modules.Institutions.Entities;
+using EgitimPlatform.Modules.Notebook.Entities;
 using EgitimPlatform.Modules.Planning.Entities;
+using EgitimPlatform.Modules.Questions.Constants;
 using EgitimPlatform.Modules.Questions.Entities;
 using EgitimPlatform.Modules.Students.Entities;
 using EgitimPlatform.Modules.Teachers.Entities;
@@ -83,7 +86,8 @@ public class DemoDataSeeder
         var existingInst = await _db.Set<Institution>().IgnoreQueryFilters().FirstOrDefaultAsync(i => i.Id == DemoInstitutionId, ct);
         if (existingInst != null)
         {
-            _logger.LogInformation("Demo showcase dataset (DEMO_SHOWCASE_V1) already exists. Skipping duplicate seeding.");
+            _logger.LogInformation("Demo showcase dataset (DEMO_SHOWCASE_V1) already exists. Skipping duplicate base seeding; applying idempotent enrichment.");
+            await SeedShowcaseEnrichmentAsync(ct);
             return;
         }
 
@@ -119,6 +123,9 @@ public class DemoDataSeeder
         // 7. Notifications
         await SeedNotificationsAsync(ct);
 
+        // 8. Linked classrooms, question-level data, study plan and notes
+        await SeedShowcaseEnrichmentAsync(ct);
+
         _logger.LogInformation("Demo Showcase Dataset (DEMO_SHOWCASE_V1) successfully seeded.");
     }
 
@@ -132,6 +139,40 @@ public class DemoDataSeeder
         _logger.LogInformation("Resetting Demo Showcase Dataset (DEMO_SHOWCASE_V1)...");
 
         // Safe removal restricted exclusively to DemoInstitutionId and deterministic Demo IDs
+        var questionResults = await _db.Set<StudentExamQuestionResult>().IgnoreQueryFilters().Where(r => r.InstitutionId == DemoInstitutionId).ToListAsync(ct);
+        _db.Set<StudentExamQuestionResult>().RemoveRange(questionResults);
+
+        var examQuestions = await _db.Set<ExamQuestion>().IgnoreQueryFilters().Where(q => q.InstitutionId == DemoInstitutionId).ToListAsync(ct);
+        _db.Set<ExamQuestion>().RemoveRange(examQuestions);
+
+        var studyTasks = await _db.Set<StudyTask>().IgnoreQueryFilters().Where(t => t.InstitutionId == DemoInstitutionId).ToListAsync(ct);
+        _db.Set<StudyTask>().RemoveRange(studyTasks);
+
+        var studyPlans = await _db.Set<StudyPlan>().IgnoreQueryFilters().Where(p => p.InstitutionId == DemoInstitutionId).ToListAsync(ct);
+        _db.Set<StudyPlan>().RemoveRange(studyPlans);
+
+        var notebookEntries = await _db.Set<NotebookEntry>().IgnoreQueryFilters().Where(n => n.InstitutionId == DemoInstitutionId).ToListAsync(ct);
+        _db.Set<NotebookEntry>().RemoveRange(notebookEntries);
+
+        var coachNotes = await _db.Set<CoachPrivateNote>().IgnoreQueryFilters().Where(n => n.InstitutionId == DemoInstitutionId).ToListAsync(ct);
+        _db.Set<CoachPrivateNote>().RemoveRange(coachNotes);
+
+        var classroomStudents = await _db.Set<ClassroomStudent>().IgnoreQueryFilters().Where(c => c.InstitutionId == DemoInstitutionId).ToListAsync(ct);
+        _db.Set<ClassroomStudent>().RemoveRange(classroomStudents);
+
+        var classroomTeachers = await _db.Set<ClassroomTeacher>().IgnoreQueryFilters().Where(c => c.InstitutionId == DemoInstitutionId).ToListAsync(ct);
+        _db.Set<ClassroomTeacher>().RemoveRange(classroomTeachers);
+
+        var classrooms = await _db.Set<Classroom>().IgnoreQueryFilters().Where(c => c.InstitutionId == DemoInstitutionId).ToListAsync(ct);
+        _db.Set<Classroom>().RemoveRange(classrooms);
+
+        var teacherSubjects = await _db.Set<TeacherSubject>().IgnoreQueryFilters().Where(t => t.InstitutionId == DemoInstitutionId).ToListAsync(ct);
+        _db.Set<TeacherSubject>().RemoveRange(teacherSubjects);
+
+        var demoQuestionIds = await _db.Set<Question>().IgnoreQueryFilters().Where(q => q.InstitutionId == DemoInstitutionId).Select(q => q.Id).ToListAsync(ct);
+        var styleAssignments = await _db.Set<QuestionStyleAssignment>().Where(a => demoQuestionIds.Contains(a.QuestionId)).ToListAsync(ct);
+        _db.Set<QuestionStyleAssignment>().RemoveRange(styleAssignments);
+
         var attempts = await _db.Set<StudentExamAttempt>().IgnoreQueryFilters().Where(a => a.InstitutionId == DemoInstitutionId).ToListAsync(ct);
         _db.Set<StudentExamAttempt>().RemoveRange(attempts);
 
@@ -643,6 +684,423 @@ public class DemoDataSeeder
                 IsRead = true,
                 ReadAt = DateTimeOffset.UtcNow.AddDays(-5)
             });
+        }
+
+        await _db.SaveChangesAsync(ct);
+    }
+
+    // ───────────────────────── Showcase enrichment (idempotent) ─────────────────────────
+    // Adds linked classrooms, a second student, question-level/style-tagged exam data,
+    // an active study plan and sample notes. Every record is scoped to DemoInstitutionId
+    // and uses deterministic IDs so repeated runs never duplicate data.
+
+    public static readonly Guid DemoStudent2Id = Guid.Parse("d0000000-0000-0000-0000-00000000000d");
+    public static readonly Guid DemoClassroom12AId = Guid.Parse("d0000000-0000-0000-0000-000000000060");
+    public static readonly Guid DemoClassroom12BId = Guid.Parse("d0000000-0000-0000-0000-000000000061");
+    public static readonly Guid DemoStudyPlanId = Guid.Parse("d0000000-0000-0000-0000-000000000070");
+
+    private async Task SeedShowcaseEnrichmentAsync(CancellationToken ct)
+    {
+        await SeedClassroomsAsync(ct);
+        await SeedQuestionStyleAssignmentsAsync(ct);
+        await SeedQuestionLevelResultsAsync(ct);
+        await SeedStudyPlanAsync(ct);
+        await SeedNotesAsync(ct);
+    }
+
+    private async Task SeedClassroomsAsync(CancellationToken ct)
+    {
+        if (!await _db.Set<Student>().IgnoreQueryFilters().AnyAsync(s => s.Id == DemoStudent2Id, ct))
+        {
+            _db.Set<Student>().Add(new Student
+            {
+                Id = DemoStudent2Id,
+                InstitutionId = DemoInstitutionId,
+                FirstName = "Zeynep",
+                LastName = "Demir",
+                StudentNumber = "1202",
+                GradeLevel = 12,
+                SchoolName = "Demo Anadolu Lisesi",
+                EnrollmentDate = DateTimeOffset.UtcNow.AddMonths(-6),
+                Status = StudentStatus.Active
+            });
+        }
+
+        var classrooms = new[]
+        {
+            (Id: DemoClassroom12AId, Name: "12-A", Branch: "Sayısal"),
+            (Id: DemoClassroom12BId, Name: "12-B", Branch: "Eşit Ağırlık")
+        };
+        foreach (var c in classrooms)
+        {
+            if (!await _db.Set<Classroom>().IgnoreQueryFilters().AnyAsync(x => x.Id == c.Id, ct))
+            {
+                _db.Set<Classroom>().Add(new Classroom
+                {
+                    Id = c.Id,
+                    InstitutionId = DemoInstitutionId,
+                    Name = c.Name,
+                    Branch = c.Branch,
+                    GradeLevel = 12,
+                    AcademicYear = "2026-2027"
+                });
+            }
+        }
+        await _db.SaveChangesAsync(ct);
+
+        var teacherLinkId = Guid.Parse("d0000000-0000-0000-0000-000000000062");
+        if (!await _db.Set<ClassroomTeacher>().IgnoreQueryFilters().AnyAsync(x => x.Id == teacherLinkId, ct))
+        {
+            _db.Set<ClassroomTeacher>().Add(new ClassroomTeacher
+            {
+                Id = teacherLinkId,
+                InstitutionId = DemoInstitutionId,
+                ClassroomId = DemoClassroom12AId,
+                TeacherId = DemoTeacherEntityId,
+                IsPrimary = true
+            });
+        }
+
+        var studentLinks = new[]
+        {
+            (Id: Guid.Parse("d0000000-0000-0000-0000-000000000063"), StudentId: DemoStudentId),
+            (Id: Guid.Parse("d0000000-0000-0000-0000-000000000064"), StudentId: DemoStudent2Id)
+        };
+        foreach (var l in studentLinks)
+        {
+            if (!await _db.Set<ClassroomStudent>().IgnoreQueryFilters().AnyAsync(x => x.Id == l.Id, ct))
+            {
+                _db.Set<ClassroomStudent>().Add(new ClassroomStudent
+                {
+                    Id = l.Id,
+                    InstitutionId = DemoInstitutionId,
+                    ClassroomId = DemoClassroom12AId,
+                    StudentId = l.StudentId
+                });
+            }
+        }
+
+        var coachLink2Id = Guid.Parse("d0000000-0000-0000-0000-000000000065");
+        if (!await _db.Set<StudentCoachAssignment>().IgnoreQueryFilters().AnyAsync(x => x.Id == coachLink2Id, ct))
+        {
+            _db.Set<StudentCoachAssignment>().Add(new StudentCoachAssignment
+            {
+                Id = coachLink2Id,
+                InstitutionId = DemoInstitutionId,
+                StudentId = DemoStudent2Id,
+                CoachId = DemoCoachEntityId,
+                IsPrimary = true,
+                IsActive = true,
+                AssignedAt = DateTimeOffset.UtcNow.AddMonths(-2)
+            });
+        }
+
+        // Teacher subject scope: Matematik (resolved via the demo question bank taxonomy)
+        var matSubjectId = await _db.Set<Question>().IgnoreQueryFilters()
+            .Where(q => q.Id == DemoQuestionId(21))
+            .Select(q => (Guid?)q.SubjectId)
+            .FirstOrDefaultAsync(ct);
+        var teacherSubjectId = Guid.Parse("d0000000-0000-0000-0000-000000000066");
+        if (matSubjectId.HasValue &&
+            !await _db.Set<TeacherSubject>().IgnoreQueryFilters().AnyAsync(x => x.Id == teacherSubjectId, ct))
+        {
+            _db.Set<TeacherSubject>().Add(new TeacherSubject
+            {
+                Id = teacherSubjectId,
+                InstitutionId = DemoInstitutionId,
+                TeacherId = DemoTeacherEntityId,
+                SubjectId = matSubjectId.Value
+            });
+        }
+
+        await _db.SaveChangesAsync(ct);
+    }
+
+    private static Guid DemoQuestionId(int counter) => Guid.Parse($"d0000000-0000-0000-0001-{counter:D12}");
+
+    // Topic block index (0..9) follows SeedQuestionsAsync ordering: 10 questions per topic.
+    private static readonly string[][] TopicStyleCodes =
+    [
+        [QuestionStyleDefaults.Codes.Interpretation, QuestionStyleDefaults.Codes.NewGeneration], // TUR-PAR
+        [QuestionStyleDefaults.Codes.Conceptual],                                                 // TUR-DBG
+        [QuestionStyleDefaults.Codes.Calculation],                                                // MAT-TK
+        [QuestionStyleDefaults.Codes.Problem, QuestionStyleDefaults.Codes.NewGeneration],         // MAT-PRB
+        [QuestionStyleDefaults.Codes.GraphTable, QuestionStyleDefaults.Codes.Calculation],        // MAT-FONK
+        [QuestionStyleDefaults.Codes.Calculation, QuestionStyleDefaults.Codes.MultiStep],         // MAT-TRIG
+        [QuestionStyleDefaults.Codes.Conceptual, QuestionStyleDefaults.Codes.GraphTable],         // FIZ-ELEK
+        [QuestionStyleDefaults.Codes.Problem, QuestionStyleDefaults.Codes.MultiStep],             // FIZ-HK
+        [QuestionStyleDefaults.Codes.Conceptual],                                                 // KIM-KT
+        [QuestionStyleDefaults.Codes.Visual],                                                     // BIY-HUC
+    ];
+
+    private async Task SeedQuestionStyleAssignmentsAsync(CancellationToken ct)
+    {
+        await QuestionStyleDefaults.SeedInitialStylesAsync(_db, ct);
+
+        var styleIds = await _db.Set<QuestionStyle>().AsNoTracking()
+            .ToDictionaryAsync(s => s.Code, s => s.Id, StringComparer.OrdinalIgnoreCase, ct);
+
+        var questionIds = Enumerable.Range(1, 100).Select(DemoQuestionId).ToList();
+        var existingQuestionIds = await _db.Set<Question>().IgnoreQueryFilters()
+            .Where(q => questionIds.Contains(q.Id))
+            .Select(q => q.Id)
+            .ToListAsync(ct);
+        var existingPairs = await _db.Set<QuestionStyleAssignment>().AsNoTracking()
+            .Where(a => questionIds.Contains(a.QuestionId))
+            .Select(a => new { a.QuestionId, a.QuestionStyleId })
+            .ToListAsync(ct);
+        var pairSet = existingPairs.Select(p => (p.QuestionId, p.QuestionStyleId)).ToHashSet();
+        var existingSet = existingQuestionIds.ToHashSet();
+
+        for (int counter = 1; counter <= 100; counter++)
+        {
+            var qId = DemoQuestionId(counter);
+            if (!existingSet.Contains(qId)) continue;
+
+            foreach (var code in TopicStyleCodes[(counter - 1) / 10])
+            {
+                if (!styleIds.TryGetValue(code, out var styleId)) continue;
+                if (pairSet.Add((qId, styleId)))
+                {
+                    _db.Set<QuestionStyleAssignment>().Add(new QuestionStyleAssignment { QuestionId = qId, QuestionStyleId = styleId });
+                }
+            }
+        }
+
+        await _db.SaveChangesAsync(ct);
+    }
+
+    /// <summary>
+    /// Assembles 40 questions into demo exams 1-4 and records raw per-question answers that
+    /// are exactly consistent with the already-seeded per-subject correct/wrong totals.
+    /// Demo TYT 5 is intentionally left aggregate-only (used by manual/Excel result entry demos).
+    /// </summary>
+    private async Task SeedQuestionLevelResultsAsync(CancellationToken ct)
+    {
+        // Per section (by DisplayOrder): question counters in "most likely correct first" order.
+        var sectionPlans = new Dictionary<int, int[]>
+        {
+            [1] = [11, 12, 13, 14, 15, 1, 2, 3, 4, 5],          // Türkçe: Dil Bilgisi then Paragraf
+            [2] = [21, 22, 23, 41, 42, 31, 32, 33, 51, 52],     // Matematik: TK, Fonksiyon, Problem, Trigonometri
+            [3] = [71, 72, 73, 74, 75, 61, 62, 63, 64, 65],     // Fizik: Hareket-Kuvvet then Elektrik
+            [4] = [81, 82, 83, 84, 85, 86, 87, 88, 89, 90],     // Kimya
+        };
+
+        for (int examIdx = 1; examIdx <= 4; examIdx++)
+        {
+            var examId = Guid.Parse($"d0000000-0000-0000-0000-0000000000{10 + examIdx}");
+            var attemptId = Guid.Parse($"d0000000-0000-0000-0000-0000000000{20 + examIdx}");
+
+            var exam = await _db.Set<Exam>().IgnoreQueryFilters().AsNoTracking().FirstOrDefaultAsync(e => e.Id == examId, ct);
+            var attempt = await _db.Set<StudentExamAttempt>().IgnoreQueryFilters().AsNoTracking().FirstOrDefaultAsync(a => a.Id == attemptId, ct);
+            if (exam == null || attempt == null) continue;
+
+            var sections = await _db.Set<ExamSection>().IgnoreQueryFilters().AsNoTracking()
+                .Where(s => s.ExamId == examId && !s.IsDeleted)
+                .ToListAsync(ct);
+            var subjectResults = await _db.Set<StudentExamSubjectResult>().IgnoreQueryFilters().AsNoTracking()
+                .Where(r => r.StudentExamAttemptId == attemptId && !r.IsDeleted)
+                .ToListAsync(ct);
+
+            foreach (var (displayOrder, counters) in sectionPlans)
+            {
+                var section = sections.FirstOrDefault(s => s.DisplayOrder == displayOrder);
+                if (section == null) continue;
+                var subjectResult = subjectResults.FirstOrDefault(r => r.ExamSectionId == section.Id);
+                if (subjectResult == null) continue;
+
+                // Display numbering follows taxonomy order; correctness follows the ranked plan.
+                var numbered = counters.OrderBy(c => c).ToList();
+                var correctSet = counters.Take(subjectResult.Correct).ToHashSet();
+                var wrongSet = counters.Skip(subjectResult.Correct).Take(subjectResult.Wrong).ToHashSet();
+
+                for (int i = 0; i < numbered.Count; i++)
+                {
+                    var counter = numbered[i];
+                    var qId = DemoQuestionId(counter);
+                    var eqId = Guid.Parse($"d0000000-0000-0002-{examIdx:D4}-{counter:D12}");
+                    var rId = Guid.Parse($"d0000000-0000-0003-{examIdx:D4}-{counter:D12}");
+
+                    if (!await _db.Set<ExamQuestion>().IgnoreQueryFilters().AnyAsync(x => x.Id == eqId, ct))
+                    {
+                        _db.Set<ExamQuestion>().Add(new ExamQuestion
+                        {
+                            Id = eqId,
+                            InstitutionId = DemoInstitutionId,
+                            ExamId = examId,
+                            ExamSectionId = section.Id,
+                            QuestionId = qId,
+                            QuestionNumber = i + 1,
+                            Order = i + 1,
+                            CorrectOption = "A"
+                        });
+                    }
+
+                    if (!await _db.Set<StudentExamQuestionResult>().IgnoreQueryFilters().AnyAsync(x => x.Id == rId, ct))
+                    {
+                        bool isCorrect = correctSet.Contains(counter);
+                        bool isWrong = wrongSet.Contains(counter);
+                        _db.Set<StudentExamQuestionResult>().Add(new StudentExamQuestionResult
+                        {
+                            Id = rId,
+                            InstitutionId = DemoInstitutionId,
+                            StudentExamAttemptId = attemptId,
+                            ExamQuestionId = eqId,
+                            QuestionId = qId,
+                            SelectedOption = isCorrect ? "A" : isWrong ? "C" : null,
+                            IsCorrect = isCorrect ? true : isWrong ? false : null,
+                            IsBlank = !isCorrect && !isWrong,
+                            NetContribution = isCorrect ? 1m : isWrong ? -1m / exam.WrongAnswerPenalty : 0m
+                        });
+                    }
+                }
+            }
+
+            await _db.SaveChangesAsync(ct);
+        }
+    }
+
+    private async Task SeedStudyPlanAsync(CancellationToken ct)
+    {
+        if (await _db.Set<StudyPlan>().IgnoreQueryFilters().AnyAsync(p => p.Id == DemoStudyPlanId, ct))
+            return;
+        // Respect the domain's single-active-plan rule.
+        if (await _db.Set<StudyPlan>().AnyAsync(p => p.StudentId == DemoStudentId && p.Status == StudyPlanStatus.Active, ct))
+            return;
+
+        var topicIds = new[] { DemoQuestionId(51), DemoQuestionId(31), DemoQuestionId(61), DemoQuestionId(1), DemoQuestionId(41) };
+        var topicInfo = await _db.Set<Question>().IgnoreQueryFilters().AsNoTracking()
+            .Where(q => topicIds.Contains(q.Id))
+            .Select(q => new { q.Id, q.SubjectId, q.TopicId })
+            .ToListAsync(ct);
+        var allTopicIds = topicInfo.Select(t => t.TopicId).Distinct().ToList();
+        var topics = await _db.Set<Topic>().IgnoreQueryFilters().AsNoTracking()
+            .Where(t => allTopicIds.Contains(t.Id)).ToDictionaryAsync(t => t.Id, ct);
+        var subjectIds = topicInfo.Select(t => t.SubjectId).Distinct().ToList();
+        var subjects = await _db.Set<Subject>().IgnoreQueryFilters().AsNoTracking()
+            .Where(s => subjectIds.Contains(s.Id)).ToDictionaryAsync(s => s.Id, ct);
+
+        var start = new DateTimeOffset(DateTimeOffset.UtcNow.Date, TimeSpan.Zero).AddDays(-2);
+        var specs = new (int QIdx, AcademicClassificationState State, int Priority, AcademicRecommendationType Type, bool Done)[]
+        {
+            (51, AcademicClassificationState.Critical, 92, AcademicRecommendationType.RemediateCritical, true),
+            (31, AcademicClassificationState.Weak, 78, AcademicRecommendationType.StrengthenWeak, true),
+            (61, AcademicClassificationState.Weak, 74, AcademicRecommendationType.MonitorDeclining, false),
+            (1, AcademicClassificationState.Developing, 55, AcademicRecommendationType.ReinforceDeveloping, false),
+            (41, AcademicClassificationState.Developing, 50, AcademicRecommendationType.ReinforceDeveloping, false),
+        };
+
+        var plan = new StudyPlan
+        {
+            Id = DemoStudyPlanId,
+            InstitutionId = DemoInstitutionId,
+            StudentId = DemoStudentId,
+            Title = "Haftalık Çalışma Planı",
+            StartDate = start,
+            EndDate = start.AddDays(7),
+            Status = StudyPlanStatus.Active,
+            Source = StudyPlanSource.AcademicIntelligence,
+            RecommendationPolicyVersion = "demo-v1",
+            StudyPlanPolicyVersion = "demo-v1",
+            ActivatedAt = start,
+            PlanDays = 7,
+            DailyStudyMinutes = 60,
+            SessionMinutes = 45,
+            TotalAvailableMinutes = 420,
+            ScheduledRecommendationCount = specs.Length,
+            UnscheduledRecommendationCount = 0
+        };
+
+        int day = 0;
+        foreach (var s in specs)
+        {
+            var info = topicInfo.FirstOrDefault(t => t.Id == DemoQuestionId(s.QIdx));
+            if (info == null) continue;
+            var topic = topics.GetValueOrDefault(info.TopicId);
+            var subject = subjects.GetValueOrDefault(info.SubjectId);
+            plan.Tasks.Add(new StudyTask
+            {
+                Id = Guid.Parse($"d0000000-0000-0000-0000-0000000000{71 + day}"),
+                InstitutionId = DemoInstitutionId,
+                StudyPlanId = DemoStudyPlanId,
+                StudentId = DemoStudentId,
+                DayIndex = day,
+                PlannedDate = start.AddDays(day),
+                Sequence = 1,
+                DurationMinutes = 45,
+                NodeType = RecommendationNodeType.Topic,
+                NodeId = info.TopicId,
+                SubjectId = info.SubjectId,
+                SubjectName = subject?.Name,
+                TopicId = info.TopicId,
+                TopicName = topic?.Name,
+                TitleSnapshot = $"{subject?.Name} - {topic?.Name} konu tekrarı ve soru çözümü",
+                ClassificationStateSnapshot = s.State,
+                PriorityScoreSnapshot = s.Priority,
+                RecommendationType = s.Type,
+                IsCompleted = s.Done,
+                CompletedAt = s.Done ? start.AddDays(day).AddHours(18) : null
+            });
+            day++;
+        }
+
+        plan.TotalPlannedMinutes = plan.Tasks.Sum(t => t.DurationMinutes);
+        plan.UnallocatedMinutes = plan.TotalAvailableMinutes - plan.TotalPlannedMinutes;
+        plan.UtilizationRate = plan.TotalAvailableMinutes > 0
+            ? Math.Round((decimal)plan.TotalPlannedMinutes / plan.TotalAvailableMinutes, 4)
+            : 0m;
+
+        _db.Set<StudyPlan>().Add(plan);
+        await _db.SaveChangesAsync(ct);
+    }
+
+    private async Task SeedNotesAsync(CancellationToken ct)
+    {
+        var notebook = new (Guid Id, string Title, string Content, string Tags, bool Pinned)[]
+        {
+            (Guid.Parse("d0000000-0000-0000-0000-000000000080"), "Trigonometri Formülleri",
+                "sin²x + cos²x = 1, tan x = sin x / cos x. Yarım açı formüllerini her gün 10 dakika tekrar et.", "matematik,formül", true),
+            (Guid.Parse("d0000000-0000-0000-0000-000000000081"), "Paragraf Stratejisi",
+                "Önce soru kökünü oku, sonra paragrafı. Ana düşünce sorularında ilk ve son cümleye dikkat.", "türkçe,strateji", false),
+        };
+        foreach (var n in notebook)
+        {
+            if (!await _db.Set<NotebookEntry>().IgnoreQueryFilters().AnyAsync(x => x.Id == n.Id, ct))
+            {
+                _db.Set<NotebookEntry>().Add(new NotebookEntry
+                {
+                    Id = n.Id,
+                    InstitutionId = DemoInstitutionId,
+                    StudentId = DemoStudentId,
+                    Title = n.Title,
+                    Content = n.Content,
+                    Tags = n.Tags,
+                    IsPinned = n.Pinned
+                });
+            }
+        }
+
+        var coachNotes = new (Guid Id, string Category, string Content)[]
+        {
+            (Guid.Parse("d0000000-0000-0000-0000-000000000082"), "Akademik",
+                "Matematikte istikrarlı yükseliş var (4 → 7 doğru). Trigonometri hâlâ kritik; haftalık planda önceliklendirildi."),
+            (Guid.Parse("d0000000-0000-0000-0000-000000000083"), "Motivasyon",
+                "Fizikte son denemelerde düşüş var; görüşmede sınav kaygısı ve çalışma düzeni konuşulacak."),
+        };
+        foreach (var n in coachNotes)
+        {
+            if (!await _db.Set<CoachPrivateNote>().IgnoreQueryFilters().AnyAsync(x => x.Id == n.Id, ct))
+            {
+                _db.Set<CoachPrivateNote>().Add(new CoachPrivateNote
+                {
+                    Id = n.Id,
+                    InstitutionId = DemoInstitutionId,
+                    CoachId = DemoCoachEntityId,
+                    StudentId = DemoStudentId,
+                    Category = n.Category,
+                    Content = n.Content
+                });
+            }
         }
 
         await _db.SaveChangesAsync(ct);
