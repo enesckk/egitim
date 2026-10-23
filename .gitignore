@@ -18,5 +18,6 @@ playwright-report/
 .local/
 .claude/
 Library/
+*.pid
 
 
