@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Lock, Plus, Calendar, ShieldCheck, Tag } from 'lucide-react';
+import { Lock, Plus, Calendar, ShieldCheck, Tag, Trash2, Loader2 } from 'lucide-react';
 import { Button } from '@/components/ui/Button';
 import { Modal } from '@/components/ui/Modal';
 import { Badge } from '@/components/ui/Badge';
@@ -9,27 +9,51 @@ import { CoachPrivateNote } from '../types';
 export interface CoachPrivateNotesTabProps {
   notes: CoachPrivateNote[];
   studentName: string;
-  onAddNote: (note: Omit<CoachPrivateNote, 'id' | 'createdAt'>) => void;
+  onAddNote: (note: Omit<CoachPrivateNote, 'id' | 'createdAt'>) => Promise<void> | void;
+  onDeleteNote?: (noteId: string) => Promise<void> | void;
+  isLoading?: boolean;
 }
 
 export const CoachPrivateNotesTab: React.FC<CoachPrivateNotesTabProps> = ({
   notes,
   studentName,
   onAddNote,
+  onDeleteNote,
+  isLoading = false,
 }) => {
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
   const [newContent, setNewContent] = useState('');
   const [newCategory, setNewCategory] = useState<CoachPrivateNote['category']>('Akademik');
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [deletingId, setDeletingId] = useState<string | null>(null);
 
-  const handleSave = (e: React.FormEvent) => {
+  const handleSave = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!newContent.trim()) return;
-    onAddNote({
-      category: newCategory,
-      content: newContent.trim(),
-    });
-    setNewContent('');
-    setIsAddModalOpen(false);
+    if (!newContent.trim() || isSubmitting) return;
+
+    try {
+      setIsSubmitting(true);
+      await onAddNote({
+        category: newCategory,
+        content: newContent.trim(),
+      });
+      setNewContent('');
+      setIsAddModalOpen(false);
+    } catch {
+      // Hata üst bileşende veya bildirimde ele alınır
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  const handleDelete = async (noteId: string) => {
+    if (!onDeleteNote || deletingId) return;
+    try {
+      setDeletingId(noteId);
+      await onDeleteNote(noteId);
+    } finally {
+      setDeletingId(null);
+    }
   };
 
   return (
@@ -64,12 +88,17 @@ export const CoachPrivateNotesTab: React.FC<CoachPrivateNotesTabProps> = ({
       </div>
 
       {/* Notes List */}
-      {notes.length > 0 ? (
+      {isLoading ? (
+        <div className="p-8 flex justify-center items-center text-neutral-400 gap-2">
+          <Loader2 className="h-5 w-5 animate-spin" />
+          <span className="text-xs">Notlar yükleniyor...</span>
+        </div>
+      ) : notes.length > 0 ? (
         <div className="space-y-3">
           {notes.map((note) => (
             <div
               key={note.id}
-              className="bg-white rounded-2xl border border-neutral-100 p-4 space-y-2 shadow-soft-sm"
+              className="bg-white rounded-2xl border border-neutral-100 p-4 space-y-2 shadow-soft-sm relative group"
             >
               <div className="flex items-center justify-between gap-2">
                 <div className="flex items-center gap-2">
@@ -78,10 +107,27 @@ export const CoachPrivateNotesTab: React.FC<CoachPrivateNotesTabProps> = ({
                     {note.category}
                   </Badge>
                 </div>
-                <span className="text-xs text-neutral-400 font-mono flex items-center gap-1">
-                  <Calendar className="h-3 w-3" />
-                  {note.createdAt}
-                </span>
+                <div className="flex items-center gap-3">
+                  <span className="text-xs text-neutral-400 font-mono flex items-center gap-1">
+                    <Calendar className="h-3 w-3" />
+                    {note.createdAt}
+                  </span>
+                  {onDeleteNote && (
+                    <button
+                      type="button"
+                      onClick={() => handleDelete(note.id)}
+                      disabled={deletingId === note.id}
+                      aria-label="Notu sil"
+                      className="text-neutral-400 hover:text-red-500 transition-colors p-1 rounded-lg hover:bg-red-50 disabled:opacity-50"
+                    >
+                      {deletingId === note.id ? (
+                        <Loader2 className="h-3.5 w-3.5 animate-spin text-red-500" />
+                      ) : (
+                        <Trash2 className="h-3.5 w-3.5" />
+                      )}
+                    </button>
+                  )}
+                </div>
               </div>
 
               <p className="text-sm text-neutral-800 leading-relaxed whitespace-pre-wrap">
@@ -111,22 +157,33 @@ export const CoachPrivateNotesTab: React.FC<CoachPrivateNotesTabProps> = ({
       {/* Add Note Modal */}
       <Modal
         isOpen={isAddModalOpen}
-        onClose={() => setIsAddModalOpen(false)}
+        onClose={() => !isSubmitting && setIsAddModalOpen(false)}
         title="Yeni Özel Koç Notu"
         subtitle={`${studentName} için yalnızca koça özel kayıt`}
         headerVariant="dark"
         footer={
           <div className="flex justify-end gap-2 w-full">
-            <Button variant="secondary" size="sm" onClick={() => setIsAddModalOpen(false)}>
+            <Button
+              variant="secondary"
+              size="sm"
+              onClick={() => setIsAddModalOpen(false)}
+              disabled={isSubmitting}
+            >
               İptal
             </Button>
             <Button
               variant="primary"
               size="sm"
               onClick={handleSave}
-              disabled={!newContent.trim()}
+              disabled={!newContent.trim() || isSubmitting}
             >
-              Notu Kaydet
+              {isSubmitting ? (
+                <>
+                  <Loader2 className="h-3.5 w-3.5 animate-spin mr-1" /> Kaydediliyor...
+                </>
+              ) : (
+                'Notu Kaydet'
+              )}
             </Button>
           </div>
         }
@@ -139,6 +196,7 @@ export const CoachPrivateNotesTab: React.FC<CoachPrivateNotesTabProps> = ({
             <select
               value={newCategory}
               onChange={(e) => setNewCategory(e.target.value as CoachPrivateNote['category'])}
+              disabled={isSubmitting}
               className="w-full text-xs bg-white border border-neutral-200 rounded-xl px-3 py-2 text-neutral-800 focus:outline-none focus:ring-2 focus:ring-primary-500"
             >
               <option value="Akademik">Akademik Değerlendirme</option>
@@ -156,6 +214,7 @@ export const CoachPrivateNotesTab: React.FC<CoachPrivateNotesTabProps> = ({
               value={newContent}
               onChange={(e) => setNewContent(e.target.value)}
               rows={4}
+              disabled={isSubmitting}
               placeholder="Öğrenciye dair özel gözlemlerinizi ve takip edilecek noktaları yazın..."
               className="w-full text-sm bg-surface-alt border border-neutral-200 rounded-xl p-3 text-neutral-900 placeholder:text-neutral-400 focus:outline-none focus:ring-2 focus:ring-primary-500"
             />

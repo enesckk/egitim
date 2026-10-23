@@ -59,6 +59,7 @@ public class ApplicationDbContext : IdentityDbContext<ApplicationUser, Applicati
             "EgitimPlatform.Modules.Questions",
             "EgitimPlatform.Modules.Planning",
             "EgitimPlatform.Modules.Communication",
+            "EgitimPlatform.Modules.Notebook",
         };
 
         foreach (var moduleName in moduleNames)
@@ -581,6 +582,52 @@ public class ApplicationDbContext : IdentityDbContext<ApplicationUser, Applicati
             if (studentType is not null)
             {
                 builder.Entity(coachTaskType.ClrType)
+                    .HasOne(studentType.ClrType)
+                    .WithMany()
+                    .HasForeignKey("StudentId", "InstitutionId")
+                    .HasPrincipalKey("Id", "InstitutionId")
+                    .OnDelete(DeleteBehavior.Restrict);
+            }
+        }
+
+        var coachPrivateNoteType = FindEntityType(builder, "CoachPrivateNote");
+        if (coachPrivateNoteType is not null)
+        {
+            if (institutionType is not null)
+            {
+                builder.Entity(coachPrivateNoteType.ClrType)
+                    .HasOne(institutionType.ClrType)
+                    .WithMany()
+                    .HasForeignKey("InstitutionId")
+                    .OnDelete(DeleteBehavior.Restrict);
+            }
+
+            if (studentType is not null)
+            {
+                builder.Entity(coachPrivateNoteType.ClrType)
+                    .HasOne(studentType.ClrType)
+                    .WithMany()
+                    .HasForeignKey("StudentId", "InstitutionId")
+                    .HasPrincipalKey("Id", "InstitutionId")
+                    .OnDelete(DeleteBehavior.Restrict);
+            }
+        }
+
+        var notebookEntryType = FindEntityType(builder, "NotebookEntry");
+        if (notebookEntryType is not null)
+        {
+            if (institutionType is not null)
+            {
+                builder.Entity(notebookEntryType.ClrType)
+                    .HasOne(institutionType.ClrType)
+                    .WithMany()
+                    .HasForeignKey("InstitutionId")
+                    .OnDelete(DeleteBehavior.Restrict);
+            }
+
+            if (studentType is not null)
+            {
+                builder.Entity(notebookEntryType.ClrType)
                     .HasOne(studentType.ClrType)
                     .WithMany()
                     .HasForeignKey("StudentId", "InstitutionId")

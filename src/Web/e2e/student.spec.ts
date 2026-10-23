@@ -539,4 +539,70 @@ test.describe('A1: Student Experience Foundation Tests', () => {
     await expect(page.locator('text="Fonksiyonlar Tekrar Etüdü"').first()).toBeVisible();
     await expect(page.locator('text="Sıradaki Çalışma"')).toBeVisible();
   });
+
+  test('13. Student can view personal notebook entries and create a new note', async ({ page }) => {
+    let mockEntries = [
+      {
+        id: 'entry-1',
+        studentId: 'usr-student-001',
+        title: 'Trigonometri Yarım Açı Formülleri',
+        content: 'sin(2x) = 2.sin(x).cos(x)',
+        tags: 'Matematik, AYT',
+        isPinned: true,
+        createdAt: new Date().toISOString(),
+      },
+    ];
+
+    await page.route('**/api/v1/notebook*', async (route) => {
+      if (route.request().method() === 'GET') {
+        await route.fulfill({
+          status: 200,
+          contentType: 'application/json',
+          body: JSON.stringify({
+            items: mockEntries,
+            pageIndex: 1,
+            totalPages: 1,
+            totalCount: mockEntries.length,
+            hasPreviousPage: false,
+            hasNextPage: false,
+          }),
+        });
+      } else if (route.request().method() === 'POST') {
+        const body = JSON.parse(route.request().postData() || '{}');
+        const newEntry = {
+          id: 'entry-2',
+          studentId: 'usr-student-001',
+          title: body.title,
+          content: body.content,
+          tags: body.tags || null,
+          isPinned: body.isPinned || false,
+          createdAt: new Date().toISOString(),
+        };
+        mockEntries = [newEntry, ...mockEntries];
+        await route.fulfill({
+          status: 201,
+          contentType: 'application/json',
+          body: JSON.stringify(newEntry),
+        });
+      }
+    });
+
+    await page.goto('/student/notebook');
+    await page.waitForLoadState('networkidle');
+
+    await expect(page.locator('text=Öğrenci Defteri').first()).toBeVisible();
+    await expect(page.locator('text=Trigonometri Yarım Açı Formülleri')).toBeVisible();
+    await expect(page.locator('text=sin(2x) = 2.sin(x).cos(x)')).toBeVisible();
+
+    const newNoteBtn = page.locator('button:has-text("Yeni Not Ekle")').first();
+    await newNoteBtn.click();
+
+    await expect(page.locator('text=Yeni Defter Notu')).toBeVisible();
+    await page.locator('input[placeholder*="Örn: Logaritma"]').fill('Kimya Periyodik Cetvel');
+    await page.locator('textarea').fill('Soygazlar: He, Ne, Ar, Kr, Xe, Rn');
+    await page.locator('button:has-text("Kaydet")').click();
+
+    await expect(page.locator('text=Kimya Periyodik Cetvel')).toBeVisible();
+    await expect(page.locator('text=Soygazlar: He, Ne, Ar, Kr, Xe, Rn')).toBeVisible();
+  });
 });

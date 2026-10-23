@@ -10,6 +10,7 @@ using EgitimPlatform.Modules.Coaching.Extensions;
 using EgitimPlatform.Modules.Identity.Extensions;
 using EgitimPlatform.Modules.Students.Extensions;
 using EgitimPlatform.Modules.Communication.Extensions;
+using EgitimPlatform.Modules.Notebook.Extensions;
 using EgitimPlatform.Modules.AI.Extensions;
 using Microsoft.AspNetCore.HttpOverrides;
 using Microsoft.AspNetCore.RateLimiting;
@@ -49,6 +50,7 @@ try
     builder.Services.AddQuestionsModule();
     builder.Services.AddPlanningModule();
     builder.Services.AddCommunicationModule();
+    builder.Services.AddNotebookModule();
     builder.Services.AddAiModule();
 
     // Controllers

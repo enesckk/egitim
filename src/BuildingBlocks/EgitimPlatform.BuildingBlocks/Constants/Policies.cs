@@ -17,4 +17,6 @@ public static class Policies
     public const string CanViewExamResults = "CanViewExamResults";
     public const string CanManageQuestions = "CanManageQuestions";
     public const string CanViewQuestions = "CanViewQuestions";
+    public const string CanManageCoachPrivateNotes = "CanManageCoachPrivateNotes";
+    public const string CanManageNotebook = "CanManageNotebook";
 }

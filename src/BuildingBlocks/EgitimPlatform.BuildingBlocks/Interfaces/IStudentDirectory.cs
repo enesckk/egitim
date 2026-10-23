@@ -9,6 +9,7 @@ public record StudentSummaryDto(Guid Id, Guid InstitutionId, string FirstName, s
 public interface IStudentDirectory
 {
     Task<StudentReferenceDto?> GetStudentAsync(Guid studentId, CancellationToken ct = default);
+    Task<StudentReferenceDto?> GetStudentByUserIdAsync(Guid userId, Guid institutionId, CancellationToken ct = default);
     Task<bool> IsParentRelatedToStudentAsync(Guid parentUserId, Guid studentId, Guid institutionId, CancellationToken ct = default);
     Task<IReadOnlyList<StudentImportLookupDto>> GetActiveStudentsForImportAsync(Guid institutionId, CancellationToken ct = default);
     Task<IReadOnlyList<StudentSummaryDto>> GetStudentsByIdsAsync(IEnumerable<Guid> studentIds, Guid institutionId, CancellationToken ct = default);

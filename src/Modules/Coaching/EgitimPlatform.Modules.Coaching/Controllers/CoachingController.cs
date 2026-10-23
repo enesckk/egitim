@@ -1,6 +1,7 @@
 using EgitimPlatform.BuildingBlocks.Constants;
 using EgitimPlatform.Modules.Coaching.Features.AssignCoach;
 using EgitimPlatform.Modules.Coaching.Features.ManageCoaches;
+using EgitimPlatform.Modules.Coaching.Features.ManageNotes;
 using FluentValidation;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Http;
@@ -87,6 +88,58 @@ public class CoachingController : ControllerBase
         }
 
         await _assignHandler.HandleAsync(command, ct);
+        return NoContent();
+    }
+
+    [HttpGet("students/{studentId:guid}/notes")]
+    [Authorize(Policy = Policies.CanManageCoachPrivateNotes)]
+    [ProducesResponseType(typeof(IReadOnlyList<CoachPrivateNoteDto>), StatusCodes.Status200OK)]
+    public async Task<ActionResult<IReadOnlyList<CoachPrivateNoteDto>>> ListNotes(
+        [FromRoute] Guid studentId,
+        [FromServices] CoachPrivateNotesHandler notesHandler,
+        CancellationToken ct)
+    {
+        var result = await notesHandler.ListAsync(new(studentId), ct);
+        return Ok(result);
+    }
+
+    [HttpPost("students/{studentId:guid}/notes")]
+    [Authorize(Policy = Policies.CanManageCoachPrivateNotes)]
+    [ProducesResponseType(typeof(CoachPrivateNoteDto), StatusCodes.Status201Created)]
+    public async Task<ActionResult<CoachPrivateNoteDto>> CreateNote(
+        [FromRoute] Guid studentId,
+        [FromBody] CreateCoachPrivateNoteRequest request,
+        [FromServices] CoachPrivateNotesHandler notesHandler,
+        CancellationToken ct)
+    {
+        var command = new CreateCoachPrivateNoteCommand(studentId, request.Category, request.Content);
+        var result = await notesHandler.CreateAsync(command, ct);
+        return StatusCode(StatusCodes.Status201Created, result);
+    }
+
+    [HttpPut("notes/{noteId:guid}")]
+    [Authorize(Policy = Policies.CanManageCoachPrivateNotes)]
+    [ProducesResponseType(typeof(CoachPrivateNoteDto), StatusCodes.Status200OK)]
+    public async Task<ActionResult<CoachPrivateNoteDto>> UpdateNote(
+        [FromRoute] Guid noteId,
+        [FromBody] UpdateCoachPrivateNoteRequest request,
+        [FromServices] CoachPrivateNotesHandler notesHandler,
+        CancellationToken ct)
+    {
+        var command = new UpdateCoachPrivateNoteCommand(noteId, request.Category, request.Content);
+        var result = await notesHandler.UpdateAsync(command, ct);
+        return Ok(result);
+    }
+
+    [HttpDelete("notes/{noteId:guid}")]
+    [Authorize(Policy = Policies.CanManageCoachPrivateNotes)]
+    [ProducesResponseType(StatusCodes.Status204NoContent)]
+    public async Task<IActionResult> DeleteNote(
+        [FromRoute] Guid noteId,
+        [FromServices] CoachPrivateNotesHandler notesHandler,
+        CancellationToken ct)
+    {
+        await notesHandler.DeleteAsync(noteId, ct);
         return NoContent();
     }
 

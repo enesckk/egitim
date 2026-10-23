@@ -268,4 +268,56 @@ test.describe('Coach Portal Quality Gate & Flow Tests', () => {
     // Safe error message / not found alert display
     await expect(page.locator('text=Öğrenci Bulunamadı')).toBeVisible();
   });
+
+  test('9. Coach Private Notes displays notes and allows adding notes via modal', async ({ page }) => {
+    await setupCoachSession(page);
+
+    await page.route('**/api/v1/coaching/students/student-1/notes', async (route: any) => {
+      if (route.request().method() === 'GET') {
+        await route.fulfill({
+          status: 200,
+          contentType: 'application/json',
+          body: JSON.stringify([
+            {
+              id: 'note-1',
+              studentId: 'student-1',
+              coachId: 'coach-123',
+              category: 'Akademik',
+              content: 'Öğrenci türev konusunda eksiklerini tamamladı.',
+              createdAt: new Date().toISOString(),
+            },
+          ]),
+        });
+      } else if (route.request().method() === 'POST') {
+        const body = JSON.parse(route.request().postData() || '{}');
+        await route.fulfill({
+          status: 201,
+          contentType: 'application/json',
+          body: JSON.stringify({
+            id: 'note-2',
+            studentId: 'student-1',
+            coachId: 'coach-123',
+            category: body.category || 'Motivasyon',
+            content: body.content,
+            createdAt: new Date().toISOString(),
+          }),
+        });
+      }
+    });
+
+    await page.goto('/coach/students/student-1?tab=notes');
+    await page.waitForLoadState('networkidle');
+
+    await expect(page.locator('text=Koça Özel Gizli Not Alanı')).toBeVisible();
+    await expect(page.locator('text=Öğrenci türev konusunda eksiklerini tamamladı.')).toBeVisible();
+
+    const addNoteBtn = page.locator('button:has-text("Not Ekle")').first();
+    await addNoteBtn.click();
+
+    await expect(page.locator('text=Yeni Özel Koç Notu')).toBeVisible();
+    await page.locator('textarea').fill('Deneme sınavı motivasyonu yüksek.');
+    await page.locator('button:has-text("Notu Kaydet")').click();
+
+    await expect(page.locator('text=Deneme sınavı motivasyonu yüksek.')).toBeVisible();
+  });
 });

@@ -15,6 +15,15 @@ public class StudentDirectory(IApplicationDbContext db) : IStudentDirectory
             .SingleOrDefaultAsync(ct);
     }
 
+    public async Task<StudentReferenceDto?> GetStudentByUserIdAsync(Guid userId, Guid institutionId, CancellationToken ct = default)
+    {
+        return await db.Set<Student>()
+            .AsNoTracking()
+            .Where(s => s.UserId == userId && s.InstitutionId == institutionId && !s.IsDeleted)
+            .Select(s => new StudentReferenceDto(s.Id, s.InstitutionId, s.UserId))
+            .SingleOrDefaultAsync(ct);
+    }
+
     public async Task<bool> IsParentRelatedToStudentAsync(Guid parentUserId, Guid studentId, Guid institutionId, CancellationToken ct = default)
     {
         return await (from link in db.Set<StudentParent>().AsNoTracking()

@@ -4,6 +4,7 @@ import { ArrowLeft, MessageSquare, AlertCircle, RefreshCw, CheckCircle2, AlertTr
 import { cn } from '@/lib/utils';
 import { academicService } from '@/services/academicService';
 import { coachTaskService, CoachTaskStatus } from '@/services/coachTaskService';
+import { coachNoteService } from '@/services/coachNoteService';
 import { examService } from '@/services/examService';
 import { Button } from '@/components/ui/Button';
 import { Tabs } from '@/components/ui/Tabs';
@@ -110,10 +111,11 @@ export const CoachStudentDetailView: React.FC<CoachStudentDetailViewProps> = ({
         return;
       }
 
-      const [activePlanRes, coachTasksRes, examsRes] = await Promise.allSettled([
+      const [activePlanRes, coachTasksRes, examsRes, notesRes] = await Promise.allSettled([
         academicService.getActiveStudyPlan(studentId),
         coachTaskService.getCoachTasks(studentId),
         examService.getStudentExamResults(studentId),
+        coachNoteService.getPrivateNotes(studentId),
       ]);
 
       const activePlan = activePlanRes.status === 'fulfilled' ? activePlanRes.value : null;
@@ -126,6 +128,17 @@ export const CoachStudentDetailView: React.FC<CoachStudentDetailViewProps> = ({
           ? examsRes.value.items.length
           : undefined;
       setExamCount(examsTotal);
+
+      const privateNotes: CoachPrivateNote[] =
+        notesRes.status === 'fulfilled' && Array.isArray(notesRes.value)
+          ? notesRes.value.map((n) => ({
+              id: n.id,
+              category: n.category,
+              content: n.content,
+              createdAt: n.createdAt ? new Date(n.createdAt).toLocaleDateString('tr-TR') : 'Bugün',
+              updatedAt: n.updatedAt ?? undefined,
+            }))
+          : [];
 
       const weeklyPlanTasks: StudentPlanTaskReview[] = [];
       let adherence = 100;
@@ -215,7 +228,7 @@ export const CoachStudentDetailView: React.FC<CoachStudentDetailViewProps> = ({
         lastActivity: baseStudentDto.createdAt
           ? new Date(baseStudentDto.createdAt).toLocaleDateString('tr-TR')
           : 'Aktif',
-        privateNotes: prev?.id === baseStudentDto.id ? prev.privateNotes : [],
+        privateNotes: prev?.id === baseStudentDto.id && prev.privateNotes.length > 0 ? prev.privateNotes : privateNotes,
         weeklyPlanTasks,
         recentExams: [],
       }));
@@ -230,15 +243,39 @@ export const CoachStudentDetailView: React.FC<CoachStudentDetailViewProps> = ({
     fetchStudentDetail();
   }, [fetchStudentDetail]);
 
-  const handleAddPrivateNote = (newNoteData: Omit<CoachPrivateNote, 'id' | 'createdAt'>) => {
-    const newNote: CoachPrivateNote = {
-      id: `pnote-${Date.now()}`,
-      createdAt: 'Bugün',
-      category: newNoteData.category,
-      content: newNoteData.content,
-    };
+  const handleAddPrivateNote = async (newNoteData: Omit<CoachPrivateNote, 'id' | 'createdAt'>) => {
+    if (!studentId) return;
+    try {
+      const created = await coachNoteService.createPrivateNote(studentId, {
+        category: newNoteData.category,
+        content: newNoteData.content,
+      });
 
-    setStudent((prev) => (prev ? { ...prev, privateNotes: [newNote, ...prev.privateNotes] } : prev));
+      const formatted: CoachPrivateNote = {
+        id: created.id,
+        category: created.category,
+        content: created.content,
+        createdAt: created.createdAt ? new Date(created.createdAt).toLocaleDateString('tr-TR') : 'Bugün',
+        updatedAt: created.updatedAt ?? undefined,
+      };
+
+      setStudent((prev) => (prev ? { ...prev, privateNotes: [formatted, ...prev.privateNotes] } : prev));
+    } catch (err) {
+      console.error('Failed to create coach private note:', err);
+      throw err;
+    }
+  };
+
+  const handleDeletePrivateNote = async (noteId: string) => {
+    try {
+      await coachNoteService.deletePrivateNote(noteId);
+      setStudent((prev) =>
+        prev ? { ...prev, privateNotes: prev.privateNotes.filter((n) => n.id !== noteId) } : prev
+      );
+    } catch (err) {
+      console.error('Failed to delete coach private note:', err);
+      throw err;
+    }
   };
 
   const activeLoading = propIsLoading || isLoading;
@@ -364,6 +401,7 @@ export const CoachStudentDetailView: React.FC<CoachStudentDetailViewProps> = ({
             notes={student.privateNotes}
             studentName={student.name}
             onAddNote={handleAddPrivateNote}
+            onDeleteNote={handleDeletePrivateNote}
           />
         )}
       </div>
