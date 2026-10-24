@@ -42,4 +42,8 @@ export const teacherService = {
   getStudent360: (studentId: string): Promise<Student360Dto> => {
     return apiClient.get<Student360Dto>(`/api/v1/students/${studentId}/360`);
   },
+
+  getDashboard: (): Promise<any> => {
+    return apiClient.get('/api/v1/teachers/dashboard');
+  },
 };

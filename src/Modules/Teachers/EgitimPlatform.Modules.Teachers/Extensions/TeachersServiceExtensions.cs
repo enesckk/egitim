@@ -14,6 +14,7 @@ public static class TeachersServiceExtensions
     {
         services.AddScoped<TeacherHandler>();
         services.AddScoped<ClassroomHandler>();
+        services.AddScoped<EgitimPlatform.Modules.Teachers.Features.GetTeacherDashboard.GetTeacherDashboardHandler>();
         services.AddScoped<ITeacherStudentQuery, TeacherStudentQuery>();
         services.AddValidatorsFromAssembly(Assembly.GetExecutingAssembly());
         return services;

@@ -6,7 +6,6 @@ import { Alert } from '@/components/ui/Alert';
 import { Skeleton } from '@/components/ui/Skeleton';
 import { AcademicGapsCard } from './components/AcademicGapsCard';
 import { StudentNetsCard } from './components/StudentNetsCard';
-import { initialTeacherDashboardData } from './mockData';
 import { TeacherDashboardViewModel } from './types';
 import { teacherService } from '@/services/teacherService';
 
@@ -34,14 +33,8 @@ export const TeacherDashboardView: React.FC<TeacherDashboardViewProps> = ({
     setErrorMessage(undefined);
 
     try {
-      const me = await teacherService.getMe();
-      setData({
-        ...initialTeacherDashboardData,
-        teacherName: me.fullName || `${me.firstName} ${me.lastName}`,
-        assignedSubjects: (me.subjects || []).map((s) => s.subjectName),
-        totalAssignedClasses: me.assignedClassroomCount || 0,
-        totalAssignedStudents: me.assignedStudentCount || 0,
-      });
+      const dashboard = await teacherService.getDashboard();
+      setData(dashboard);
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : 'Öğretmen paneli yüklenemedi.';
       setErrorMessage(msg);
@@ -67,7 +60,7 @@ export const TeacherDashboardView: React.FC<TeacherDashboardViewProps> = ({
     }
   };
 
-  const activeData = data || initialData || initialTeacherDashboardData;
+  const activeData = data || initialData;
   const activeLoading = propIsLoading || isLoading;
   const activeError = propErrorMessage || errorMessage;
 
@@ -88,12 +81,12 @@ export const TeacherDashboardView: React.FC<TeacherDashboardViewProps> = ({
     );
   }
 
-  // Error State
-  if (activeError) {
+  // Error State or Empty
+  if (activeError || !activeData) {
     return (
       <div className="max-w-5xl mx-auto py-8 space-y-4" data-testid="teacher-dashboard-error">
         <Alert variant="danger" icon={<AlertCircle className="h-5 w-5" />} title="Genel Bakış Yüklenemedi">
-          {activeError}
+          {activeError || 'Öğretmen paneli verisi bulunamadı.'}
         </Alert>
         <div className="text-center pt-2">
           <Button variant="primary" size="sm" onClick={handleRetry} leftIcon={<RefreshCw className="h-4 w-4" />}>

@@ -1,4 +1,5 @@
 using EgitimPlatform.Modules.Planning.Features;
+using EgitimPlatform.Modules.Planning.Features.GetInstitutionOverview;
 using Microsoft.Extensions.DependencyInjection;
 
 namespace EgitimPlatform.Modules.Planning.Extensions;
@@ -13,6 +14,7 @@ public static class PlanningServiceExtensions
         services.AddScoped<ListStudyPlansHandler>();
         services.AddScoped<UpdateTaskCompletionHandler>();
         services.AddScoped<CancelStudyPlanHandler>();
+        services.AddScoped<GetInstitutionOverviewHandler>();
 
         services.AddScoped<CreateCoachTaskHandler>();
         services.AddScoped<ListCoachTasksHandler>();

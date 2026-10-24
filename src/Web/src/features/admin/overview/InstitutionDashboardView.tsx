@@ -5,7 +5,6 @@ import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/Button';
 import { Alert } from '@/components/ui/Alert';
 import { Skeleton } from '@/components/ui/Skeleton';
-import { initialAdminOverviewData } from './mockData';
 import { InstitutionOverviewViewModel, Timeframe } from './types';
 import { KpiGrid } from './components/KpiGrid';
 import { AcademicTrendChart } from './components/AcademicTrendChart';
@@ -44,28 +43,8 @@ export const InstitutionDashboardView: React.FC<InstitutionDashboardViewProps> =
     setErrorMessage(undefined);
 
     try {
-      const [studentsRes, coachesRes] = await Promise.all([
-        adminService.listStudents({ page: 1, pageSize: 1 }),
-        adminService.listCoaches({ page: 1, pageSize: 1 }),
-      ]);
-
-      const totalStudents = studentsRes?.totalCount ?? 0;
-      const totalCoaches = coachesRes?.totalCount ?? 0;
-
-      const updatedKpis = initialAdminOverviewData.kpis.map((kpi) => {
-        if (kpi.label.includes('Öğrenci')) {
-          return { ...kpi, value: totalStudents.toString() };
-        }
-        if (kpi.label.includes('Koç') || kpi.label.includes('Portföy')) {
-          return { ...kpi, value: `${totalCoaches} Koç` };
-        }
-        return kpi;
-      });
-
-      setData({
-        ...initialAdminOverviewData,
-        kpis: updatedKpis,
-      });
+      const overview = await adminService.getInstitutionOverview();
+      setData(overview);
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : 'Kurum gösterge paneli yüklenemedi.';
       setErrorMessage(msg);
@@ -91,11 +70,11 @@ export const InstitutionDashboardView: React.FC<InstitutionDashboardViewProps> =
     }
   };
 
-  const activeData = data || initialData || initialAdminOverviewData;
+  const activeData = data || initialData;
   const activeLoading = propIsLoading || isLoading;
   const activeError = propErrorMessage || errorMessage;
 
-  const chartData = activeData.trendData[timeframe] || activeData.trendData['1m'];
+  const chartData = activeData?.trendData ? (activeData.trendData[timeframe] || activeData.trendData['1m'] || []) : [];
 
   // Loading State
   if (activeLoading) {
@@ -116,8 +95,8 @@ export const InstitutionDashboardView: React.FC<InstitutionDashboardViewProps> =
     );
   }
 
-  // Error State
-  if (activeError) {
+  // Error State or Empty
+  if (activeError || !activeData) {
     return (
       <div className="max-w-6xl mx-auto py-10 space-y-4 select-none" data-testid="admin-dashboard-error">
         <Alert
@@ -125,7 +104,7 @@ export const InstitutionDashboardView: React.FC<InstitutionDashboardViewProps> =
           icon={<AlertCircle className="h-5 w-5" />}
           title="Veriler Yüklenemedi"
         >
-          {activeError}
+          {activeError || 'Kurum genel bakış verisi bulunamadı.'}
         </Alert>
         <div className="text-center pt-2">
           <Button

@@ -288,4 +288,9 @@ export const adminService = {
   linkParent: (studentId: string, parentId: string): Promise<void> => {
     return apiClient.post<void>(`/api/v1/students/${studentId}/parents`, { parentId });
   },
+
+  // Institution Overview (Real Dashboard)
+  getInstitutionOverview: (): Promise<any> => {
+    return apiClient.get('/api/v1/institution/overview');
+  },
 };

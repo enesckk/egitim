@@ -1,4 +1,5 @@
 using EgitimPlatform.BuildingBlocks.Constants;
+using EgitimPlatform.Modules.Teachers.Features.GetTeacherDashboard;
 using EgitimPlatform.Modules.Teachers.Features.ManageTeachers;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
@@ -14,6 +15,10 @@ public class TeachersController(TeacherHandler handler, EgitimPlatform.BuildingB
     [HttpGet("me")]
     public async Task<ActionResult<TeacherMeDto>> GetMe(CancellationToken ct)
         => Ok(await handler.GetMeAsync(ct));
+
+    [HttpGet("dashboard")]
+    public async Task<ActionResult<TeacherDashboardDto>> GetDashboard([FromServices] GetTeacherDashboardHandler dashboardHandler, CancellationToken ct)
+        => Ok(await dashboardHandler.HandleAsync(ct));
 
     [HttpGet("{teacherId:guid}")]
     [Authorize(Policy = Policies.CanManageTeachers)]
