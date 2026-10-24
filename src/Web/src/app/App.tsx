@@ -19,6 +19,7 @@ import {
   GraduationCap,
   BookOpen,
   BookMarked,
+  FolderArchive,
   UserCheck,
   Building2,
   LogOut,
@@ -49,6 +50,7 @@ const StudentAcademicView = lazy(() => import('@/features/student/academic').the
 const StudentPlansView = lazy(() => import('@/features/student/plans').then((m) => ({ default: m.StudentPlansView })));
 const StudentExamsView = lazy(() => import('@/features/student/exams').then((m) => ({ default: m.StudentExamsView })));
 const StudentNotebookView = lazy(() => import('@/features/student/notebook/StudentNotebookView'));
+const StudentMaterialsView = lazy(() => import('@/features/student/materials').then((m) => ({ default: m.StudentMaterialsView })));
 const StudentMessagesView = lazy(() => import('@/features/student/messages').then((m) => ({ default: m.StudentMessagesView })));
 const StudentProfileView = lazy(() => import('@/features/student/profile').then((m) => ({ default: m.StudentProfileView })));
 
@@ -118,6 +120,12 @@ const STUDENT_NAV_ITEMS: PortalNavItem[] = [
     path: '/student/notebook',
     label: 'Defter',
     icon: <BookMarked className="h-5 w-5" />,
+  },
+  {
+    id: 'materials',
+    path: '/student/materials',
+    label: 'Materyaller',
+    icon: <FolderArchive className="h-5 w-5" />,
   },
   {
     id: 'messages',
@@ -328,6 +336,7 @@ const StudentPortalLayout: React.FC = () => {
           <Route path="/plans" element={<StudentPlansView />} />
           <Route path="/exams" element={<StudentExamsView />} />
           <Route path="/notebook" element={<StudentNotebookView />} />
+          <Route path="/materials" element={<StudentMaterialsView />} />
           <Route path="/messages" element={<StudentMessagesView />} />
           <Route path="/profile" element={<StudentProfileView />} />
           <Route path="*" element={<Navigate to="/student/today" replace />} />

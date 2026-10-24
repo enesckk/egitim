@@ -60,6 +60,7 @@ public class ApplicationDbContext : IdentityDbContext<ApplicationUser, Applicati
             "EgitimPlatform.Modules.Planning",
             "EgitimPlatform.Modules.Communication",
             "EgitimPlatform.Modules.Notebook",
+            "EgitimPlatform.Modules.Content",
         };
 
         foreach (var moduleName in moduleNames)

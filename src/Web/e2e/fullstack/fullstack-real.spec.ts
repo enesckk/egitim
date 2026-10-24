@@ -12,6 +12,7 @@ import { execSync } from 'child_process';
 async function loginAs(page: Page, email: string, password: string) {
   await page.goto('/login');
   await expect(page.locator('#login-email')).toBeVisible();
+  await expect(page.locator('#login-email')).toBeEnabled({ timeout: 10000 });
 
   await page.locator('#login-email').fill(email);
   await page.locator('#login-password').fill(password);
@@ -22,12 +23,14 @@ async function loginAs(page: Page, email: string, password: string) {
 }
 
 async function logout(page: Page) {
+  await page.context().clearCookies();
   await page.evaluate(() => {
     localStorage.clear();
     sessionStorage.clear();
   });
   await page.goto('/login');
   await expect(page.locator('#login-email')).toBeVisible();
+  await expect(page.locator('#login-email')).toBeEnabled({ timeout: 10000 });
 }
 
 test.describe('Real Full-Stack Verification — 5 Role Portals, Exam Import & MSSQL Persistence', () => {
@@ -474,6 +477,67 @@ with zipfile.ZipFile('/tmp/template_e2e.xlsx', 'r') as z_in:
     await page.goto('/student/messages');
     await expect(page.getByTestId('student-messages-view')).toBeVisible({ timeout: 10000 });
     await expect(page.locator('p.whitespace-pre-wrap', { hasText: uniqueMsgContent })).toBeVisible({ timeout: 10000 });
+  });
+
+  test('11. Course Content & Materials: Real Teacher Upload → Student Access → Revoke Access', async ({ page }) => {
+    // Step 1: Real Login as Teacher
+    await loginAs(page, 'teacher.demo@egitim.com', 'Demo1234!');
+    await expect(page).toHaveURL(/\/teacher/);
+
+    // Step 2: Navigate to Teacher Content View
+    await page.goto('/teacher/content');
+    await expect(page.getByRole('heading', { name: /Ders Materyalleri & Testler/i })).toBeVisible({ timeout: 10000 });
+
+    // Step 3: Open Upload Modal & Submit Material
+    page.on('dialog', async (dialog) => {
+      try {
+        await dialog.accept();
+      } catch {
+        // dialog might be already handled or closed
+      }
+    });
+    const uniqueTitle = `E2E Analitik Geometri ${Date.now().toString().slice(-4)}`;
+    await page.locator('#btn-new-material').click();
+    await expect(page.locator('#upload-title-input')).toBeVisible({ timeout: 5000 });
+
+    await page.locator('#upload-title-input').fill(uniqueTitle);
+    await page.locator('#upload-file-input').setInputFiles('/tmp/sample.pdf');
+
+    await page.locator('#btn-submit-upload').click();
+    await expect(page.locator('#btn-submit-upload')).not.toBeVisible({ timeout: 10000 });
+    await expect(page.getByText(uniqueTitle)).toBeVisible({ timeout: 10000 });
+
+    // Step 4: Assign to first available Classroom
+    const materialCard = page.locator('div.bg-white', { hasText: uniqueTitle });
+    await materialCard.getByRole('button', { name: /Şubeye Ata/i }).click();
+    await expect(page.getByRole('heading', { name: /Materyali Şubeye Ata/i })).toBeVisible({ timeout: 5000 });
+    await page.getByRole('button', { name: 'Atamayı Onayla' }).click();
+    await expect(page.getByText(/şubeye başarıyla atandı/i)).toBeVisible({ timeout: 10000 });
+
+    // Step 5: Real Login as Student & Verify Material is Accessible
+    await logout(page);
+    await loginAs(page, 'student.demo@egitim.com', 'Demo1234!');
+    await page.goto('/student/materials');
+    await expect(page.getByRole('heading', { name: /Ders Materyallerim/i })).toBeVisible({ timeout: 10000 });
+    await expect(page.locator('#student-materials-grid')).toBeVisible({ timeout: 10000 });
+    await expect(page.getByText(uniqueTitle)).toBeVisible({ timeout: 10000 });
+
+    // Step 6: Teacher Revokes Classroom Access
+    await logout(page);
+    await loginAs(page, 'teacher.demo@egitim.com', 'Demo1234!');
+    await page.goto('/teacher/content');
+    await expect(page.getByText(uniqueTitle)).toBeVisible({ timeout: 10000 });
+
+    const revokeBtn = page.locator('div.bg-white', { hasText: uniqueTitle }).locator('button[title="Erişimi İptal Et"]').first();
+    await revokeBtn.click();
+    await expect(page.getByText(/Şube erişimi başarıyla geri alındı/i)).toBeVisible({ timeout: 10000 });
+
+    // Step 7: Verify Student No Longer Sees the Material (Fail-Closed)
+    await logout(page);
+    await loginAs(page, 'student.demo@egitim.com', 'Demo1234!');
+    await page.goto('/student/materials');
+    await expect(page.getByRole('heading', { name: /Ders Materyallerim/i })).toBeVisible({ timeout: 10000 });
+    await expect(page.getByText(uniqueTitle)).not.toBeVisible({ timeout: 5000 });
   });
 
 });

@@ -9,7 +9,17 @@
   </PropertyGroup>
 
   <ItemGroup>
+    <PackageReference Include="Microsoft.EntityFrameworkCore.Relational" Version="10.0.11" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <FrameworkReference Include="Microsoft.AspNetCore.App" />
+  </ItemGroup>
+
+  <ItemGroup>
     <ProjectReference Include="..\..\..\BuildingBlocks\EgitimPlatform.BuildingBlocks\EgitimPlatform.BuildingBlocks.csproj" />
+    <ProjectReference Include="..\..\Teachers\EgitimPlatform.Modules.Teachers\EgitimPlatform.Modules.Teachers.csproj" />
+    <ProjectReference Include="..\..\Students\EgitimPlatform.Modules.Students\EgitimPlatform.Modules.Students.csproj" />
   </ItemGroup>
 
 </Project>

@@ -20,4 +20,8 @@ playwright-report/
 Library/
 *.pid
 
+# Storage and uploads
+Storage/
+src/Api/EgitimPlatform.Api/Storage/
+
 
