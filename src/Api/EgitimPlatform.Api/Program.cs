@@ -11,6 +11,7 @@ using EgitimPlatform.Modules.Identity.Extensions;
 using EgitimPlatform.Modules.Students.Extensions;
 using EgitimPlatform.Modules.Communication.Extensions;
 using EgitimPlatform.Modules.Content.Extensions;
+using EgitimPlatform.Modules.Reporting.Extensions;
 using EgitimPlatform.Modules.Notebook.Extensions;
 using EgitimPlatform.Modules.AI.Extensions;
 using Microsoft.AspNetCore.HttpOverrides;
@@ -52,6 +53,7 @@ try
     builder.Services.AddPlanningModule();
     builder.Services.AddCommunicationModule();
     builder.Services.AddContentModule();
+    builder.Services.AddReportingModule();
     builder.Services.AddNotebookModule();
     builder.Services.AddAiModule();
 

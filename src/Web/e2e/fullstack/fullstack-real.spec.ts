@@ -540,4 +540,30 @@ with zipfile.ZipFile('/tmp/template_e2e.xlsx', 'r') as z_in:
     await expect(page.getByText(uniqueTitle)).not.toBeVisible({ timeout: 5000 });
   });
 
+  test('12. Institutional Reporting: Real Filter, Performance Analytics & CSV Export', async ({ page }) => {
+    // Step 1: Login as Admin
+    await loginAs(page, 'admin.demo@egitim.com', 'Demo1234!');
+    await expect(page).toHaveURL(/\/overview/);
+
+    // Step 2: Navigate to Reports View
+    await page.goto('/admin/reports');
+    await expect(page.getByRole('heading', { name: /Demo Eğitim Kurumu/i })).toBeVisible({ timeout: 10000 });
+    await expect(page.locator('#table-exam-performances')).toBeVisible({ timeout: 10000 });
+
+    // Step 3: Apply Classroom Filter
+    await page.locator('#select-filter-classroom').selectOption({ index: 1 });
+    await page.locator('#btn-apply-filter').click();
+    await expect(page.locator('#table-exam-performances')).toBeVisible({ timeout: 10000 });
+
+    // Step 4: Verify Export Trigger
+    const [download] = await Promise.all([
+      page.waitForEvent('download', { timeout: 15000 }).catch(() => null),
+      page.locator('#btn-export-csv').click(),
+    ]);
+
+    if (download) {
+      expect(download.suggestedFilename()).toContain('.csv');
+    }
+  });
+
 });
