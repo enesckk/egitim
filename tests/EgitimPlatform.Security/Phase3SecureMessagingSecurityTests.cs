@@ -329,4 +329,121 @@ public class Phase3SecureMessagingSecurityTests
 
         await db.SaveChangesAsync();
     }
+
+    [Fact]
+    public async Task Parent_Cannot_Message_Unrelated_Coach_FailsClosed()
+    {
+        using var db = CreateDb();
+        var instId = Guid.NewGuid();
+        var parentUserId = Guid.NewGuid();
+        var coachUserId = Guid.NewGuid();
+        var studentUserId = Guid.NewGuid();
+
+        await CreateUserWithRoleAsync(db, instId, parentUserId, Roles.Parent);
+        await CreateUserWithRoleAsync(db, instId, coachUserId, Roles.Coach);
+        await CreateUserWithRoleAsync(db, instId, studentUserId, Roles.Student);
+
+        var parent = new Parent { Id = Guid.NewGuid(), InstitutionId = instId, UserId = parentUserId, FirstName = "Parent", LastName = "User" };
+        var coach = new Coach { Id = Guid.NewGuid(), InstitutionId = instId, UserId = coachUserId, FirstName = "Coach", LastName = "User" };
+        var student = new Student { Id = Guid.NewGuid(), InstitutionId = instId, UserId = studentUserId, FirstName = "Student", LastName = "User" };
+
+        db.Set<Parent>().Add(parent);
+        db.Set<Coach>().Add(coach);
+        db.Set<Student>().Add(student);
+
+        // Parent is linked to student, BUT coach is NOT assigned to student
+        db.Set<StudentParent>().Add(new StudentParent { Id = Guid.NewGuid(), InstitutionId = instId, ParentId = parent.Id, StudentId = student.Id });
+        await db.SaveChangesAsync();
+
+        var currentUser = Substitute.For<ICurrentUser>();
+        currentUser.IsAuthenticated.Returns(true);
+        currentUser.UserId.Returns(parentUserId);
+        currentUser.GetInstitutionIdAsync().Returns(instId);
+        currentUser.Roles.Returns([Roles.Parent]);
+
+        var handler = new MessagesHandler(db, currentUser, Substitute.For<IAuditService>());
+
+        await Assert.ThrowsAsync<SecurityException>(() => handler.SendMessageAsync(new SendMessageRequest(
+            null,
+            coachUserId,
+            "İlişkisiz koça yetkisiz mesaj",
+            null
+        )));
+    }
+
+    [Fact]
+    public async Task Parent_Cannot_Message_Teacher_Whose_Class_Child_Is_Not_In()
+    {
+        using var db = CreateDb();
+        var instId = Guid.NewGuid();
+        var parentUserId = Guid.NewGuid();
+        var teacherUserId = Guid.NewGuid();
+        var studentUserId = Guid.NewGuid();
+
+        await CreateUserWithRoleAsync(db, instId, parentUserId, Roles.Parent);
+        await CreateUserWithRoleAsync(db, instId, teacherUserId, Roles.Teacher);
+        await CreateUserWithRoleAsync(db, instId, studentUserId, Roles.Student);
+
+        var parent = new Parent { Id = Guid.NewGuid(), InstitutionId = instId, UserId = parentUserId, FirstName = "Parent", LastName = "User" };
+        var teacher = new Teacher { Id = Guid.NewGuid(), InstitutionId = instId, UserId = teacherUserId, FirstName = "Teacher", LastName = "User" };
+        var student = new Student { Id = Guid.NewGuid(), InstitutionId = instId, UserId = studentUserId, FirstName = "Student", LastName = "User" };
+
+        db.Set<Parent>().Add(parent);
+        db.Set<Teacher>().Add(teacher);
+        db.Set<Student>().Add(student);
+
+        db.Set<StudentParent>().Add(new StudentParent { Id = Guid.NewGuid(), InstitutionId = instId, ParentId = parent.Id, StudentId = student.Id });
+        // Teacher is in Classroom 11-A, student is NOT in Classroom 11-A
+        var classroom = new Classroom { Id = Guid.NewGuid(), InstitutionId = instId, Name = "11-A" };
+        db.Set<Classroom>().Add(classroom);
+        db.Set<ClassroomTeacher>().Add(new ClassroomTeacher { Id = Guid.NewGuid(), InstitutionId = instId, TeacherId = teacher.Id, ClassroomId = classroom.Id });
+        await db.SaveChangesAsync();
+
+        var currentUser = Substitute.For<ICurrentUser>();
+        currentUser.IsAuthenticated.Returns(true);
+        currentUser.UserId.Returns(parentUserId);
+        currentUser.GetInstitutionIdAsync().Returns(instId);
+        currentUser.Roles.Returns([Roles.Parent]);
+
+        var handler = new MessagesHandler(db, currentUser, Substitute.For<IAuditService>());
+
+        await Assert.ThrowsAsync<SecurityException>(() => handler.SendMessageAsync(new SendMessageRequest(
+            null,
+            teacherUserId,
+            "Yetkisiz öğretmen mesajı",
+            null
+        )));
+    }
+
+    [Fact]
+    public async Task Revoked_Coach_Assignment_Blocks_Future_Messages()
+    {
+        using var db = CreateDb();
+        var instId = Guid.NewGuid();
+        var coachUserId = Guid.NewGuid();
+        var studentUserId = Guid.NewGuid();
+
+        var (coach, student) = await SetupActiveCoachStudentAsync(db, instId, coachUserId, studentUserId);
+
+        // Revoke assignment
+        var assignment = await db.Set<StudentCoachAssignment>().FirstAsync(a => a.CoachId == coach.Id && a.StudentId == student.Id);
+        assignment.IsActive = false;
+        assignment.EndedAt = DateTimeOffset.UtcNow;
+        await db.SaveChangesAsync();
+
+        var currentUser = Substitute.For<ICurrentUser>();
+        currentUser.IsAuthenticated.Returns(true);
+        currentUser.UserId.Returns(coachUserId);
+        currentUser.GetInstitutionIdAsync().Returns(instId);
+        currentUser.Roles.Returns([Roles.Coach]);
+
+        var handler = new MessagesHandler(db, currentUser, Substitute.For<IAuditService>());
+
+        await Assert.ThrowsAsync<SecurityException>(() => handler.SendMessageAsync(new SendMessageRequest(
+            null,
+            studentUserId,
+            "Görev süresi bittikten sonra mesaj",
+            null
+        )));
+    }
 }

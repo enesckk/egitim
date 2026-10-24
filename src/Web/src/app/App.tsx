@@ -71,6 +71,7 @@ const TeacherMessagesView = lazy(() => import('@/features/teacher/messages').the
 
 // Parent Portal Features (Lazy Loaded)
 const ParentSummaryView = lazy(() => import('@/features/parent/summary').then((m) => ({ default: m.ParentSummaryView })));
+const ParentMessagesView = lazy(() => import('@/features/parent/messages').then((m) => ({ default: m.ParentMessagesView })));
 
 // Admin Portal Features (Lazy Loaded)
 const InstitutionDashboardView = lazy(() => import('@/features/admin/overview').then((m) => ({ default: m.InstitutionDashboardView })));
@@ -206,7 +207,23 @@ const TEACHER_NAV_ITEMS: PortalNavItem[] = [
   },
 ];
 
-// 4. Institution Admin Navigation Items (Desktop Dark Navy Sidebar & Mobile Drawer)
+// 4. Parent Navigation Items (Desktop & Mobile)
+const PARENT_NAV_ITEMS: PortalNavItem[] = [
+  {
+    id: 'summary',
+    path: '/parent/summary',
+    label: 'Öğrenci Özeti',
+    icon: <LayoutDashboard className="h-5 w-5" />,
+  },
+  {
+    id: 'messages',
+    path: '/parent/messages',
+    label: 'Mesajlar',
+    icon: <MessageSquare className="h-5 w-5" />,
+  },
+];
+
+// 5. Institution Admin Navigation Items (Desktop Dark Navy Sidebar & Mobile Drawer)
 const ADMIN_NAV_ITEMS: PortalNavItem[] = [
   {
     id: 'overview',
@@ -471,16 +488,29 @@ const TeacherPortalLayout: React.FC = () => {
 
 // Parent Portal Layout Component
 const ParentPortalLayout: React.FC = () => {
+  const location = useLocation();
   const navigate = useNavigate();
   const { user, logout } = useAuth();
+
+  const currentNav =
+    PARENT_NAV_ITEMS.find((item) => location.pathname.startsWith(item.path)) ||
+    PARENT_NAV_ITEMS[0];
+
+  const handleNavChange = (id: string) => {
+    const target = PARENT_NAV_ITEMS.find((item) => item.id === id);
+    if (target) {
+      navigate(target.path);
+    }
+  };
 
   return (
     <AppShell
       role="parent"
-      showSidebar={false}
-      showBottomNav={false}
+      navItems={PARENT_NAV_ITEMS}
+      activeNavId={currentNav.id}
+      onNavChange={handleNavChange}
       headerProps={{
-        pageTitle: 'Öğrenci Özeti',
+        pageTitle: currentNav.label,
         brandTitle: 'Bilim Akademi',
         brandSubtitle: 'Veli Portalı',
         institutionName: user?.institutionName || 'Kadıköy Şubesi',
@@ -495,6 +525,7 @@ const ParentPortalLayout: React.FC = () => {
       <Suspense fallback={<LoadingState message="Sayfa yükleniyor..." />}>
         <Routes>
           <Route path="/summary" element={<ParentSummaryView />} />
+          <Route path="/messages" element={<ParentMessagesView />} />
           <Route path="*" element={<Navigate to="/parent/summary" replace />} />
         </Routes>
       </Suspense>
