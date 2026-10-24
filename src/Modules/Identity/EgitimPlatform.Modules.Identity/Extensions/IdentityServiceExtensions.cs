@@ -25,12 +25,12 @@ namespace EgitimPlatform.Modules.Identity.Extensions;
 /// </summary>
 public static class IdentityServiceExtensions
 {
-    public static IServiceCollection AddIdentityModule(this IServiceCollection services, IConfiguration configuration)
+    public static IServiceCollection AddIdentityModule(this IServiceCollection services, IConfiguration configuration, string? environmentName = null)
     {
         // JWT settings — FAIL FAST on invalid/placeholder configuration
         var jwtSettings = configuration.GetSection(JwtSettings.SectionName).Get<JwtSettings>()
             ?? throw new InvalidOperationException("JwtSettings section is missing from configuration.");
-        jwtSettings.Validate(); // Throws if key is missing, too short, or placeholder
+        jwtSettings.Validate(environmentName); // Throws if key is missing, too short, or placeholder
         services.Configure<JwtSettings>(configuration.GetSection(JwtSettings.SectionName));
 
         // Bootstrap settings (SuperAdmin creation) — disabled by default

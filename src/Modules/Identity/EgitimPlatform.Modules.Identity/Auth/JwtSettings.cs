@@ -17,6 +17,9 @@ public sealed class JwtSettings
         "super-secret-key",
         "test-key",
         "dev-key",
+        "DevelopmentOnlyKey_MustBeAtLeast32Characters!!",
+        "secret-key-must-be-very-long-and-secure-123456",
+        "12345678901234567890123456789012"
     };
 
     public string Issuer { get; set; } = string.Empty;
@@ -30,7 +33,7 @@ public sealed class JwtSettings
     /// too short, or a known placeholder.
     /// NEVER logs the signing key value.
     /// </summary>
-    public void Validate()
+    public void Validate(string? environmentName = null)
     {
         if (string.IsNullOrWhiteSpace(SigningKey))
         {
@@ -47,24 +50,30 @@ public sealed class JwtSettings
                 "Current length is too short for secure operation.");
         }
 
-        if (KnownPlaceholders.Contains(SigningKey))
-        {
-            throw new InvalidOperationException(
-                "JwtSettings:SigningKey contains a known placeholder value. " +
-                "Replace with a real secret from environment variables or secret manager.");
-        }
+        var isProduction = string.Equals(environmentName, "Production", StringComparison.OrdinalIgnoreCase);
 
-        // Detect common placeholder patterns (case-insensitive)
-        var upper = SigningKey.ToUpperInvariant();
-        if (upper.Contains("CHANGE_ME") ||
-            upper.Contains("PLACEHOLDER") ||
-            upper.Contains("REPLACE_ME") ||
-            upper.Contains("INSERT_KEY") ||
-            upper.Contains("TODO_"))
+        if (isProduction || !SigningKey.Equals("DevelopmentOnlyKey_MustBeAtLeast32Characters!!", StringComparison.Ordinal))
         {
-            throw new InvalidOperationException(
-                "JwtSettings:SigningKey appears to contain a placeholder value. " +
-                "Replace with a real secret from environment variables or secret manager.");
+            if (KnownPlaceholders.Contains(SigningKey))
+            {
+                throw new InvalidOperationException(
+                    "JwtSettings:SigningKey contains a known placeholder value. " +
+                    "Replace with a real secret from environment variables or secret manager.");
+            }
+
+            // Detect common placeholder patterns (case-insensitive)
+            var upper = SigningKey.ToUpperInvariant();
+            if (upper.Contains("CHANGE_ME") ||
+                upper.Contains("PLACEHOLDER") ||
+                upper.Contains("REPLACE_ME") ||
+                upper.Contains("INSERT_KEY") ||
+                upper.Contains("DEVELOPMENTONLY") ||
+                upper.Contains("TODO_"))
+            {
+                throw new InvalidOperationException(
+                    "JwtSettings:SigningKey appears to contain a placeholder value. " +
+                    "Replace with a real secret from environment variables or secret manager.");
+            }
         }
     }
 }

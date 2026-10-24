@@ -41,7 +41,7 @@ try
     builder.Services.AddPlatformInfrastructure(builder.Configuration);
 
     // Identity module (JWT auth, authorization policies, feature handlers)
-    builder.Services.AddIdentityModule(builder.Configuration);
+    builder.Services.AddIdentityModule(builder.Configuration, builder.Environment.EnvironmentName);
 
     // Domain modules
     builder.Services.AddStudentsModule();
@@ -213,6 +213,20 @@ try
         {
             var config = httpContext.RequestServices.GetRequiredService<IConfiguration>();
             var limit = config.GetValue<int>("RateLimiting:RefreshLimit", 30);
+            return RateLimitPartition.GetFixedWindowLimiter(
+                partitionKey: httpContext.Connection.RemoteIpAddress?.ToString() ?? "unknown",
+                factory: _ => new FixedWindowRateLimiterOptions
+                {
+                    PermitLimit = limit,
+                    Window = TimeSpan.FromMinutes(1),
+                    QueueLimit = 0,
+                });
+        });
+
+        options.AddPolicy("upload", httpContext =>
+        {
+            var config = httpContext.RequestServices.GetRequiredService<IConfiguration>();
+            var limit = config.GetValue<int>("RateLimiting:UploadLimit", 20);
             return RateLimitPartition.GetFixedWindowLimiter(
                 partitionKey: httpContext.Connection.RemoteIpAddress?.ToString() ?? "unknown",
                 factory: _ => new FixedWindowRateLimiterOptions

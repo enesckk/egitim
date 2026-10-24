@@ -3,6 +3,7 @@ using EgitimPlatform.Modules.Content.Features.ManageMaterials;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.RateLimiting;
 
 namespace EgitimPlatform.Modules.Content.Controllers;
 
@@ -28,6 +29,7 @@ public class ContentMaterialsController : ControllerBase
 
     [HttpPost]
     [Authorize(Roles = Roles.Teacher)]
+    [EnableRateLimiting("upload")]
     [Consumes("multipart/form-data")]
     public async Task<IActionResult> CreateMaterial([FromForm] CreateMaterialFormModel form, CancellationToken cancellationToken)
     {
