@@ -21,6 +21,15 @@ async function loginAs(page: Page, email: string, password: string) {
   await page.waitForURL((url) => !url.pathname.includes('/login'), { timeout: 15000 });
 }
 
+async function logout(page: Page) {
+  await page.evaluate(() => {
+    localStorage.clear();
+    sessionStorage.clear();
+  });
+  await page.goto('/login');
+  await expect(page.locator('#login-email')).toBeVisible();
+}
+
 test.describe('Real Full-Stack Verification — 5 Role Portals, Exam Import & MSSQL Persistence', () => {
 
   test.beforeAll(async ({ request }) => {
@@ -435,6 +444,36 @@ with zipfile.ZipFile('/tmp/template_e2e.xlsx', 'r') as z_in:
     await page.reload();
     await expect(page.getByRole('heading', { name: /Koçluk Görüşmeleri/i })).toBeVisible({ timeout: 10000 });
     await expect(page.getByText(uniqueMeetingType)).toBeVisible({ timeout: 10000 });
+  });
+
+  test('10. Secure Messaging: Real Browser Messaging, MSSQL Persistence, Unread Tracking & Reload', async ({ page }) => {
+    // Step 1: Real Login as Coach
+    await loginAs(page, 'coach.demo@egitim.com', 'Demo1234!');
+    await expect(page).toHaveURL(/\/coach/);
+
+    // Step 2: Navigate to Coach Messages View
+    await page.goto('/coach/messages');
+    await expect(page.getByTestId('coach-messages-view')).toBeVisible({ timeout: 10000 });
+
+    // Step 3: Send unique message to assigned student
+    const uniqueMsgContent = `E2E Koç Mesajı ${Date.now().toString().slice(-4)}`;
+    await page.locator('#message-content-input').fill(uniqueMsgContent);
+    await page.locator('button:has-text("Gönder")').click();
+
+    // Verify message appears in active thread
+    await expect(page.locator('p.whitespace-pre-wrap', { hasText: uniqueMsgContent })).toBeVisible({ timeout: 10000 });
+
+    // Step 4: Verify persistence after reload
+    await page.reload();
+    await expect(page.getByTestId('coach-messages-view')).toBeVisible({ timeout: 10000 });
+    await expect(page.locator('p.whitespace-pre-wrap', { hasText: uniqueMsgContent })).toBeVisible({ timeout: 10000 });
+
+    // Step 5: Logout and Real Login as Student to verify receipt of message
+    await logout(page);
+    await loginAs(page, 'student.demo@egitim.com', 'Demo1234!');
+    await page.goto('/student/messages');
+    await expect(page.getByTestId('student-messages-view')).toBeVisible({ timeout: 10000 });
+    await expect(page.locator('p.whitespace-pre-wrap', { hasText: uniqueMsgContent })).toBeVisible({ timeout: 10000 });
   });
 
 });

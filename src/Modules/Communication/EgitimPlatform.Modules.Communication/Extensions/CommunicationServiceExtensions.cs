@@ -1,5 +1,6 @@
 using EgitimPlatform.BuildingBlocks.Interfaces;
 using EgitimPlatform.Modules.Communication.Features;
+using EgitimPlatform.Modules.Communication.Features.ManageMessages;
 using EgitimPlatform.Modules.Communication.Jobs;
 using EgitimPlatform.Modules.Communication.Services;
 using Microsoft.Extensions.DependencyInjection;
@@ -16,6 +17,7 @@ public static class CommunicationServiceExtensions
         services.AddScoped<MarkNotificationReadHandler>();
         services.AddScoped<MarkAllNotificationsReadHandler>();
         services.AddScoped<DueSoonNotificationJob>();
+        services.AddScoped<MessagesHandler>();
 
         return services;
     }
