@@ -1,7 +1,9 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Modal } from '@/components/ui/Modal';
 import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
+import { academicService, StudentSummaryDto } from '@/services/academicService';
+import { coachMeetingService } from '@/services/coachMeetingService';
 import { CoachMeetingItem } from '../types';
 
 export interface NewMeetingModalProps {
@@ -15,32 +17,67 @@ export const NewMeetingModal: React.FC<NewMeetingModalProps> = ({
   onClose,
   onAddMeeting,
 }) => {
-  const [studentName, setStudentName] = useState('Ayşe Kaya');
-  const [dateStr, setDateStr] = useState('Bugün');
-  const [timeStr, setTimeStr] = useState('18:00');
+  const [students, setStudents] = useState<StudentSummaryDto[]>([]);
+  const [selectedStudentId, setSelectedStudentId] = useState('');
+  const [dateStr, setDateStr] = useState('');
+  const [timeStr, setTimeStr] = useState('14:00');
   const [durationMinutes, setDurationMinutes] = useState(30);
   const [type, setType] = useState('Haftalık Takip & Analiz');
   const [locationType, setLocationType] = useState<'Online Video' | 'Yüz Yüze • Kurum'>('Online Video');
   const [notes, setNotes] = useState('');
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
-  const handleSubmit = (e: React.FormEvent) => {
+  useEffect(() => {
+    if (isOpen) {
+      setError(null);
+      // Default to tomorrow 14:00 to avoid any UTC time zone offset issues or past time validation
+      const tomorrow = new Date();
+      tomorrow.setDate(tomorrow.getDate() + 1);
+      const tomorrowStr = tomorrow.toISOString().split('T')[0];
+      setDateStr(tomorrowStr);
+      academicService.getStudents({ page: 1, pageSize: 50 }).then((res) => {
+        const items = res?.items || [];
+        setStudents(items);
+        if (items.length > 0 && !selectedStudentId) {
+          setSelectedStudentId(items[0].id);
+        }
+      }).catch(() => {});
+    }
+  }, [isOpen]);
+
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    onAddMeeting({
-      id: `meet-${Date.now()}`,
-      studentId: 'student-1',
-      studentName,
-      initials: studentName.split(' ').map((n) => n[0]).join(''),
-      grade: '11. Sınıf',
-      field: 'Sayısal',
-      dateStr,
-      timeStr,
-      durationMinutes,
-      type,
-      locationType,
-      status: 'upcoming',
-      notes,
-    });
-    onClose();
+    if (!selectedStudentId) {
+      setError('Lütfen bir öğrenci seçin.');
+      return;
+    }
+
+    try {
+      setIsSubmitting(true);
+      setError(null);
+
+      const [hours, minutes] = timeStr.split(':').map(Number);
+      const start = new Date(dateStr);
+      start.setHours(hours || 14, minutes || 0, 0, 0);
+
+      const created = await coachMeetingService.createMeeting({
+        studentId: selectedStudentId,
+        startTime: start.toISOString(),
+        durationMinutes,
+        meetingType: type,
+        locationType,
+        notes: notes.trim() || undefined,
+      });
+
+      onAddMeeting(created as CoachMeetingItem);
+      onClose();
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : 'Görüşme oluşturulamadı.';
+      setError(msg);
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   return (
@@ -52,45 +89,57 @@ export const NewMeetingModal: React.FC<NewMeetingModalProps> = ({
       headerVariant="dark"
       footer={
         <div className="flex justify-end gap-2 w-full">
-          <Button variant="secondary" size="sm" onClick={onClose}>
+          <Button variant="secondary" size="sm" onClick={onClose} disabled={isSubmitting}>
             İptal
           </Button>
-          <Button variant="primary" size="sm" onClick={handleSubmit}>
-            Görüşmeyi Kaydet
+          <Button
+            type="submit"
+            form="new-meeting-form"
+            variant="primary"
+            size="sm"
+            disabled={isSubmitting || !selectedStudentId}
+          >
+            {isSubmitting ? 'Kaydediliyor...' : 'Görüşmeyi Kaydet'}
           </Button>
         </div>
       }
     >
-      <form onSubmit={handleSubmit} className="space-y-3 select-none">
+      <form id="new-meeting-form" onSubmit={handleSubmit} className="space-y-3 select-none">
+        {error && (
+          <div className="p-2.5 text-xs text-danger bg-danger/10 rounded-xl">
+            {error}
+          </div>
+        )}
+
         <div>
           <label className="text-xs font-semibold text-neutral-700 block mb-1">
             Öğrenci
           </label>
           <select
-            value={studentName}
-            onChange={(e) => setStudentName(e.target.value)}
+            value={selectedStudentId}
+            onChange={(e) => setSelectedStudentId(e.target.value)}
             className="w-full text-xs bg-white border border-neutral-200 rounded-xl px-3 py-2 text-neutral-800 focus:outline-none focus:ring-2 focus:ring-primary-500"
           >
-            <option value="Ayşe Kaya">Ayşe Kaya (11. Sınıf • Sayısal)</option>
-            <option value="Zeynep Demir">Zeynep Demir (12. Sınıf • Sayısal)</option>
-            <option value="Ali Çelik">Ali Çelik (11. Sınıf • EA)</option>
-            <option value="Emre Türk">Emre Türk (11. Sınıf • Sözel)</option>
-            <option value="Nur Aydın">Nur Aydın (10. Sınıf • EA)</option>
+            {students.map((s) => (
+              <option key={s.id} value={s.id}>
+                {s.fullName || `${s.firstName} ${s.lastName}`} {s.gradeLevel ? `(${s.gradeLevel}. Sınıf)` : ''}
+              </option>
+            ))}
           </select>
         </div>
 
         <div className="grid grid-cols-2 gap-2.5">
           <Input
+            type="date"
             label="Tarih"
             value={dateStr}
             onChange={(e) => setDateStr(e.target.value)}
-            placeholder="Örn: Yarın veya 3 Eyl"
           />
           <Input
+            type="time"
             label="Saat"
             value={timeStr}
             onChange={(e) => setTimeStr(e.target.value)}
-            placeholder="15:30"
           />
         </div>
 

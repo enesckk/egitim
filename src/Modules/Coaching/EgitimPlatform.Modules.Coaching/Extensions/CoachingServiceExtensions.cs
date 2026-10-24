@@ -1,6 +1,7 @@
 using EgitimPlatform.BuildingBlocks.Interfaces;
 using EgitimPlatform.Modules.Coaching.Features.AssignCoach;
 using EgitimPlatform.Modules.Coaching.Features.ManageCoaches;
+using EgitimPlatform.Modules.Coaching.Features.ManageMeetings;
 using EgitimPlatform.Modules.Coaching.Features.ManageNotes;
 using EgitimPlatform.Modules.Coaching.Services;
 using FluentValidation;
@@ -16,6 +17,7 @@ public static class CoachingServiceExtensions
         services.AddScoped<AssignCoachHandler>();
         services.AddScoped<CoachManagementHandler>();
         services.AddScoped<CoachPrivateNotesHandler>();
+        services.AddScoped<CoachMeetingsHandler>();
         services.AddScoped<IStudentCoachSummaryQuery, StudentCoachSummaryQuery>();
         services.AddScoped<ICoachStudentQuery, CoachStudentQuery>();
         services.AddScoped<IStudentCoachAssigner, StudentCoachAssigner>();

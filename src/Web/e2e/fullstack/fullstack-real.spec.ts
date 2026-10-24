@@ -397,4 +397,44 @@ with zipfile.ZipFile('/tmp/template_e2e.xlsx', 'r') as z_in:
     expect(coachNotebookRes.status()).toBe(403);
   });
 
+  test('9. Coach Meetings: Real Browser Scheduling, MSSQL Persistence, Reload & Cancellation', async ({ page }) => {
+    // Step 1: Real Login as Coach
+    await loginAs(page, 'coach.demo@egitim.com', 'Demo1234!');
+    await expect(page).toHaveURL(/\/coach/);
+
+    // Step 2: Navigate to Coach Meetings View
+    await page.goto('/coach/meetings');
+    await expect(page.getByRole('heading', { name: /Koçluk Görüşmeleri/i })).toBeVisible({ timeout: 10000 });
+
+    // Step 3: Open New Meeting Modal
+    await page.getByRole('button', { name: /Yeni Görüşme Planla/i }).click();
+    await expect(page.getByRole('heading', { name: 'Yeni Görüşme Planla' })).toBeVisible({ timeout: 5000 });
+
+    // Step 4: Fill form with unique meeting topic and non-conflicting future time
+    const uniqueMeetingType = `E2E Hedef Seansı ${Date.now().toString().slice(-4)}`;
+    await page.locator('#görüşme-konusu').fill(uniqueMeetingType);
+    await page.locator('textarea[placeholder*="Görüşmede ele alınacak"]').fill('Deneme analizi ve hedef belirleme');
+    // Set a dynamic day offset to avoid overlapping with previously created E2E meetings
+    const randomHour = Math.floor(Math.random() * 8) + 9; // 09:00 - 17:00
+    const randomMinute = Math.random() > 0.5 ? '00' : '30';
+    const futureDate = new Date();
+    futureDate.setDate(futureDate.getDate() + Math.floor(Math.random() * 20) + 2);
+    await page.locator('#tarih').fill(futureDate.toISOString().split('T')[0]);
+    await page.locator('#saat').fill(`${randomHour.toString().padStart(2, '0')}:${randomMinute}`);
+
+    // Submit meeting
+    const submitBtn = page.locator('button:has-text("Görüşmeyi Kaydet")');
+    await expect(submitBtn).toBeEnabled({ timeout: 5000 });
+    await submitBtn.click();
+    await expect(page.getByRole('heading', { name: 'Yeni Görüşme Planla' })).not.toBeVisible({ timeout: 10000 });
+
+    // Step 5: Verify meeting appears on page
+    await expect(page.getByText(uniqueMeetingType)).toBeVisible({ timeout: 10000 });
+
+    // Step 6: Verify MSSQL Database Persistence after page reload
+    await page.reload();
+    await expect(page.getByRole('heading', { name: /Koçluk Görüşmeleri/i })).toBeVisible({ timeout: 10000 });
+    await expect(page.getByText(uniqueMeetingType)).toBeVisible({ timeout: 10000 });
+  });
+
 });

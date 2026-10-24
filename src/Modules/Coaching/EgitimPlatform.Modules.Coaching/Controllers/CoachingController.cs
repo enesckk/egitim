@@ -143,6 +143,54 @@ public class CoachingController : ControllerBase
         return NoContent();
     }
 
+    [HttpGet("meetings")]
+    [Authorize(Policy = Policies.CanManageCoachPrivateNotes)]
+    [ProducesResponseType(typeof(IReadOnlyList<EgitimPlatform.Modules.Coaching.Features.ManageMeetings.CoachMeetingDto>), StatusCodes.Status200OK)]
+    public async Task<ActionResult<IReadOnlyList<EgitimPlatform.Modules.Coaching.Features.ManageMeetings.CoachMeetingDto>>> ListMeetings(
+        [FromServices] EgitimPlatform.Modules.Coaching.Features.ManageMeetings.CoachMeetingsHandler meetingsHandler,
+        CancellationToken ct)
+    {
+        var result = await meetingsHandler.ListAsync(ct);
+        return Ok(result);
+    }
+
+    [HttpPost("meetings")]
+    [Authorize(Policy = Policies.CanManageCoachPrivateNotes)]
+    [ProducesResponseType(typeof(EgitimPlatform.Modules.Coaching.Features.ManageMeetings.CoachMeetingDto), StatusCodes.Status201Created)]
+    public async Task<ActionResult<EgitimPlatform.Modules.Coaching.Features.ManageMeetings.CoachMeetingDto>> CreateMeeting(
+        [FromBody] EgitimPlatform.Modules.Coaching.Features.ManageMeetings.CreateCoachMeetingRequest request,
+        [FromServices] EgitimPlatform.Modules.Coaching.Features.ManageMeetings.CoachMeetingsHandler meetingsHandler,
+        CancellationToken ct)
+    {
+        var result = await meetingsHandler.CreateAsync(request, ct);
+        return StatusCode(StatusCodes.Status201Created, result);
+    }
+
+    [HttpPut("meetings/{meetingId:guid}")]
+    [Authorize(Policy = Policies.CanManageCoachPrivateNotes)]
+    [ProducesResponseType(typeof(EgitimPlatform.Modules.Coaching.Features.ManageMeetings.CoachMeetingDto), StatusCodes.Status200OK)]
+    public async Task<ActionResult<EgitimPlatform.Modules.Coaching.Features.ManageMeetings.CoachMeetingDto>> UpdateMeeting(
+        [FromRoute] Guid meetingId,
+        [FromBody] EgitimPlatform.Modules.Coaching.Features.ManageMeetings.UpdateCoachMeetingRequest request,
+        [FromServices] EgitimPlatform.Modules.Coaching.Features.ManageMeetings.CoachMeetingsHandler meetingsHandler,
+        CancellationToken ct)
+    {
+        var result = await meetingsHandler.UpdateAsync(meetingId, request, ct);
+        return Ok(result);
+    }
+
+    [HttpDelete("meetings/{meetingId:guid}")]
+    [Authorize(Policy = Policies.CanManageCoachPrivateNotes)]
+    [ProducesResponseType(StatusCodes.Status204NoContent)]
+    public async Task<IActionResult> DeleteMeeting(
+        [FromRoute] Guid meetingId,
+        [FromServices] EgitimPlatform.Modules.Coaching.Features.ManageMeetings.CoachMeetingsHandler meetingsHandler,
+        CancellationToken ct)
+    {
+        await meetingsHandler.DeleteAsync(meetingId, ct);
+        return NoContent();
+    }
+
     private static ModelStateDictionary CreateModelState(FluentValidation.Results.ValidationResult validationResult)
     {
         var modelState = new ModelStateDictionary();

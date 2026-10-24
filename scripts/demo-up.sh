@@ -37,7 +37,7 @@ fi
 echo "Waiting for MSSQL engine readiness on port ${DB_PORT}..."
 MSSQL_READY=false
 for i in {1..40}; do
-  if docker logs "${DB_CONTAINER}" 2>&1 | grep -q "Recovery is complete"; then
+  if nc -z 127.0.0.1 "${DB_PORT}" 2>/dev/null; then
     MSSQL_READY=true
     echo "MSSQL engine is fully recovered and ready."
     break

@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Calendar, Plus, AlertCircle, RefreshCw } from 'lucide-react';
 import { Button } from '@/components/ui/Button';
@@ -8,7 +8,7 @@ import { Alert } from '@/components/ui/Alert';
 import { Skeleton } from '@/components/ui/Skeleton';
 import { MeetingItemCard } from './components/MeetingItemCard';
 import { NewMeetingModal } from './components/NewMeetingModal';
-import { initialCoachMeetingsData } from './mockData';
+import { coachMeetingService } from '@/services/coachMeetingService';
 import { CoachMeetingItem, CoachMeetingsViewModel } from './types';
 
 export interface CoachMeetingsViewProps {
@@ -19,22 +19,57 @@ export interface CoachMeetingsViewProps {
 }
 
 export const CoachMeetingsView: React.FC<CoachMeetingsViewProps> = ({
-  initialData = initialCoachMeetingsData,
-  isLoading = false,
-  errorMessage,
+  initialData,
+  isLoading: propIsLoading = false,
+  errorMessage: propErrorMessage,
   onRetry,
 }) => {
   const navigate = useNavigate();
-  const [meetings, setMeetings] = useState<CoachMeetingItem[]>(initialData.meetings);
+  const [meetings, setMeetings] = useState<CoachMeetingItem[]>(initialData?.meetings || []);
+  const [isLoading, setIsLoading] = useState<boolean>(propIsLoading || (!initialData && !propErrorMessage));
+  const [errorMessage, setErrorMessage] = useState<string | undefined>(propErrorMessage);
   const [statusFilter, setStatusFilter] = useState('');
   const [isNewModalOpen, setIsNewModalOpen] = useState(false);
+
+  const fetchMeetings = useCallback(async () => {
+    if (initialData) return;
+    setIsLoading(true);
+    setErrorMessage(undefined);
+
+    try {
+      const data = await coachMeetingService.listMeetings();
+      setMeetings(data as CoachMeetingItem[]);
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : 'Görüşmeler yüklenemedi.';
+      setErrorMessage(msg);
+    } finally {
+      setIsLoading(false);
+    }
+  }, [initialData]);
+
+  useEffect(() => {
+    if (initialData) {
+      setMeetings(initialData.meetings);
+      setIsLoading(false);
+    } else {
+      fetchMeetings();
+    }
+  }, [initialData, fetchMeetings]);
+
+  const handleRetry = () => {
+    if (onRetry) {
+      onRetry();
+    } else {
+      fetchMeetings();
+    }
+  };
 
   const handleAddMeeting = (newMeeting: CoachMeetingItem) => {
     setMeetings((prev) => [newMeeting, ...prev]);
   };
 
   // Loading State
-  if (isLoading) {
+  if (propIsLoading || isLoading) {
     return (
       <div className="max-w-5xl mx-auto space-y-4 select-none">
         <Skeleton className="h-16 w-1/3 rounded-xl" />
@@ -48,19 +83,17 @@ export const CoachMeetingsView: React.FC<CoachMeetingsViewProps> = ({
   }
 
   // Error State
-  if (errorMessage) {
+  if (propErrorMessage || errorMessage) {
     return (
       <div className="max-w-5xl mx-auto py-8 space-y-4">
         <Alert variant="danger" icon={<AlertCircle className="h-5 w-5" />} title="Görüşmeler Yüklenemedi">
-          {errorMessage}
+          {propErrorMessage || errorMessage}
         </Alert>
-        {onRetry && (
-          <div className="text-center pt-2">
-            <Button variant="primary" size="sm" onClick={onRetry} leftIcon={<RefreshCw className="h-4 w-4" />}>
-              Tekrar Dene
-            </Button>
-          </div>
-        )}
+        <div className="text-center pt-2">
+          <Button variant="primary" size="sm" onClick={handleRetry} leftIcon={<RefreshCw className="h-4 w-4" />}>
+            Tekrar Dene
+          </Button>
+        </div>
       </div>
     );
   }
