@@ -5,6 +5,7 @@ import { BottomNav, NavItem } from './BottomNav';
 import { Sidebar } from './Sidebar';
 import { NotificationModal } from './NotificationModal';
 import { notificationService } from '@/services/notificationService';
+import { PwaInstallBanner } from '@/components/common/PwaInstallBanner';
 
 export type UserRole = 'student' | 'coach' | 'teacher' | 'parent' | 'admin';
 
@@ -111,6 +112,8 @@ export const AppShell: React.FC<AppShellProps> = ({
         onClose={() => setIsNotificationOpen(false)}
         onNotificationsChanged={fetchUnread}
       />
+
+      <PwaInstallBanner />
     </div>
   );
 };
