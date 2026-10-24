@@ -1,4 +1,5 @@
 using EgitimPlatform.Modules.Communication.Features;
+using EgitimPlatform.Modules.Communication.Features.ManagePreferences;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
@@ -12,7 +13,8 @@ public class NotificationsController(
     ListNotificationsHandler listHandler,
     GetUnreadNotificationCountHandler countHandler,
     MarkNotificationReadHandler markReadHandler,
-    MarkAllNotificationsReadHandler markAllReadHandler) : ControllerBase
+    MarkAllNotificationsReadHandler markAllReadHandler,
+    INotificationPreferencesHandler preferencesHandler) : ControllerBase
 {
     [HttpGet]
     [ProducesResponseType(typeof(List<NotificationDto>), StatusCodes.Status200OK)]
@@ -45,5 +47,21 @@ public class NotificationsController(
     {
         await markAllReadHandler.HandleAsync(ct);
         return NoContent();
+    }
+
+    [HttpGet("preferences")]
+    [ProducesResponseType(typeof(NotificationPreferencesDto), StatusCodes.Status200OK)]
+    public async Task<IActionResult> GetPreferences(CancellationToken ct)
+    {
+        var result = await preferencesHandler.GetPreferencesAsync(ct);
+        return Ok(result);
+    }
+
+    [HttpPut("preferences")]
+    [ProducesResponseType(typeof(NotificationPreferencesDto), StatusCodes.Status200OK)]
+    public async Task<IActionResult> UpdatePreferences([FromBody] UpdateNotificationPreferencesRequest req, CancellationToken ct)
+    {
+        var result = await preferencesHandler.UpdatePreferencesAsync(req, ct);
+        return Ok(result);
     }
 }

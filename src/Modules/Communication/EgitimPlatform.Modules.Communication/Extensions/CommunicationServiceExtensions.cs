@@ -16,6 +16,7 @@ public static class CommunicationServiceExtensions
         services.AddScoped<GetUnreadNotificationCountHandler>();
         services.AddScoped<MarkNotificationReadHandler>();
         services.AddScoped<MarkAllNotificationsReadHandler>();
+        services.AddScoped<Features.ManagePreferences.INotificationPreferencesHandler, Features.ManagePreferences.NotificationPreferencesHandler>();
         services.AddScoped<DueSoonNotificationJob>();
         services.AddScoped<MessagesHandler>();
 

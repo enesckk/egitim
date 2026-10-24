@@ -1,8 +1,10 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { cn } from '@/lib/utils';
 import { Header, HeaderProps } from './Header';
 import { BottomNav, NavItem } from './BottomNav';
 import { Sidebar } from './Sidebar';
+import { NotificationModal } from './NotificationModal';
+import { notificationService } from '@/services/notificationService';
 
 export type UserRole = 'student' | 'coach' | 'teacher' | 'parent' | 'admin';
 
@@ -32,7 +34,22 @@ export const AppShell: React.FC<AppShellProps> = ({
   sidebarFooter,
 }) => {
   const [isDrawerOpen, setIsDrawerOpen] = useState(false);
+  const [isNotificationOpen, setIsNotificationOpen] = useState(false);
+  const [unreadCount, setUnreadCount] = useState<number>(0);
   const hasNav = navItems.length > 0;
+
+  const fetchUnread = useCallback(async () => {
+    try {
+      const count = await notificationService.getUnreadCount();
+      setUnreadCount(count || 0);
+    } catch {
+      // non-blocking
+    }
+  }, []);
+
+  useEffect(() => {
+    fetchUnread();
+  }, [fetchUnread]);
 
   // Student uses mobile bottom nav; Coach/Teacher/Admin use drawer/sidebar; Parent uses clean focused layout
   const isMobileBottomNavRole = role === 'student';
@@ -63,6 +80,8 @@ export const AppShell: React.FC<AppShellProps> = ({
         {/* Header */}
         <Header
           {...headerProps}
+          unreadCount={unreadCount}
+          onNotificationClick={() => setIsNotificationOpen(true)}
           onMenuToggle={hasNav ? () => setIsDrawerOpen(true) : undefined}
         />
 
@@ -86,6 +105,12 @@ export const AppShell: React.FC<AppShellProps> = ({
           />
         )}
       </div>
+
+      <NotificationModal
+        isOpen={isNotificationOpen}
+        onClose={() => setIsNotificationOpen(false)}
+        onNotificationsChanged={fetchUnread}
+      />
     </div>
   );
 };

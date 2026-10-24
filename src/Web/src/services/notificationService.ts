@@ -33,4 +33,21 @@ export const notificationService = {
   markAllRead: async (): Promise<void> => {
     await apiClient.post('/api/v1/notifications/read-all');
   },
+
+  getPreferences: async (): Promise<NotificationPreferencesDto> => {
+    return apiClient.get<NotificationPreferencesDto>('/api/v1/notifications/preferences');
+  },
+
+  updatePreferences: async (req: NotificationPreferencesDto): Promise<NotificationPreferencesDto> => {
+    return apiClient.put<NotificationPreferencesDto>('/api/v1/notifications/preferences', req);
+  },
 };
+
+export interface NotificationPreferencesDto {
+  inAppEnabled: boolean;
+  examResultsEnabled: boolean;
+  coachTasksEnabled: boolean;
+  meetingsEnabled: boolean;
+  messagesEnabled: boolean;
+  materialsEnabled: boolean;
+}

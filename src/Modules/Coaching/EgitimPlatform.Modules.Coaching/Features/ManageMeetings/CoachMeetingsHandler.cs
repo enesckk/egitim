@@ -2,6 +2,7 @@ using EgitimPlatform.BuildingBlocks.Constants;
 using EgitimPlatform.BuildingBlocks.Exceptions;
 using EgitimPlatform.BuildingBlocks.Interfaces;
 using EgitimPlatform.Modules.Coaching.Entities;
+using EgitimPlatform.Modules.Students.Entities;
 using Microsoft.EntityFrameworkCore;
 
 namespace EgitimPlatform.Modules.Coaching.Features.ManageMeetings;
@@ -9,7 +10,8 @@ namespace EgitimPlatform.Modules.Coaching.Features.ManageMeetings;
 public sealed class CoachMeetingsHandler(
     IApplicationDbContext db,
     ICurrentUser currentUser,
-    IAuditService audit)
+    IAuditService audit,
+    INotificationService? notificationService = null)
 {
     private async Task<(Guid institutionId, Coach? coach)> ResolveCoachContextAsync(CancellationToken ct)
     {
@@ -192,6 +194,28 @@ public sealed class CoachMeetingsHandler(
 
         db.Set<CoachMeeting>().Add(meeting);
         await db.SaveChangesAsync(ct);
+
+        if (notificationService != null)
+        {
+            try
+            {
+                var student = await db.Set<Student>().AsNoTracking()
+                    .FirstOrDefaultAsync(s => s.Id == req.StudentId && s.InstitutionId == institutionId, ct);
+                if (student?.UserId != null)
+                {
+                    await notificationService.CreateNotificationAsync(
+                        institutionId,
+                        student.UserId.Value,
+                        NotificationType.CoachMeetingScheduled,
+                        "Yeni Koçluk Görüşmesi",
+                        $"{meeting.MeetingType} görüşmesi planlandı ({req.StartTime:dd.MM.yyyy HH:mm}).",
+                        "CoachMeeting",
+                        meeting.Id,
+                        ct);
+                }
+            }
+            catch { }
+        }
 
         await audit.LogAsync(
             currentUser.UserId ?? Guid.Empty,

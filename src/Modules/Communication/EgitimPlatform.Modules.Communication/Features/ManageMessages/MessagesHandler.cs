@@ -15,7 +15,8 @@ namespace EgitimPlatform.Modules.Communication.Features.ManageMessages;
 public sealed class MessagesHandler(
     IApplicationDbContext db,
     ICurrentUser currentUser,
-    IAuditService auditService)
+    IAuditService auditService,
+    INotificationService? notificationService = null)
 {
     private static readonly HashSet<string> AllowedRoles =
     [
@@ -319,6 +320,24 @@ public sealed class MessagesHandler(
 
         db.Set<Message>().Add(message);
         await db.SaveChangesAsync(ct);
+
+        // Notify recipient about new message
+        if (notificationService != null)
+        {
+            try
+            {
+                await notificationService.CreateNotificationAsync(
+                    institutionId,
+                    recipientUserId,
+                    NotificationType.NewMessageReceived,
+                    "Yeni Mesajınız Var",
+                    $"{content[..Math.Min(content.Length, 60)]}...",
+                    "Message",
+                    message.Id,
+                    ct);
+            }
+            catch { }
+        }
 
         await auditService.LogAsync(
             userId: currentUserId,

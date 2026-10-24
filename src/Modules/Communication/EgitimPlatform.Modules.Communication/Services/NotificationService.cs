@@ -28,6 +28,20 @@ public class NotificationService(IApplicationDbContext db) : INotificationServic
             if (exists) return;
         }
 
+        // Verify recipient user preference
+        var pref = await db.Set<UserNotificationPreference>().AsNoTracking()
+            .FirstOrDefaultAsync(p => p.InstitutionId == institutionId && p.UserId == userId && !p.IsDeleted, ct);
+
+        if (pref != null)
+        {
+            if (!pref.InAppEnabled) return;
+            if (type == NotificationType.ExamResultPublished && !pref.ExamResultsEnabled) return;
+            if ((type == NotificationType.CoachTaskAssigned || type == NotificationType.CoachTaskDueSoon) && !pref.CoachTasksEnabled) return;
+            if (type == NotificationType.CoachMeetingScheduled && !pref.MeetingsEnabled) return;
+            if (type == NotificationType.NewMessageReceived && !pref.MessagesEnabled) return;
+            if (type == NotificationType.ContentMaterialShared && !pref.MaterialsEnabled) return;
+        }
+
         var notification = new Notification
         {
             Id = Guid.NewGuid(),

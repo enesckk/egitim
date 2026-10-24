@@ -566,4 +566,36 @@ with zipfile.ZipFile('/tmp/template_e2e.xlsx', 'r') as z_in:
     }
   });
 
+  test('13. Notifications & User Settings: Real Notification List, Unread Tracking & Profile Settings', async ({ page }) => {
+    // Step 1: Login as Student
+    await loginAs(page, 'student.demo@egitim.com', 'Demo1234!');
+    await expect(page).toHaveURL(/\/student/);
+
+    // Step 2: Open In-App Notifications Modal from Header Bell
+    const bellBtn = page.locator('button[aria-label="Bildirimler"]');
+    await expect(bellBtn).toBeVisible({ timeout: 10000 });
+    await bellBtn.click();
+
+    // Verify Notification Modal and persistent notification list
+    await expect(page.getByRole('heading', { name: 'Bildirimler' })).toBeVisible({ timeout: 5000 });
+    await expect(page.locator('#notification-list')).toBeVisible({ timeout: 10000 });
+
+    // Close notifications modal
+    await page.getByRole('button', { name: 'Kapat', exact: true }).click();
+    await expect(page.getByRole('heading', { name: 'Bildirimler' })).not.toBeVisible({ timeout: 5000 });
+
+    // Step 3: Navigate to Profile & User Settings
+    await page.goto('/student/profile');
+    await expect(page.getByRole('heading', { name: 'Profil' })).toBeVisible({ timeout: 10000 });
+
+    // Open Notification Preferences Modal
+    await page.getByText(/Bildirim Tercihleri/i).click();
+    await expect(page.getByRole('heading', { name: 'Bildirim Tercihleri' })).toBeVisible({ timeout: 5000 });
+    await expect(page.getByText(/Kayıtlı Bildirim Kanalları/i)).toBeVisible({ timeout: 5000 });
+
+    // Close preferences modal
+    await page.getByRole('button', { name: 'Kapat', exact: true }).click();
+    await expect(page.getByRole('heading', { name: 'Bildirim Tercihleri' })).not.toBeVisible({ timeout: 5000 });
+  });
+
 });
