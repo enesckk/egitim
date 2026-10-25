@@ -14,6 +14,7 @@ export interface HeaderProps {
   onNotificationClick?: () => void;
   onProfileClick?: () => void;
   actions?: React.ReactNode;
+  isStudent?: boolean;
 }
 
 export const Header: React.FC<HeaderProps> = ({
@@ -28,7 +29,47 @@ export const Header: React.FC<HeaderProps> = ({
   onNotificationClick,
   onProfileClick,
   actions,
+  isStudent = false,
 }) => {
+  if (isStudent) {
+    return (
+      <header className="sticky top-0 z-30 bg-[#F8F7F3]/95 backdrop-blur-md border-b border-neutral-200/60 h-16 flex items-center justify-between px-4 sm:px-6 select-none transition-all">
+        {/* Left: Avatar + "Hoş geldin," + Student Full Name */}
+        <button
+          type="button"
+          onClick={onProfileClick}
+          className="flex items-center gap-3 cursor-pointer group text-left focus:outline-none"
+          aria-label="Profilimi Aç"
+        >
+          <div className="w-10 h-10 rounded-full bg-[#14233E] text-white flex items-center justify-center font-bold text-sm shadow-sm group-hover:scale-105 transition-transform">
+            {userName ? userName.charAt(0).toUpperCase() : 'Ö'}
+          </div>
+          <div className="flex flex-col">
+            <span className="text-[11px] text-neutral-500 font-medium leading-none">Hoş geldin,</span>
+            <span className="text-sm sm:text-base font-bold text-[#14233E] mt-0.5 leading-tight group-hover:text-[#315FE8] transition-colors">
+              {userName && !userName.includes('@') && !userName.includes('.demo') ? userName : 'Ahmet Yılmaz'}
+            </span>
+          </div>
+        </button>
+
+        {/* Right: Notification Bell */}
+        <div className="flex items-center gap-2">
+          {actions}
+          <button
+            type="button"
+            onClick={onNotificationClick}
+            className="relative p-2.5 rounded-full bg-white border border-neutral-200/70 text-neutral-600 hover:text-neutral-900 hover:bg-neutral-50 transition-all shadow-xs min-h-[44px] min-w-[44px] flex items-center justify-center"
+            aria-label="Bildirimler"
+          >
+            <Bell className="h-4 w-4" />
+            {typeof unreadCount === 'number' && unreadCount > 0 && (
+              <span className="absolute top-1 right-1 w-2.5 h-2.5 bg-red-500 rounded-full ring-2 ring-white" />
+            )}
+          </button>
+        </div>
+      </header>
+    );
+  }
   return (
     <header className="sticky top-0 z-30 bg-white/95 backdrop-blur-sm border-b border-neutral-200 h-14 flex items-center px-4 gap-3 flex-shrink-0 select-none">
       {/* Mobile Hamburger */}

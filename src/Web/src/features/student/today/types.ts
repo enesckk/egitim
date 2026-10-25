@@ -40,7 +40,9 @@ export interface WeeklyProgressData {
 export interface RecommendationItem {
   topic: string;
   message: string;
-  actionLabel: string;
+  actionLabel?: string;
+  subject?: string;
+  priorityScore?: number;
 }
 
 export interface UpcomingEventItem {
@@ -59,10 +61,10 @@ export interface MonthlyStatItem {
 export interface StudentTodayViewModel {
   studentName: string;
   dateString: string;
-  nextStudy: NextStudyItem;
+  nextStudy?: NextStudyItem;
   todayPlans: TodayPlanItem[];
-  weeklyProgress: WeeklyProgressData;
-  recommendation: RecommendationItem;
-  upcomingEvents: UpcomingEventItem[];
-  monthlyStats: MonthlyStatItem[];
+  weeklyProgress?: WeeklyProgressData;
+  recommendation?: RecommendationItem;
+  upcomingEvents?: UpcomingEventItem[];
+  monthlyStats?: MonthlyStatItem[];
 }

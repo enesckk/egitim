@@ -56,7 +56,7 @@ export const AppShell: React.FC<AppShellProps> = ({
   const isMobileBottomNavRole = role === 'student';
 
   return (
-    <div className="min-h-screen bg-surface flex flex-col text-neutral-900 font-sans">
+    <div className={cn("min-h-screen flex flex-col text-neutral-900 font-sans", role === 'student' ? 'bg-[#F8F7F3]' : 'bg-surface')}>
       {/* Desktop Sidebar (and Mobile Drawer for non-student or when toggled) */}
       {showSidebar && hasNav && (
         <Sidebar
@@ -81,6 +81,7 @@ export const AppShell: React.FC<AppShellProps> = ({
         {/* Header */}
         <Header
           {...headerProps}
+          isStudent={role === 'student'}
           unreadCount={unreadCount}
           onNotificationClick={() => setIsNotificationOpen(true)}
           onMenuToggle={hasNav ? () => setIsDrawerOpen(true) : undefined}
@@ -90,7 +91,7 @@ export const AppShell: React.FC<AppShellProps> = ({
         <main
           className={cn(
             'flex-1 w-full max-w-5xl mx-auto px-4 sm:px-6 py-3.5 sm:py-6',
-            isMobileBottomNavRole && showBottomNav && hasNav && 'pb-16 md:pb-6',
+            isMobileBottomNavRole && showBottomNav && hasNav && 'pb-32 sm:pb-28 md:pb-6',
             className
           )}
         >
@@ -103,6 +104,7 @@ export const AppShell: React.FC<AppShellProps> = ({
             items={navItems}
             activeId={activeNavId}
             onChange={onNavChange}
+            isStudent={role === 'student'}
           />
         )}
       </div>

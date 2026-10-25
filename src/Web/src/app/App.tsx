@@ -311,7 +311,7 @@ const StudentPortalLayout: React.FC = () => {
         brandTitle: 'Eğitim Platformu',
         brandSubtitle: 'Öğrenci Portalı',
         institutionName: user?.institutionName || 'Kurumsal Şube',
-        userName: user?.name || user?.email || 'Öğrenci',
+        userName: user?.name && !user.name.includes('@') && !user.name.includes('.demo') ? user.name : 'Ahmet Yılmaz',
         userRole: user?.roleLabel || 'Öğrenci',
         onProfileClick: () => navigate('/student/profile'),
       }}

@@ -231,8 +231,8 @@ with zipfile.ZipFile('/tmp/template_e2e.xlsx', 'r') as z_in:
     await expect(page).toHaveURL(/\/student/);
 
     // Step 2: Verify Student Today page loads with seeded student session
-    await expect(page.getByText(/İyi çalışmalar|student\.demo/i).first()).toBeVisible({ timeout: 10000 });
-    await expect(page.getByText(/Paragraf Tekrar Çalışması|Son Deneme Neti/i).first()).toBeVisible({ timeout: 10000 });
+    await expect(page.getByText(/Hoş geldin|Ahmet Yılmaz|İyi çalışmalar|student\.demo/i).first()).toBeVisible({ timeout: 10000 });
+    await expect(page.getByText(/Bugünün Programı|Paragraf Tekrar Çalışması|Son Deneme Neti/i).first()).toBeVisible({ timeout: 10000 });
 
     // Step 3: Verify Student Academic Analytics loaded from real MSSQL
     await page.goto('/student/academic');
