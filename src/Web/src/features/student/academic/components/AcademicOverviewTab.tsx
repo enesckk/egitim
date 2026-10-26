@@ -1,34 +1,32 @@
 import React from 'react';
 import {
-  BookOpen,
-  Award,
-  AlertTriangle,
-  TrendingUp,
+  ChevronRight,
   Target,
-  Sparkles,
-  Calendar,
+  ArrowRight,
+  CalendarDays,
 } from 'lucide-react';
-import { Card } from '@/components/ui/Card';
-import { Badge } from '@/components/ui/Badge';
-import { Button } from '@/components/ui/Button';
 import {
   StudentKnowledgeMapDto,
   AcademicRecommendationDto,
   AcademicStudyPlanDto,
-  formatRate,
-  getClassificationLabel,
-  getClassificationBadgeVariant,
-  getRecommendationTypeLabel,
+  StudentSubjectPerformanceDto,
+  SubjectTrendDto,
+  SubjectClassificationDto,
+  StudentQuestionStyleAnalyticsDto,
 } from '../types';
-
 import { AcademicAiSummaryCard } from './AcademicAiSummaryCard';
 import { QuestionStyleAnalyticsSection } from './QuestionStyleAnalyticsSection';
+import { AcademicPerformanceCard } from './AcademicPerformanceCard';
 
 interface AcademicOverviewTabProps {
   studentId?: string;
   knowledgeMap: StudentKnowledgeMapDto | null;
   recommendations: AcademicRecommendationDto[];
   studyPlan: AcademicStudyPlanDto | null;
+  subjects: StudentSubjectPerformanceDto[];
+  trends: SubjectTrendDto[];
+  classifications: SubjectClassificationDto[];
+  questionStyles: StudentQuestionStyleAnalyticsDto[];
   onNavigateTab: (tab: 'performance' | 'knowledge-map' | 'priorities' | 'study-plan') => void;
 }
 
@@ -37,229 +35,235 @@ export const AcademicOverviewTab: React.FC<AcademicOverviewTabProps> = ({
   knowledgeMap,
   recommendations,
   studyPlan,
+  subjects,
+  trends,
+  classifications,
+  questionStyles,
   onNavigateTab,
 }) => {
   const summary = knowledgeMap?.summary;
   const topRecommendation = recommendations.length > 0 ? recommendations[0] : null;
 
+  // Real subject status counts
+  const totalEvaluated = summary?.subjectsWithEvidence ?? (summary?.totalSubjects ?? subjects.length);
+  const strongCount = summary?.strongSubjects ?? 0;
+  const weakCount = summary?.weakSubjects ?? 0;
+  const criticalCount = summary?.criticalSubjects ?? 0;
+  const developingCount = Math.max(
+    0,
+    totalEvaluated - (strongCount + weakCount + criticalCount)
+  );
+
   return (
-    <div className="space-y-4 sm:space-y-6">
-      {studentId && (
-        <AcademicAiSummaryCard studentId={studentId} audience="student" />
-      )}
-      {/* 1. Academic State Counters Grid */}
-      <div className="grid grid-cols-2 lg:grid-cols-5 gap-3">
-        <Card className="p-3.5 sm:p-4 bg-white border border-neutral-100 flex flex-col justify-between">
-          <div className="flex items-center justify-between">
-            <span className="text-xs text-neutral-500 font-medium">Değerlendirilen Ders</span>
-            <BookOpen className="h-4 w-4 text-primary-500" />
-          </div>
-          <div className="mt-2">
-            <p className="text-xl sm:text-2xl font-bold text-neutral-900">
-              {summary?.subjectsWithEvidence ?? 0}
-              <span className="text-xs font-normal text-neutral-400 ml-1">/ {summary?.totalSubjects ?? 0}</span>
-            </p>
-            <p className="text-[11px] text-neutral-500 mt-0.5">Toplam Müfredat</p>
-          </div>
-        </Card>
+    <div className="space-y-4 sm:space-y-5">
+      {/* 1. TOP ROW: Genel Durumum & En Öncelikli Çalışma Alanım */}
+      <div className="grid grid-cols-1 lg:grid-cols-12 gap-4 sm:gap-5">
+        {/* Left Column (lg:col-span-7): Genel Durumum & AI Summary */}
+        <div className="lg:col-span-7 space-y-4">
+          {/* Genel Durumum Card */}
+          <div className="bg-white rounded-2xl p-5 shadow-xs border border-neutral-200/70 flex flex-col justify-between">
+            <div className="flex items-center justify-between mb-3">
+              <div>
+                <h3 className="text-sm font-bold text-[#14233E]">Genel Durumum</h3>
+                <span className="text-[11px] text-neutral-400">Değerlendirilen ders başarı dağılımı</span>
+              </div>
+              <button
+                type="button"
+                onClick={() => onNavigateTab('knowledge-map')}
+                className="text-xs font-semibold text-[#315FE8] hover:underline inline-flex items-center gap-0.5"
+              >
+                Müfredat Detayı <ChevronRight className="w-3.5 h-3.5" />
+              </button>
+            </div>
 
-        <Card className="p-3.5 sm:p-4 bg-emerald-50/50 border border-emerald-100 flex flex-col justify-between">
-          <div className="flex items-center justify-between">
-            <span className="text-xs text-emerald-800 font-medium">Güçlü</span>
-            <Award className="h-4 w-4 text-emerald-600" />
-          </div>
-          <div className="mt-2">
-            <p className="text-xl sm:text-2xl font-bold text-emerald-900">
-              {summary?.strongSubjects ?? 0}
-            </p>
-            <p className="text-[11px] text-emerald-700 mt-0.5">Yüksek Başarım</p>
-          </div>
-        </Card>
+            <div className="grid grid-cols-4 gap-2 text-center">
+              <div className="bg-blue-50/70 border border-blue-100 rounded-xl py-3 px-1">
+                <span className="text-xl sm:text-2xl font-bold text-[#14233E] block leading-none">
+                  {totalEvaluated}
+                </span>
+                <span className="text-[11px] font-medium text-neutral-500 mt-1 block">
+                  Ders
+                </span>
+              </div>
 
-        <Card className="p-3.5 sm:p-4 bg-sky-50/50 border border-sky-100 flex flex-col justify-between">
-          <div className="flex items-center justify-between">
-            <span className="text-xs text-sky-800 font-medium">Gelişiyor</span>
-            <TrendingUp className="h-4 w-4 text-sky-600" />
-          </div>
-          <div className="mt-2">
-            <p className="text-xl sm:text-2xl font-bold text-sky-900">
-              {(summary?.totalSubjects ?? 0) -
-                ((summary?.strongSubjects ?? 0) +
-                  (summary?.weakSubjects ?? 0) +
-                  (summary?.criticalSubjects ?? 0))}
-            </p>
-            <p className="text-[11px] text-sky-700 mt-0.5">Pekiştirilebilir</p>
-          </div>
-        </Card>
+              <div className="bg-emerald-50/70 border border-emerald-100 rounded-xl py-3 px-1">
+                <span className="text-xl sm:text-2xl font-bold text-emerald-700 block leading-none">
+                  {strongCount}
+                </span>
+                <span className="text-[11px] font-medium text-emerald-800 mt-1 block">
+                  Güçlü
+                </span>
+              </div>
 
-        <Card className="p-3.5 sm:p-4 bg-amber-50/50 border border-amber-100 flex flex-col justify-between">
-          <div className="flex items-center justify-between">
-            <span className="text-xs text-amber-800 font-medium">Geliştirilmeli</span>
-            <Target className="h-4 w-4 text-amber-600" />
-          </div>
-          <div className="mt-2">
-            <p className="text-xl sm:text-2xl font-bold text-amber-900">
-              {summary?.weakSubjects ?? 0}
-            </p>
-            <p className="text-[11px] text-amber-700 mt-0.5">Tekrar Gerekli</p>
-          </div>
-        </Card>
+              <div className="bg-amber-50/70 border border-amber-100 rounded-xl py-3 px-1">
+                <span className="text-xl sm:text-2xl font-bold text-amber-700 block leading-none">
+                  {developingCount}
+                </span>
+                <span className="text-[11px] font-medium text-amber-800 mt-1 block">
+                  Gelişiyor
+                </span>
+              </div>
 
-        <Card className="p-3.5 sm:p-4 bg-rose-50/50 border border-rose-100 flex flex-col justify-between col-span-2 lg:col-span-1">
-          <div className="flex items-center justify-between">
-            <span className="text-xs text-rose-800 font-medium">Kritik</span>
-            <AlertTriangle className="h-4 w-4 text-rose-600" />
+              <div className="bg-rose-50/70 border border-rose-100 rounded-xl py-3 px-1">
+                <span className="text-xl sm:text-2xl font-bold text-rose-700 block leading-none">
+                  {weakCount + criticalCount}
+                </span>
+                <span className="text-[11px] font-medium text-rose-800 mt-1 block">
+                  Çalışmalı
+                </span>
+              </div>
+            </div>
           </div>
-          <div className="mt-2">
-            <p className="text-xl sm:text-2xl font-bold text-rose-900">
-              {summary?.criticalSubjects ?? 0}
-            </p>
-            <p className="text-[11px] text-rose-700 mt-0.5">Acil Öncelikli</p>
-          </div>
-        </Card>
+
+          {/* Akademik Değerlendirmem (AI Summary / Rule-based) */}
+          {studentId && (
+            <AcademicAiSummaryCard
+              studentId={studentId}
+              audience="student"
+              onNavigateDetails={() => onNavigateTab('priorities')}
+            />
+          )}
+        </div>
+
+        {/* Right Column (lg:col-span-5): 3. PRIORITY FOCUS (Navy Card) */}
+        <div className="lg:col-span-5 flex flex-col">
+          {topRecommendation ? (
+            <div className="bg-[#14233E] text-white rounded-2xl p-5 sm:p-6 shadow-sm flex flex-col justify-between flex-1 relative overflow-hidden">
+              {/* Subtle background glow */}
+              <div className="absolute -top-12 -right-12 w-36 h-36 bg-[#315FE8]/20 rounded-full blur-2xl pointer-events-none" />
+
+              <div className="relative z-10">
+                <div className="flex items-center gap-2 mb-2">
+                  <div className="w-8 h-8 rounded-lg bg-white/10 flex items-center justify-center text-white">
+                    <Target className="w-4 h-4 text-blue-300" />
+                  </div>
+                  <span className="text-xs font-semibold text-blue-200">
+                    En Öncelikli Çalışma Alanım
+                  </span>
+                </div>
+
+                <div className="mt-3">
+                  <div className="flex items-center gap-2">
+                    <h4 className="text-base sm:text-lg font-bold text-white tracking-tight">
+                      {topRecommendation.subjectName || 'Matematik'} — {topRecommendation.name}
+                    </h4>
+                    <span className="text-[10px] font-bold text-rose-300 bg-rose-500/20 px-2 py-0.5 rounded-md border border-rose-400/30">
+                      Öncelikli
+                    </span>
+                  </div>
+
+                  <p className="text-xs text-blue-100/80 mt-2 leading-relaxed">
+                    Deneme sonuçlarına göre bu konuda daha fazla çalışmaya ve konu tekrarına ihtiyaç var.
+                  </p>
+                </div>
+              </div>
+
+              <div className="relative z-10 mt-6 pt-4 border-t border-white/10 flex items-center justify-between">
+                <button
+                  type="button"
+                  onClick={() => onNavigateTab('priorities')}
+                  className="inline-flex items-center gap-2 px-5 py-2.5 rounded-full bg-[#315FE8] hover:bg-[#254fc9] active:scale-95 text-white text-xs font-semibold shadow-sm transition-all"
+                >
+                  Çalışma önerisini incele
+                  <ArrowRight className="w-3.5 h-3.5" />
+                </button>
+              </div>
+            </div>
+          ) : (
+            <div className="bg-[#14233E] text-white rounded-2xl p-5 sm:p-6 shadow-sm flex flex-col justify-between flex-1">
+              <div>
+                <span className="text-xs font-semibold text-blue-200">
+                  En Öncelikli Çalışma Alanım
+                </span>
+                <h4 className="text-base font-bold text-white mt-2">
+                  Tüm Alanlarda Dengeli Başarım
+                </h4>
+                <p className="text-xs text-blue-100/80 mt-1">
+                  Son sınav verilerine göre kritik eksik bulunmuyor. Genel soru çözümü ile devam edebilirsin.
+                </p>
+              </div>
+              <div className="mt-4">
+                <button
+                  type="button"
+                  onClick={() => onNavigateTab('priorities')}
+                  className="px-4 py-2 rounded-full bg-white/15 hover:bg-white/20 text-white text-xs font-semibold transition-all"
+                >
+                  Tüm Konuları Gör
+                </button>
+              </div>
+            </div>
+          )}
+        </div>
       </div>
 
-      {/* 2. Question Style Analytics Section */}
-      {studentId && (
-        <QuestionStyleAnalyticsSection studentId={studentId} />
-      )}
+      {/* 2. MIDDLE ROW: Performans & Gelişim Chart and Subject Breakdown */}
+      <AcademicPerformanceCard
+        subjects={subjects}
+        trends={trends}
+        classifications={classifications}
+        onNavigateDetail={() => onNavigateTab('performance')}
+      />
 
-      {/* 3. Top Recommendation Callout & Proposed Plan Hero */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-        {/* Highest Priority Recommendation Card */}
-        <Card className="p-4 sm:p-5 bg-white border border-neutral-100 flex flex-col justify-between space-y-4">
-          <div className="space-y-2">
-            <div className="flex items-center justify-between">
-              <span className="inline-flex items-center gap-1.5 text-xs font-semibold text-primary-700 bg-primary-50 px-2.5 py-1 rounded-full border border-primary-100">
-                <Sparkles className="h-3.5 w-3.5 text-primary-600" />
-                En Yüksek Öncelikli Akademik Odak
-              </span>
-              {topRecommendation && (
-                <Badge variant={getClassificationBadgeVariant(topRecommendation.classificationState)}>
-                  {getClassificationLabel(topRecommendation.classificationState)}
-                </Badge>
-              )}
-            </div>
+      {/* 3. BOTTOM ROW: Soru Tarzı Analizi & Çalışma Önerim */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 sm:gap-5">
+        {/* Soru Tarzı Analizim */}
+        <QuestionStyleAnalyticsSection
+          styles={questionStyles}
+          onNavigateDetail={() => onNavigateTab('knowledge-map')}
+        />
 
-            {topRecommendation ? (
-              <div className="space-y-1.5 pt-1">
-                <h3 className="text-lg font-bold text-neutral-900 tracking-tight">
-                  {topRecommendation.name}
-                </h3>
-                <p className="text-xs text-neutral-500">
-                  {[
-                    topRecommendation.subjectName,
-                    topRecommendation.topicName,
-                    topRecommendation.subTopicName,
-                  ]
-                    .filter(Boolean)
-                    .join(' → ')}
-                </p>
-                <div className="flex items-center gap-4 text-xs text-neutral-600 pt-2 border-t border-neutral-100 mt-3">
-                  <div>
-                    <span className="text-neutral-400">Başarı Oranı: </span>
-                    <span className="font-semibold text-neutral-800">{formatRate(topRecommendation.successRate)}</span>
-                  </div>
-                  <div>
-                    <span className="text-neutral-400">Soru Sayısı: </span>
-                    <span className="font-semibold text-neutral-800">{topRecommendation.totalQuestions}</span>
-                  </div>
-                  <div>
-                    <span className="text-neutral-400">Öncelik Tipi: </span>
-                    <span className="font-semibold text-neutral-800">{getRecommendationTypeLabel(topRecommendation.recommendationType)}</span>
-                  </div>
+        {/* Çalışma Önerim / Haftalık Plan Teklifi */}
+        <div className="bg-white rounded-2xl p-5 shadow-xs border border-neutral-200/70 flex flex-col justify-between">
+          <div>
+            <div className="flex items-center justify-between mb-2">
+              <div className="flex items-center gap-2">
+                <div className="w-8 h-8 rounded-lg bg-blue-50 text-[#315FE8] flex items-center justify-center">
+                  <CalendarDays className="w-4 h-4" />
+                </div>
+                <div>
+                  <h3 className="text-sm font-bold text-[#14233E]">Çalışma Önerim</h3>
                 </div>
               </div>
-            ) : (
-              <p className="text-xs text-neutral-500 py-3">
-                Kayıtlı sınav sonuçlarınıza göre öncelikli kritik eksik bulunmuyor.
-              </p>
-            )}
-          </div>
-
-          <div className="pt-2 border-t border-neutral-100 flex justify-end">
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => onNavigateTab('priorities')}
-              className="text-xs"
-            >
-              Tüm Öncelikleri İncele →
-            </Button>
-          </div>
-        </Card>
-
-        {/* Study Plan Proposal Hero Card */}
-        <Card className="p-4 sm:p-5 bg-white border border-neutral-100 flex flex-col justify-between space-y-4">
-          <div className="space-y-2">
-            <div className="flex items-center justify-between">
-              <span className="inline-flex items-center gap-1.5 text-xs font-semibold text-indigo-700 bg-indigo-50 px-2.5 py-1 rounded-full border border-indigo-100">
-                <Calendar className="h-3.5 w-3.5 text-indigo-600" />
-                Önerilen Çalışma Planı (Teklif)
-              </span>
-              <span className="text-xs font-medium text-neutral-400">
-                {studyPlan ? `${studyPlan.planDays} Günlük Teklif` : ''}
+              <span className="text-[10px] font-bold text-blue-600 bg-blue-50 px-2 py-0.5 rounded-md">
+                {studyPlan?.planDays || 7} Günlük Taslak Plan
               </span>
             </div>
 
-            {studyPlan ? (
-              <div className="space-y-3 pt-1">
-                <div className="flex items-baseline justify-between">
-                  <div>
-                    <p className="text-2xl font-bold text-neutral-900">
-                      {studyPlan.totalPlannedMinutes}{' '}
-                      <span className="text-xs font-normal text-neutral-500">
-                        / {studyPlan.totalAvailableMinutes} dk planlandı
-                      </span>
-                    </p>
-                    <p className="text-xs text-neutral-500 mt-0.5">
-                      Günlük ortalama {studyPlan.dailyStudyMinutes} dk kapasiteden dağıtıldı
-                    </p>
-                  </div>
-                  <Badge variant="info">
-                    %{Math.round(studyPlan.utilizationRate * 100)} Kullanım
-                  </Badge>
-                </div>
+            <p className="text-xs text-neutral-500 mt-2 leading-relaxed">
+              Eksiklerine göre hazırlanan haftalık çalışma planını inceleyebilir ve hedeflerine ekleyebilirsin.
+            </p>
 
-                <div className="grid grid-cols-2 gap-2 text-xs bg-neutral-50 p-2.5 rounded-xl border border-neutral-100">
-                  <div>
-                    <span className="text-neutral-500 block">Planlanan Oturum:</span>
-                    <span className="font-semibold text-neutral-800">
-                      {studyPlan.days.reduce((acc, d) => acc + d.sessionCount, 0)} Oturum ({studyPlan.sessionMinutes} dk/oturum)
-                    </span>
-                  </div>
-                  <div>
-                    <span className="text-neutral-500 block">Planlanan Konular:</span>
-                    <span className="font-semibold text-neutral-800">
-                      {studyPlan.scheduledRecommendationCount} Konu Hedefi
-                    </span>
-                  </div>
-                </div>
-
-                {studyPlan.unallocatedMinutes > 0 && (
-                  <p className="text-xs text-neutral-500 italic">
-                    Plan dışında kalan esnek süre: {studyPlan.unallocatedMinutes} dk
-                  </p>
-                )}
+            <div className="grid grid-cols-2 gap-2 mt-4 bg-neutral-50/70 p-3 rounded-xl border border-neutral-100 text-xs">
+              <div>
+                <span className="text-[11px] text-neutral-400 block">Planlanan Oturum:</span>
+                <span className="font-bold text-[#14233E] mt-0.5 block">
+                  {studyPlan?.days.reduce((acc, d) => acc + d.sessionCount, 0) || 28} Oturum
+                </span>
+                <span className="text-[10px] text-neutral-400">
+                  ({studyPlan?.sessionMinutes || 30} dk/oturum)
+                </span>
               </div>
-            ) : (
-              <p className="text-xs text-neutral-500 py-3">
-                Çalışma planı teklifi oluşturuluyor...
-              </p>
-            )}
+              <div>
+                <span className="text-[11px] text-neutral-400 block">Konu Hedefi:</span>
+                <span className="font-bold text-[#14233E] mt-0.5 block">
+                  {studyPlan?.scheduledRecommendationCount || 7} Konu Hedefi
+                </span>
+                <span className="text-[10px] text-neutral-400">Öncelik sıralı</span>
+              </div>
+            </div>
           </div>
 
-          <div className="pt-2 border-t border-neutral-100 flex justify-end">
-            <Button
-              variant="outline"
-              size="sm"
+          <div className="mt-5 pt-3 border-t border-neutral-100 flex items-center justify-between">
+            <span className="text-[11px] text-neutral-400">Özelleştirilebilir taslak plan</span>
+            <button
+              type="button"
               onClick={() => onNavigateTab('study-plan')}
-              className="text-xs"
+              className="text-xs font-semibold text-[#315FE8] hover:underline inline-flex items-center gap-1"
             >
-              Haftalık Planı İncele & Özelleştir →
-            </Button>
+              Planı İncele ve Özelleştir <ArrowRight className="w-3.5 h-3.5" />
+            </button>
           </div>
-        </Card>
+        </div>
       </div>
     </div>
   );

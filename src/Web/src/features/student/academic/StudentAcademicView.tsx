@@ -23,6 +23,7 @@ import {
   StudentKnowledgeMapDto,
   AcademicRecommendationDto,
   AcademicStudyPlanDto,
+  StudentQuestionStyleAnalyticsDto,
 } from './types';
 import { AcademicOverviewTab } from './components/AcademicOverviewTab';
 import { AcademicPerformanceTab } from './components/AcademicPerformanceTab';
@@ -56,6 +57,7 @@ export const StudentAcademicView: React.FC<StudentAcademicViewProps> = ({
   const [knowledgeMap, setKnowledgeMap] = useState<StudentKnowledgeMapDto | null>(null);
   const [recommendations, setRecommendations] = useState<AcademicRecommendationDto[]>([]);
   const [studyPlan, setStudyPlan] = useState<AcademicStudyPlanDto | null>(null);
+  const [questionStyles, setQuestionStyles] = useState<StudentQuestionStyleAnalyticsDto[]>([]);
 
   // Status states
   const [isLoading, setIsLoading] = useState<boolean>(true);
@@ -118,6 +120,7 @@ export const StudentAcademicView: React.FC<StudentAcademicViewProps> = ({
           mapRes,
           recRes,
           planRes,
+          qStylesRes,
         ] = await Promise.all([
           academicService.getSubjectPerformance(resolvedStudentId, params, signal),
           academicService.getSubjectTrends(resolvedStudentId, params, signal),
@@ -125,6 +128,7 @@ export const StudentAcademicView: React.FC<StudentAcademicViewProps> = ({
           academicService.getKnowledgeMap(resolvedStudentId, params, signal),
           academicService.getRecommendations(resolvedStudentId, params, signal),
           academicService.getStudyPlan(resolvedStudentId, params, signal),
+          academicService.getQuestionStyleAnalytics(resolvedStudentId, undefined, signal).catch(() => []),
         ]);
 
         // Race protection check: drop response if a newer request was dispatched
@@ -138,9 +142,10 @@ export const StudentAcademicView: React.FC<StudentAcademicViewProps> = ({
         setKnowledgeMap(mapRes);
         setRecommendations(recRes);
         setStudyPlan(planRes);
+        setQuestionStyles(qStylesRes || []);
       } catch (err: unknown) {
         if (err instanceof Error && err.name === 'AbortError') {
-          return; // Ignore aborted request errors
+          return;
         }
         if (sequenceId !== undefined && sequenceId !== requestSeqRef.current) {
           return;
@@ -198,8 +203,7 @@ export const StudentAcademicView: React.FC<StudentAcademicViewProps> = ({
       <div className="max-w-5xl mx-auto space-y-4 select-none" data-testid="student-academic-loading">
         <Skeleton className="h-10 w-64 rounded-xl" />
         <Skeleton className="h-14 w-full rounded-2xl" />
-        <div className="grid grid-cols-2 lg:grid-cols-5 gap-3">
-          <Skeleton className="h-24 rounded-xl" />
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
           <Skeleton className="h-24 rounded-xl" />
           <Skeleton className="h-24 rounded-xl" />
           <Skeleton className="h-24 rounded-xl" />
@@ -227,28 +231,28 @@ export const StudentAcademicView: React.FC<StudentAcademicViewProps> = ({
   }
 
   const navTabs = [
-    { key: 'overview', label: 'Genel Bakış', icon: <LayoutDashboard className="h-4 w-4" /> },
-    { key: 'performance', label: 'Performans & Trendler', icon: <BarChart3 className="h-4 w-4" /> },
-    { key: 'knowledge-map', label: 'Müfredat Haritası', icon: <FolderTree className="h-4 w-4" /> },
-    { key: 'priorities', label: 'Akademik Öncelikler', icon: <Sparkles className="h-4 w-4" /> },
-    { key: 'study-plan', label: 'Çalışma Planı Önerisi', icon: <Calendar className="h-4 w-4" /> },
+    { key: 'overview', label: 'Genel Bakış', shortLabel: 'Genel', icon: <LayoutDashboard className="h-4 w-4 shrink-0" /> },
+    { key: 'performance', label: 'Performans & Trendler', shortLabel: 'Trendler', icon: <BarChart3 className="h-4 w-4 shrink-0" /> },
+    { key: 'knowledge-map', label: 'Müfredat Haritası', shortLabel: 'Müfredat', icon: <FolderTree className="h-4 w-4 shrink-0" /> },
+    { key: 'priorities', label: 'Akademik Öncelikler', shortLabel: 'Öncelikler', icon: <Sparkles className="h-4 w-4 shrink-0" /> },
+    { key: 'study-plan', label: 'Çalışma Planı Önerisi', shortLabel: 'Plan Teklifi', icon: <Calendar className="h-4 w-4 shrink-0" /> },
   ] as const;
 
   return (
-    <div className="max-w-5xl mx-auto select-none space-y-4 sm:space-y-6" data-testid="student-academic-view">
+    <div className="max-w-5xl mx-auto select-none space-y-4 sm:space-y-5" data-testid="student-academic-view">
       {/* 1. Header & Exam Filter */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-neutral-100 pb-3 sm:pb-4">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-neutral-200/60 pb-3 sm:pb-4">
         <div>
-          <h1 className="font-serif text-2xl sm:text-3xl text-neutral-900 tracking-tight leading-tight">
-            Akademik Zeka & Analiz
+          <h1 className="text-xl sm:text-2xl font-bold text-[#14233E] tracking-tight">
+            Akademik Analizim
           </h1>
           <p className="text-neutral-500 text-xs sm:text-sm mt-0.5">
-            Gerçek sınav verilerine dayalı başarım, gelişim trendi ve çalışma planı teklifi
+            Sınav sonuçların ve akademik gelişim durumun
           </p>
         </div>
 
         <div className="flex items-center gap-2">
-          <Filter className="h-4 w-4 text-neutral-400" />
+          <Filter className="h-3.5 w-3.5 text-neutral-400" />
           <Select
             options={[
               { value: '', label: 'Tüm Sınav Türleri' },
@@ -259,13 +263,13 @@ export const StudentAcademicView: React.FC<StudentAcademicViewProps> = ({
             value={examTypeId}
             onChange={(e) => setExamTypeId(e.target.value)}
             placeholder="Sınav Türü Filtrele"
-            className="text-xs min-h-[34px] py-1"
+            className="text-xs min-h-[36px] py-1 bg-white border-neutral-200/80 rounded-xl"
           />
         </div>
       </div>
 
-      {/* 2. Navigation Tabs */}
-      <div className="bg-white rounded-2xl border border-neutral-100 p-1.5 flex items-center gap-1 overflow-x-auto no-scrollbar shadow-soft-sm">
+      {/* 2. Responsive Capsule Sub-Navigation Tabs */}
+      <div className="bg-white/90 backdrop-blur-md rounded-2xl border border-neutral-200/70 p-1.5 flex items-center gap-1 overflow-x-auto no-scrollbar shadow-xs">
         {navTabs.map((tab) => {
           const isActive = activeTab === tab.key;
           return (
@@ -274,14 +278,15 @@ export const StudentAcademicView: React.FC<StudentAcademicViewProps> = ({
               type="button"
               onClick={() => setActiveTab(tab.key as AcademicTabKey)}
               className={cn(
-                'flex items-center gap-2 px-3.5 py-2 rounded-xl text-xs font-medium transition-all shrink-0 min-h-[36px]',
+                'flex items-center gap-1.5 sm:gap-2 px-3 sm:px-3.5 py-2 rounded-xl text-xs transition-all shrink-0 min-h-[38px] select-none',
                 isActive
-                  ? 'bg-primary-600 text-white shadow-sm font-semibold'
-                  : 'text-neutral-600 hover:text-neutral-900 hover:bg-neutral-50'
+                  ? 'bg-[#14233E] text-white shadow-xs font-semibold'
+                  : 'text-neutral-600 hover:text-neutral-900 hover:bg-neutral-100/70 font-medium'
               )}
             >
               {tab.icon}
-              <span>{tab.label}</span>
+              <span className="hidden sm:inline">{tab.label}</span>
+              <span className="sm:hidden">{tab.shortLabel}</span>
             </button>
           );
         })}
@@ -295,6 +300,10 @@ export const StudentAcademicView: React.FC<StudentAcademicViewProps> = ({
             knowledgeMap={knowledgeMap}
             recommendations={recommendations}
             studyPlan={studyPlan}
+            subjects={subjects}
+            trends={trends}
+            classifications={classifications}
+            questionStyles={questionStyles}
             onNavigateTab={(tabKey) => setActiveTab(tabKey)}
           />
         )}

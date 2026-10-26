@@ -1,255 +1,235 @@
-import React, { useEffect, useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
-  HelpCircle,
+  ChevronRight,
   TrendingUp,
   TrendingDown,
   Minus,
-  AlertCircle,
-  Layers,
 } from 'lucide-react';
-import { Card } from '@/components/ui/Card';
-import { Badge } from '@/components/ui/Badge';
+import { cn } from '@/lib/utils';
 import {
   StudentQuestionStyleAnalyticsDto,
-  formatRate,
-  getClassificationLabel,
-  getClassificationBadgeVariant,
   getTrendDirectionLabel,
 } from '../types';
 import { academicService } from '@/services/academicService';
 
-interface QuestionStyleAnalyticsSectionProps {
-  studentId: string;
+export interface QuestionStyleAnalyticsSectionProps {
+  styles?: StudentQuestionStyleAnalyticsDto[];
+  studentId?: string;
   isReadOnly?: boolean;
   simplified?: boolean;
+  loading?: boolean;
+  onNavigateDetail?: () => void;
 }
 
 export const QuestionStyleAnalyticsSection: React.FC<QuestionStyleAnalyticsSectionProps> = ({
+  styles: initialStyles,
   studentId,
   simplified = false,
+  loading: externalLoading = false,
+  onNavigateDetail,
 }) => {
-  const [styles, setStyles] = useState<StudentQuestionStyleAnalyticsDto[]>([]);
-  const [loading, setLoading] = useState<boolean>(true);
-  const [error, setError] = useState<string | null>(null);
+  const [internalStyles, setInternalStyles] = useState<StudentQuestionStyleAnalyticsDto[]>(initialStyles || []);
+  const [internalLoading, setInternalLoading] = useState<boolean>(!initialStyles && !!studentId);
+  const [showAllModal, setShowAllModal] = useState(false);
 
   useEffect(() => {
-    let isMounted = true;
-    const controller = new AbortController();
-
-    async function fetchStyleAnalytics() {
-      try {
-        setLoading(true);
-        setError(null);
-        const data = await academicService.getQuestionStyleAnalytics(
-          studentId,
-          undefined,
-          controller.signal
-        );
-        if (isMounted) {
-          setStyles(data || []);
-        }
-      } catch (err: unknown) {
-        if (isMounted) {
-          // Ignore abort errors
-          if (err instanceof DOMException && err.name === 'AbortError') return;
-          setError('Soru tarzı analizi yüklenirken bir sorun oluştu.');
-        }
-      } finally {
-        if (isMounted) {
-          setLoading(false);
-        }
-      }
+    if (initialStyles) {
+      setInternalStyles(initialStyles);
+      return;
     }
 
     if (studentId) {
-      fetchStyleAnalytics();
+      let isMounted = true;
+      const controller = new AbortController();
+
+      async function fetchStyles() {
+        try {
+          setInternalLoading(true);
+          const data = await academicService.getQuestionStyleAnalytics(
+            studentId!,
+            undefined,
+            controller.signal
+          );
+          if (isMounted) {
+            setInternalStyles(data || []);
+          }
+        } catch {
+          // ignore error
+        } finally {
+          if (isMounted) {
+            setInternalLoading(false);
+          }
+        }
+      }
+
+      fetchStyles();
+      return () => {
+        isMounted = false;
+        controller.abort();
+      };
     }
+  }, [initialStyles, studentId]);
 
-    return () => {
-      isMounted = false;
-      controller.abort();
-    };
-  }, [studentId]);
+  const effectiveLoading = externalLoading || internalLoading;
+  const effectiveStyles = initialStyles || internalStyles;
 
-  if (loading) {
+  if (effectiveLoading && effectiveStyles.length === 0) {
     return (
-      <Card className="p-4 sm:p-6 bg-white border border-neutral-100">
-        <div className="flex items-center space-x-3 mb-4">
-          <div className="h-5 w-5 bg-neutral-200 animate-pulse rounded" />
-          <div className="h-5 w-48 bg-neutral-200 animate-pulse rounded" />
-        </div>
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+      <div className="bg-white rounded-2xl p-5 shadow-xs border border-neutral-200/70 animate-pulse">
+        <div className="h-5 w-40 bg-neutral-200 rounded mb-4" />
+        <div className="space-y-3">
           {[1, 2, 3, 4].map((i) => (
-            <div key={i} className="h-32 bg-neutral-50 animate-pulse rounded-lg border border-neutral-100" />
+            <div key={i} className="h-6 bg-neutral-100 rounded" />
           ))}
         </div>
-      </Card>
+      </div>
     );
   }
 
-  if (error) {
-    return (
-      <Card className="p-4 sm:p-6 bg-rose-50/50 border border-rose-100">
-        <div className="flex items-center space-x-2 text-rose-800 text-sm">
-          <AlertCircle className="h-4 w-4 shrink-0 text-rose-600" />
-          <span>{error}</span>
-        </div>
-      </Card>
-    );
-  }
-
-  const hasData = styles.some((s) => s.totalQuestions > 0);
+  // Filter styles with attempts first, sort by successRate ascending (weakest / most challenged first)
+  const stylesWithData = effectiveStyles.filter((s) => s.totalQuestions > 0);
+  const sortedStyles = [...stylesWithData].sort((a, b) => (a.successRate ?? 0) - (b.successRate ?? 0));
+  const topStyles = simplified ? sortedStyles.slice(0, 3) : sortedStyles.slice(0, 4);
 
   const renderTrendIcon = (trend?: 'Increasing' | 'Stable' | 'Decreasing' | null) => {
     switch (trend) {
       case 'Increasing':
-        return <TrendingUp className="h-3.5 w-3.5 text-emerald-600" />;
+        return <TrendingUp className="w-3.5 h-3.5 text-emerald-600 inline" />;
       case 'Decreasing':
-        return <TrendingDown className="h-3.5 w-3.5 text-rose-600" />;
+        return <TrendingDown className="w-3.5 h-3.5 text-rose-600 inline" />;
       case 'Stable':
-        return <Minus className="h-3.5 w-3.5 text-sky-600" />;
+        return <Minus className="w-3.5 h-3.5 text-sky-600 inline" />;
       default:
-        return <HelpCircle className="h-3.5 w-3.5 text-neutral-400" />;
+        return null;
     }
   };
 
   return (
-    <Card className="p-4 sm:p-6 bg-white border border-neutral-100">
-      <div className="flex items-center justify-between mb-4 pb-2 border-b border-neutral-100">
-        <div className="flex items-center space-x-2">
-          <Layers className="h-5 w-5 text-primary-600" />
-          <div>
-            <h3 className="text-base font-semibold text-neutral-900">
-              {simplified ? 'Soru Tarzı Başarımı' : 'Soru Tarzı Performans Analizi'}
-            </h3>
-            <p className="text-xs text-neutral-500">
-              {simplified
-                ? 'Öğrencinin farklı soru formatlarındaki performansı'
-                : 'Yeni nesil, işlem, grafik/tablo ve diğer soru tarzlarındaki deterministik başarım'}
-            </p>
-          </div>
+    <div className="bg-white rounded-2xl p-5 shadow-xs border border-neutral-200/70 flex flex-col justify-between">
+      <div>
+        <div className="flex items-center justify-between mb-1">
+          <h3 className="text-sm font-bold text-[#14233E]">
+            {simplified ? 'Soru Tarzı Başarımı' : 'Soru Tarzı Analizim'}
+          </h3>
+          {onNavigateDetail ? (
+            <button
+              type="button"
+              onClick={onNavigateDetail}
+              className="text-xs font-semibold text-[#315FE8] hover:underline inline-flex items-center gap-0.5"
+            >
+              Detaylı Analiz <ChevronRight className="w-3.5 h-3.5" />
+            </button>
+          ) : (
+            <button
+              type="button"
+              onClick={() => setShowAllModal(true)}
+              className="text-xs font-semibold text-[#315FE8] hover:underline inline-flex items-center gap-0.5"
+            >
+              Detaylı Analiz <ChevronRight className="w-3.5 h-3.5" />
+            </button>
+          )}
         </div>
-        {!hasData && (
-          <Badge variant="secondary" size="sm">
-            Veri Bekleniyor
-          </Badge>
+        <p className="text-[11px] text-neutral-400 mb-4">
+          {simplified
+            ? 'Farklı soru tarzlarındaki başarım oranları'
+            : 'En çok zorlandığın soru formatları'}
+        </p>
+
+        {stylesWithData.length === 0 ? (
+          <div className="py-6 text-center text-xs text-neutral-400">
+            Henüz soru tarzı analizi için yeterli veri bulunmuyor.
+          </div>
+        ) : (
+          <div className="space-y-3.5">
+            {topStyles.map((style) => {
+              const rate = Math.round((style.successRate ?? 0) * 100);
+              const barColor =
+                rate >= 70
+                  ? 'bg-emerald-500'
+                  : rate >= 50
+                  ? 'bg-sky-500'
+                  : rate >= 35
+                  ? 'bg-amber-500'
+                  : 'bg-rose-500';
+
+              return (
+                <div key={style.questionStyleId} className="flex items-center gap-3">
+                  <div className="w-24 sm:w-28 text-xs font-medium text-neutral-700 truncate" title={style.name}>
+                    {style.name}
+                  </div>
+                  <div className="flex-1 h-2 rounded-full bg-neutral-100 overflow-hidden">
+                    <div
+                      className={cn('h-full rounded-full transition-all duration-500', barColor)}
+                      style={{ width: `${Math.max(4, rate)}%` }}
+                    />
+                  </div>
+                  <div className="w-10 text-right text-xs font-bold text-neutral-800">
+                    %{rate}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
         )}
       </div>
 
-      {!hasData ? (
-        <div className="text-center py-8 px-4 bg-neutral-50/70 rounded-lg border border-neutral-100">
-          <HelpCircle className="h-8 w-8 text-neutral-400 mx-auto mb-2" />
-          <p className="text-sm font-medium text-neutral-700">Henüz Soru Tarzı Verisi Yok</p>
-          <p className="text-xs text-neutral-500 mt-1 max-w-md mx-auto">
-            Soru tarzı analizi için öğrencinin soru-düzeyinde etiketli denemeleri tamamlaması gerekmektedir (en az 2 deneme ve 5 soru).
-          </p>
-        </div>
-      ) : simplified ? (
-        // Simplified view for parent portal
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
-          {styles.map((style) => (
-            <div
-              key={style.questionStyleId}
-              className="p-3.5 rounded-lg border border-neutral-100 bg-neutral-50/50 flex flex-col justify-between"
-            >
+      <div className="mt-4 pt-3 border-t border-neutral-100 flex items-center justify-between text-[11px] text-neutral-400">
+        <span>{stylesWithData.length} farklı soru tarzı değerlendirildi</span>
+        {onNavigateDetail && (
+          <button
+            type="button"
+            onClick={onNavigateDetail}
+            className="text-neutral-600 font-semibold hover:text-[#315FE8] inline-flex items-center gap-0.5"
+          >
+            Tümünü İncele
+          </button>
+        )}
+      </div>
+
+      {/* Progressive Modal for All Question Styles */}
+      {showAllModal && (
+        <div className="fixed inset-0 z-50 bg-black/40 backdrop-blur-xs flex items-center justify-center p-4">
+          <div className="bg-white rounded-3xl max-w-2xl w-full max-h-[85vh] flex flex-col shadow-2xl border border-neutral-200">
+            <div className="p-5 border-b border-neutral-100 flex items-center justify-between">
               <div>
-                <div className="flex items-center justify-between gap-2">
-                  <span className="text-sm font-medium text-neutral-900 truncate">
-                    {style.name}
-                  </span>
-                  <Badge variant={getClassificationBadgeVariant(style.classificationState)} size="sm">
-                    {getClassificationLabel(style.classificationState)}
-                  </Badge>
-                </div>
-                <div className="mt-2 flex items-baseline justify-between">
-                  <span className="text-xl font-bold text-neutral-900">
-                    {formatRate(style.successRate)}
-                  </span>
-                  <span className="text-xs text-neutral-500">
-                    {style.totalQuestions} soru
-                  </span>
-                </div>
+                <h3 className="text-base font-bold text-[#14233E]">Tüm Soru Tarzı Analizi</h3>
+                <p className="text-xs text-neutral-400 mt-0.5">Soru formatlarındaki doğruluk ve gelişim trendleri</p>
               </div>
-              <div className="mt-3 pt-2 border-t border-neutral-200/50 flex items-center justify-between text-[11px] text-neutral-500">
-                <span>Doğru: {style.correctCount} / {style.attemptedQuestions}</span>
-                {style.trendDirection && (
-                  <span className="flex items-center gap-1 font-medium">
-                    {renderTrendIcon(style.trendDirection)}
-                    {getTrendDirectionLabel(style.trendDirection)}
-                  </span>
-                )}
-              </div>
+              <button
+                type="button"
+                onClick={() => setShowAllModal(false)}
+                className="w-8 h-8 rounded-full bg-neutral-100 text-neutral-600 hover:bg-neutral-200 flex items-center justify-center"
+              >
+                ✕
+              </button>
             </div>
-          ))}
-        </div>
-      ) : (
-        // Full detailed view for student & coach
-        <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-3.5">
-          {styles.map((style) => (
-            <div
-              key={style.questionStyleId}
-              className="p-4 rounded-xl border border-neutral-200/70 bg-white hover:border-primary-200 transition-all shadow-xs flex flex-col justify-between"
-            >
-              <div>
-                <div className="flex items-start justify-between gap-2 mb-2">
-                  <h4 className="text-sm font-semibold text-neutral-900 truncate" title={style.name}>
-                    {style.name}
-                  </h4>
-                  <Badge variant={getClassificationBadgeVariant(style.classificationState)} size="sm">
-                    {getClassificationLabel(style.classificationState)}
-                  </Badge>
-                </div>
 
-                <div className="grid grid-cols-2 gap-2 my-3 p-2.5 bg-neutral-50 rounded-lg">
+            <div className="p-5 overflow-y-auto space-y-3">
+              {effectiveStyles.map((style) => (
+                <div key={style.questionStyleId} className="p-3.5 rounded-2xl border border-neutral-100 bg-neutral-50/50 flex items-center justify-between">
                   <div>
-                    <span className="text-[10px] font-medium text-neutral-500 uppercase tracking-wider block">
-                      Başarı Oranı
-                    </span>
-                    <span className="text-lg font-bold text-neutral-900">
-                      {formatRate(style.successRate)}
-                    </span>
+                    <h4 className="text-xs font-bold text-neutral-900">{style.name}</h4>
+                    <p className="text-[11px] text-neutral-400 mt-0.5">
+                      {style.totalQuestions} soru • {style.correctCount} doğru
+                    </p>
                   </div>
-                  <div>
-                    <span className="text-[10px] font-medium text-neutral-500 uppercase tracking-wider block">
-                      Doğruluk
+                  <div className="text-right">
+                    <span className="text-sm font-bold text-[#14233E]">
+                      %{Math.round((style.successRate ?? 0) * 100)}
                     </span>
-                    <span className="text-lg font-bold text-neutral-900">
-                      {formatRate(style.accuracy)}
-                    </span>
+                    {style.trendDirection && (
+                      <p className="text-[10px] text-neutral-500 flex items-center justify-end gap-1 mt-0.5">
+                        {renderTrendIcon(style.trendDirection)}
+                        {getTrendDirectionLabel(style.trendDirection)}
+                      </p>
+                    )}
                   </div>
                 </div>
-
-                <div className="space-y-1.5 text-xs text-neutral-600">
-                  <div className="flex justify-between">
-                    <span>Toplam Soru:</span>
-                    <span className="font-medium text-neutral-900">{style.totalQuestions}</span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span>Cevaplanan:</span>
-                    <span className="font-medium text-neutral-900">{style.attemptedQuestions}</span>
-                  </div>
-                  <div className="flex justify-between text-[11px] text-neutral-500 pt-1 border-t border-neutral-100">
-                    <span className="text-emerald-700">D: {style.correctCount}</span>
-                    <span className="text-rose-700">Y: {style.incorrectCount}</span>
-                    <span className="text-neutral-500">B: {style.blankCount}</span>
-                    <span>Kapsam: {formatRate(style.coverage)}</span>
-                  </div>
-                </div>
-              </div>
-
-              <div className="mt-3.5 pt-2.5 border-t border-neutral-100 flex items-center justify-between text-xs">
-                <span className="text-neutral-500 text-[11px]">
-                  {style.observationCount} deneme
-                </span>
-                <div className="flex items-center gap-1 font-medium text-[11px] text-neutral-700">
-                  {renderTrendIcon(style.trendDirection)}
-                  <span>{getTrendDirectionLabel(style.trendDirection ?? null)}</span>
-                </div>
-              </div>
+              ))}
             </div>
-          ))}
+          </div>
         </div>
       )}
-    </Card>
+    </div>
   );
 };

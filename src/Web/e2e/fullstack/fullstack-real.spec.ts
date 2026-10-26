@@ -237,6 +237,17 @@ with zipfile.ZipFile('/tmp/template_e2e.xlsx', 'r') as z_in:
     // Step 3: Verify Student Academic Analytics loaded from real MSSQL
     await page.goto('/student/academic');
     await expect(page.getByText(/Akademik Analiz|Akademik Zeka|Ders Bazlı Performans/i).first()).toBeVisible({ timeout: 10000 });
+    // Verify Academic sections and metric boundaries: average net, status distribution, and question styles
+    await expect(page.getByText(/Genel Durumum/i).first()).toBeVisible({ timeout: 10000 });
+    await expect(page.getByText(/En Öncelikli Çalışma Alanım/i).first()).toBeVisible({ timeout: 10000 });
+    await expect(page.getByText(/Performansım ve Gelişim/i).first()).toBeVisible({ timeout: 10000 });
+    await expect(page.getByText(/Soru Tarzı Analizim/i).first()).toBeVisible({ timeout: 10000 });
+    await expect(page.getByText(/Çalışma Önerim/i).first()).toBeVisible({ timeout: 10000 });
+    // Verify section tabs navigate cleanly without clipping
+    await page.getByRole('button', { name: /Müfredat/i }).first().click();
+    await expect(page.getByText(/Müfredat Ağacı Kapsamı/i).first()).toBeVisible({ timeout: 10000 });
+    await page.getByRole('button', { name: /Genel/i }).first().click();
+    await expect(page.getByText(/Genel Durumum/i).first()).toBeVisible({ timeout: 10000 });
 
     // Step 4: Navigate to Student Notebook
     await page.goto('/student/notebook');
