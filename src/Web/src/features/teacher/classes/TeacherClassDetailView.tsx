@@ -35,8 +35,8 @@ function mapDetailDtoToDetail(dto: ClassroomDetailDto): TeacherClassDetail {
       studentId: s.studentId,
       name: s.fullName,
       initials,
-      mathNet: 24.5,
-      physicsNet: 9.0,
+      mathNet: null,
+      physicsNet: null,
       status: 'takipte',
       trend: 'stable',
     };
@@ -49,25 +49,12 @@ function mapDetailDtoToDetail(dto: ClassroomDetailDto): TeacherClassDetail {
     branch: dto.branch || 'Genel Şube',
     subject: (dto.teachers || []).map((t) => t.fullName).join(', ') || 'Branş Dersi',
     studentCount: students.length,
-    averageNet: 65.4,
+    averageNet: null,
     attentionRequiredCount: 0,
     students,
-    topicMasteries: [
-      {
-        topic: 'Türev & Uygulamaları',
-        subject: 'Matematik',
-        masteryPercentage: 82,
-        unmasteredStudentCount: 3,
-      },
-      {
-        topic: 'Elektrik & Manyetizma',
-        subject: 'Fizik',
-        masteryPercentage: 74,
-        unmasteredStudentCount: 5,
-      },
-    ],
-    recentExamTitle: 'Son Kurumsal Deneme',
-    recentExamAverageNet: 65.4,
+    topicMasteries: [],
+    recentExamTitle: null,
+    recentExamAverageNet: null,
   };
 }
 
@@ -211,8 +198,8 @@ export const TeacherClassDetailView: React.FC<TeacherClassDetailViewProps> = ({
             <span className="text-[10px] uppercase font-semibold text-neutral-400 block">
               Ortalama Net
             </span>
-            <span className="font-mono text-lg font-bold text-primary-700">
-              {cls.averageNet}
+            <span className="font-mono text-sm sm:text-base font-bold text-neutral-800">
+              {cls.averageNet != null ? `${cls.averageNet} net` : 'Henüz sınav verisi yok'}
             </span>
           </div>
         </div>
@@ -289,43 +276,49 @@ export const TeacherClassDetailView: React.FC<TeacherClassDetailViewProps> = ({
           </div>
 
           <div className="space-y-3">
-            {cls.topicMasteries.map((topic) => {
-              const isLow = topic.masteryPercentage < 60;
-              const isMedium = topic.masteryPercentage >= 60 && topic.masteryPercentage < 75;
+            {cls.topicMasteries.length === 0 ? (
+              <p className="text-xs text-neutral-400 text-center py-6">
+                Bu şube için henüz konu hakimiyet verisi bulunmuyor.
+              </p>
+            ) : (
+              cls.topicMasteries.map((topic) => {
+                const isLow = topic.masteryPercentage < 60;
+                const isMedium = topic.masteryPercentage >= 60 && topic.masteryPercentage < 75;
 
-              return (
-                <div key={topic.topic} className="space-y-1.5 bg-surface-alt p-3 rounded-xl border border-neutral-100">
-                  <div className="flex items-center justify-between text-xs">
-                    <div>
-                      <span className="font-semibold text-neutral-900">{topic.topic}</span>
-                      <span className="text-[11px] text-neutral-400 ml-1.5">({topic.subject})</span>
+                return (
+                  <div key={topic.topic} className="space-y-1.5 bg-surface-alt p-3 rounded-xl border border-neutral-100">
+                    <div className="flex items-center justify-between text-xs">
+                      <div>
+                        <span className="font-semibold text-neutral-900">{topic.topic}</span>
+                        <span className="text-[11px] text-neutral-400 ml-1.5">({topic.subject})</span>
+                      </div>
+                      <span
+                        className={cn(
+                          'font-mono font-bold',
+                          isLow ? 'text-danger' : isMedium ? 'text-warning-dark' : 'text-success'
+                        )}
+                      >
+                        %{topic.masteryPercentage} Hakimiyet
+                      </span>
                     </div>
-                    <span
-                      className={cn(
-                        'font-mono font-bold',
-                        isLow ? 'text-danger' : isMedium ? 'text-warning-dark' : 'text-success'
-                      )}
-                    >
-                      %{topic.masteryPercentage} Hakimiyet
-                    </span>
-                  </div>
 
-                  <div className="h-2 w-full bg-neutral-200 rounded-full overflow-hidden">
-                    <div
-                      className={cn(
-                        'h-full rounded-full transition-all duration-500',
-                        isLow ? 'bg-danger' : isMedium ? 'bg-warning' : 'bg-success'
-                      )}
-                      style={{ width: `${topic.masteryPercentage}%` }}
-                    />
-                  </div>
+                    <div className="h-2 w-full bg-neutral-200 rounded-full overflow-hidden">
+                      <div
+                        className={cn(
+                          'h-full rounded-full transition-all duration-500',
+                          isLow ? 'bg-danger' : isMedium ? 'bg-warning' : 'bg-success'
+                        )}
+                        style={{ width: `${topic.masteryPercentage}%` }}
+                      />
+                    </div>
 
-                  <p className="text-[10px] text-neutral-500">
-                    {topic.unmasteredStudentCount} öğrenci bu konuda ek tekrar veya soru çözümüne ihtiyaç duyuyor.
-                  </p>
-                </div>
-              );
-            })}
+                    <p className="text-[10px] text-neutral-500">
+                      {topic.unmasteredStudentCount} öğrenci bu konuda ek tekrar veya soru çözümüne ihtiyaç duyuyor.
+                    </p>
+                  </div>
+                );
+              })
+            )}
           </div>
         </div>
       </div>

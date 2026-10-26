@@ -8,7 +8,6 @@ import { Alert } from '@/components/ui/Alert';
 import { Skeleton } from '@/components/ui/Skeleton';
 import { Modal } from '@/components/ui/Modal';
 import { Input } from '@/components/ui/Input';
-import { initialTeacherStudentsData } from './mockData';
 import { TeacherStudentDetailModel, TeacherStudentTopicPerformance, TeacherStudentExamDetail } from './types';
 import { teacherService } from '@/services/teacherService';
 import { Student360Dto } from '@/services/academicService';
@@ -26,13 +25,13 @@ function mapStudent360ToTeacherModel(dto: Student360Dto): TeacherStudentDetailMo
 
   const topics: TeacherStudentTopicPerformance[] = (dto.currentGoals || []).map((g) => ({
     id: g.id,
-    subject: 'Matematik',
+    subject: g.targetSchoolName || 'Akademik Hedef',
     topic: g.title,
-    masteryPercentage: g.targetScore ? Math.min(100, Math.round(g.targetScore / 5)) : 75,
-    solvedQuestionCount: 50,
-    accuracyRate: 75,
+    masteryPercentage: g.targetScore ? Math.min(100, Math.round(g.targetScore)) : 0,
+    solvedQuestionCount: 0,
+    accuracyRate: g.targetScore ? Math.min(100, Math.round(g.targetScore)) : 0,
     status: 'improving',
-    lastPracticedDate: g.effectiveDate ? new Date(g.effectiveDate).toLocaleDateString('tr-TR') : 'Bugün',
+    lastPracticedDate: g.effectiveDate ? new Date(g.effectiveDate).toLocaleDateString('tr-TR') : 'Güncel',
   }));
 
   const exams: TeacherStudentExamDetail[] = dto.recentExam
@@ -42,11 +41,11 @@ function mapStudent360ToTeacherModel(dto: Student360Dto): TeacherStudentDetailMo
           examTitle: dto.recentExam.title,
           date: dto.recentExam.takenAt
             ? new Date(dto.recentExam.takenAt).toLocaleDateString('tr-TR')
-            : 'Bugün',
-          subject: 'Genel',
-          correctCount: 30,
-          incorrectCount: 5,
-          emptyCount: 5,
+            : 'Güncel',
+          subject: dto.recentExam.examType || 'Genel',
+          correctCount: 0,
+          incorrectCount: 0,
+          emptyCount: 0,
           net: dto.recentExam.totalNet,
           netChange: dto.recentExam.delta,
           incorrectTopics: [],
@@ -61,8 +60,8 @@ function mapStudent360ToTeacherModel(dto: Student360Dto): TeacherStudentDetailMo
     grade: dto.student.gradeLevel ? `${dto.student.gradeLevel}. Sınıf` : '12. Sınıf',
     classBranch: dto.student.gradeLevel ? `${dto.student.gradeLevel}. Sınıf` : '12. Sınıf',
     assignedSubjects: ['Matematik', 'Fizik'],
-    mathAverageNet: 24.5,
-    physicsAverageNet: 9.0,
+    mathAverageNet: null,
+    physicsAverageNet: null,
     overallAcademicStatus: 'takipte',
     topicPerformances: topics,
     recentExamResults: exams,
@@ -131,7 +130,7 @@ export const TeacherStudentDetailView: React.FC<TeacherStudentDetailViewProps> =
     }
   };
 
-  const activeStudent = student || (initialStudents ? initialStudents[0] : initialTeacherStudentsData.students[0]);
+  const activeStudent = student || (initialStudents ? initialStudents[0] : undefined);
   const activeLoading = propIsLoading || isLoading;
   const activeError = propErrorMessage || errorMessage;
 
@@ -204,8 +203,12 @@ export const TeacherStudentDetailView: React.FC<TeacherStudentDetailViewProps> =
               Dersleriniz: <strong className="text-neutral-700">{activeStudent.assignedSubjects.join(', ')}</strong>
             </p>
             <div className="flex items-center gap-3 font-mono text-xs text-neutral-600 mt-1.5">
-              <span>Matematik Ort: <strong className="text-primary-700">{activeStudent.mathAverageNet} net</strong></span>
-              {activeStudent.physicsAverageNet > 0 && (
+              {activeStudent.mathAverageNet != null ? (
+                <span>Matematik Ort: <strong className="text-primary-700">{activeStudent.mathAverageNet} net</strong></span>
+              ) : (
+                <span>Branş Sınav Verisi: <span className="text-neutral-400">Henüz sınav verisi yok</span></span>
+              )}
+              {activeStudent.physicsAverageNet != null && (
                 <>
                   <span>•</span>
                   <span>Fizik Ort: <strong className="text-primary-700">{activeStudent.physicsAverageNet} net</strong></span>

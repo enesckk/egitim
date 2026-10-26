@@ -24,12 +24,12 @@ export interface TeacherClassDetail {
   branch: string;
   subject: string;
   studentCount: number;
-  averageNet: number;
+  averageNet?: number | null;
   attentionRequiredCount: number;
   students: ClassStudentItem[];
   topicMasteries: ClassTopicMasteryItem[];
-  recentExamTitle: string;
-  recentExamAverageNet: number;
+  recentExamTitle?: string | null;
+  recentExamAverageNet?: number | null;
 }
 
 export interface TeacherClassesViewModel {

@@ -45,7 +45,7 @@ export const ClassCard: React.FC<ClassCardProps> = ({ cls, onSelect }) => {
               Sınıf Net Ortalaması
             </span>
             <span className="font-mono text-base font-bold text-neutral-900 mt-0.5 block">
-              {cls.averageNet} net
+              {cls.averageNet != null ? `${cls.averageNet} net` : 'Henüz sınav verisi yok'}
             </span>
           </div>
 

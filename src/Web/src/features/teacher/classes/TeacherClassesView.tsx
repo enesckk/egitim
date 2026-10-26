@@ -20,12 +20,12 @@ function mapClassroomToDetail(c: ClassroomDto): TeacherClassDetail {
     branch: c.branch || 'Genel Şube',
     subject: (c.teachers || []).map((t) => t.fullName).join(', ') || 'Branş Dersi',
     studentCount: c.studentCount || 0,
-    averageNet: 65.4,
+    averageNet: null,
     attentionRequiredCount: 0,
     students: [],
     topicMasteries: [],
-    recentExamTitle: 'Son Kurumsal Deneme',
-    recentExamAverageNet: 65.4,
+    recentExamTitle: null,
+    recentExamAverageNet: null,
   };
 }
 

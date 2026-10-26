@@ -29,8 +29,8 @@ export interface TeacherStudentDetailModel {
   grade: string;
   classBranch: string;
   assignedSubjects: string[];
-  mathAverageNet: number;
-  physicsAverageNet: number;
+  mathAverageNet?: number | null;
+  physicsAverageNet?: number | null;
   overallAcademicStatus: 'takipte' | 'dikkat' | 'kritik';
   topicPerformances: TeacherStudentTopicPerformance[];
   recentExamResults: TeacherStudentExamDetail[];

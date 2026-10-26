@@ -40,6 +40,7 @@ export const AcademicGapsCard: React.FC<AcademicGapsCardProps> = ({
   onSelectStudent,
 }) => {
   const criticalCount = gaps.filter((g) => g.severity === 'critical').length;
+  const totalCount = gaps.length;
 
   return (
     <div className="space-y-3 select-none">
@@ -50,8 +51,11 @@ export const AcademicGapsCard: React.FC<AcademicGapsCardProps> = ({
             Öne Çıkan Akademik Açıklar
           </h2>
           {criticalCount > 0 && (
-            <span className="inline-flex items-center justify-center w-5 h-5 rounded-full bg-danger text-white text-xs font-bold font-mono">
-              {criticalCount}
+            <span
+              className="inline-flex items-center justify-center px-2 py-0.5 rounded-full bg-danger text-white text-xs font-bold font-mono"
+              title={`${criticalCount} kritik açık, toplam ${totalCount} açık tespit edildi`}
+            >
+              {criticalCount} Kritik / {totalCount} Toplam
             </span>
           )}
         </div>
