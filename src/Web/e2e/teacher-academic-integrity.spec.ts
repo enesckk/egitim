@@ -78,7 +78,7 @@ test.describe('Teacher Academic Data Integrity & Empty States', () => {
     await page.waitForLoadState('networkidle');
 
     // Verify badge text explicitly distinguishes critical vs total
-    await expect(page.getByText('2 Kritik / 3 Toplam')).toBeVisible();
+    await expect(page.getByText('2 Kritik Konu Açığı / 3 Toplam Açık')).toBeVisible();
   });
 
   test('2. Classrooms view renders honest empty states without hardcoded 65.4 net', async ({ page }) => {

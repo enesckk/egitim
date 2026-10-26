@@ -459,8 +459,8 @@ const TeacherPortalLayout: React.FC = () => {
         brandTitle: 'Bilim Akademi',
         brandSubtitle: 'Öğretmen Portalı',
         institutionName: user?.institutionName || 'Kadıköy Şubesi',
-        userName: user?.name || 'Kemal Bey',
-        userRole: user?.roleLabel || 'Matematik & Fizik Zümresi',
+        userName: user?.name && !user.name.includes('@') && !user.name.includes('.demo') ? user.name : 'Ayşe Öğretmen',
+        userRole: user?.roleLabel || 'Öğretmen',
       }}
       sidebarFooter={
         <button

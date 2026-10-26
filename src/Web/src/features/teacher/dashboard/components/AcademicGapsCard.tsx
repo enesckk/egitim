@@ -1,39 +1,11 @@
 import React from 'react';
-import { AlertTriangle, TrendingUp, ChevronRight } from 'lucide-react';
-import { cn } from '@/lib/utils';
-import { AcademicGapItem, AcademicSeverity } from '../types';
+import { AlertTriangle, ChevronRight, BookOpen, AlertCircle } from 'lucide-react';
+import { AcademicGapItem, StudentAttentionGroup } from '../types';
 
 export interface AcademicGapsCardProps {
   gaps: AcademicGapItem[];
   onSelectStudent: (studentId: string) => void;
 }
-
-const SEVERITY_CONFIG: Record<
-  AcademicSeverity,
-  { bg: string; border: string; icon: React.ReactNode; badgeClass: string; label: string }
-> = {
-  critical: {
-    bg: 'bg-danger-light',
-    border: 'border-red-200',
-    icon: <AlertTriangle className="h-4 w-4 text-danger flex-shrink-0" />,
-    badgeClass: 'bg-danger text-white',
-    label: 'Kritik',
-  },
-  warning: {
-    bg: 'bg-warning-light',
-    border: 'border-amber-200',
-    icon: <AlertTriangle className="h-4 w-4 text-warning flex-shrink-0" />,
-    badgeClass: 'bg-warning text-white',
-    label: 'Dikkat',
-  },
-  info: {
-    bg: 'bg-primary-50',
-    border: 'border-primary-100',
-    icon: <TrendingUp className="h-4 w-4 text-primary-600 flex-shrink-0" />,
-    badgeClass: 'bg-primary-100 text-primary-700',
-    label: 'Takipte',
-  },
-};
 
 export const AcademicGapsCard: React.FC<AcademicGapsCardProps> = ({
   gaps,
@@ -42,79 +14,148 @@ export const AcademicGapsCard: React.FC<AcademicGapsCardProps> = ({
   const criticalCount = gaps.filter((g) => g.severity === 'critical').length;
   const totalCount = gaps.length;
 
+  // Group academic gaps by student (1 card per student)
+  const studentGroups: StudentAttentionGroup[] = React.useMemo(() => {
+    const map = new Map<string, StudentAttentionGroup>();
+
+    gaps.forEach((gap) => {
+      let group = map.get(gap.studentId);
+      if (!group) {
+        group = {
+          studentId: gap.studentId,
+          studentName: gap.studentName,
+          initials: gap.initials,
+          grade: gap.grade,
+          criticalCount: 0,
+          totalCount: 0,
+          gaps: [],
+          topTopics: [],
+        };
+        map.set(gap.studentId, group);
+      }
+
+      group.totalCount += 1;
+      if (gap.severity === 'critical') {
+        group.criticalCount += 1;
+      }
+      group.gaps.push(gap);
+      if (!group.topTopics.includes(gap.topic)) {
+        group.topTopics.push(gap.topic);
+      }
+    });
+
+    // Sort students by critical gaps descending, then total gaps descending
+    return Array.from(map.values()).sort((a, b) => {
+      if (b.criticalCount !== a.criticalCount) {
+        return b.criticalCount - a.criticalCount;
+      }
+      return b.totalCount - a.totalCount;
+    });
+  }, [gaps]);
+
   return (
-    <div className="space-y-3 select-none">
+    <div className="space-y-3.5 select-none" data-testid="attention-students-section">
       <div className="flex items-center justify-between">
-        <div className="flex items-center gap-2">
-          <AlertTriangle className="h-4 w-4 text-danger" />
-          <h2 className="font-semibold text-neutral-800 text-sm sm:text-base">
-            Öne Çıkan Akademik Açıklar
-          </h2>
-          {criticalCount > 0 && (
-            <span
-              className="inline-flex items-center justify-center px-2 py-0.5 rounded-full bg-danger text-white text-xs font-bold font-mono"
-              title={`${criticalCount} kritik açık, toplam ${totalCount} açık tespit edildi`}
-            >
-              {criticalCount} Kritik / {totalCount} Toplam
-            </span>
-          )}
+        <div className="flex items-center gap-2.5">
+          <div className="p-1.5 rounded-lg bg-red-50 text-red-600">
+            <AlertTriangle className="h-4 w-4" />
+          </div>
+          <div>
+            <h2 className="font-bold text-[#14233E] text-base sm:text-lg">
+              Dikkat Gerektiren Öğrenciler
+            </h2>
+            <p className="text-xs text-neutral-500">
+              Şubelerinizde konu ve kazanım açığı tespit edilen öğrenciler
+            </p>
+          </div>
         </div>
+
+        {totalCount > 0 && (
+          <span
+            className="inline-flex items-center justify-center px-2.5 py-1 rounded-full bg-red-100 text-red-800 text-xs font-bold font-mono"
+            title={`${criticalCount} kritik konu açığı, toplam ${totalCount} konu açığı tespit edildi`}
+          >
+            {criticalCount} Kritik Konu Açığı / {totalCount} Toplam Açık
+          </span>
+        )}
       </div>
 
-      <div className="space-y-2.5">
-        {gaps.map((gap) => {
-          const style = SEVERITY_CONFIG[gap.severity];
+      {studentGroups.length === 0 ? (
+        <div className="p-8 text-center bg-white rounded-2xl border border-neutral-200/70 text-neutral-500 space-y-2">
+          <div className="w-10 h-10 rounded-full bg-emerald-50 text-emerald-600 flex items-center justify-center mx-auto">
+            <BookOpen className="h-5 w-5" />
+          </div>
+          <p className="text-sm font-semibold text-[#14233E]">Akademik Açık Tespit Edilmedi</p>
+          <p className="text-xs text-neutral-400">Atanmış şubelerinizdeki öğrenciler için henüz kritik veya öncelikli bir konu açığı bulunmuyor.</p>
+        </div>
+      ) : (
+        <div className="space-y-3">
+          {studentGroups.map((group) => {
+            const hasCritical = group.criticalCount > 0;
 
-          return (
-            <div
-              key={gap.id}
-              className={cn(
-                'rounded-2xl border p-3.5 sm:p-4 flex flex-col sm:flex-row sm:items-start justify-between gap-3 transition-all',
-                style.bg,
-                style.border
-              )}
-            >
-              <div className="flex items-start gap-3 min-w-0">
-                <div className="w-10 h-10 rounded-2xl bg-white border border-neutral-200 text-neutral-800 text-xs font-bold flex items-center justify-center flex-shrink-0 shadow-soft-sm">
-                  {gap.initials}
+            return (
+              <div
+                key={group.studentId}
+                onClick={() => onSelectStudent(group.studentId)}
+                className="bg-white rounded-2xl border border-neutral-200/70 p-4 sm:p-5 hover:border-[#315FE8]/40 hover:shadow-sm transition-all cursor-pointer group flex flex-col sm:flex-row sm:items-center justify-between gap-3.5"
+                data-testid="student-attention-card"
+              >
+                <div className="flex items-start gap-3.5 min-w-0">
+                  <div className="w-11 h-11 rounded-xl bg-[#14233E] text-white text-sm font-bold flex items-center justify-center flex-shrink-0 shadow-xs">
+                    {group.initials}
+                  </div>
+
+                  <div className="min-w-0 flex-1">
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <p className="font-bold text-sm sm:text-base text-[#14233E] group-hover:text-[#315FE8] transition-colors truncate">
+                        {group.studentName}
+                      </p>
+                      <span className="text-[11px] font-medium px-2 py-0.5 rounded-md bg-neutral-100 text-neutral-600">
+                        {group.grade}
+                      </span>
+                      {hasCritical ? (
+                        <span className="inline-flex items-center gap-1 text-[11px] font-bold px-2 py-0.5 rounded-full bg-red-50 text-red-700 border border-red-200">
+                          <AlertCircle className="h-3 w-3" />
+                          {group.criticalCount} Kritik Açık
+                        </span>
+                      ) : (
+                        <span className="inline-flex items-center gap-1 text-[11px] font-medium px-2 py-0.5 rounded-full bg-amber-50 text-amber-700 border border-amber-200">
+                          {group.totalCount} Konu Takipte
+                        </span>
+                      )}
+                    </div>
+
+                    {/* Top priority topics */}
+                    <div className="flex items-center gap-1.5 flex-wrap mt-2">
+                      <span className="text-[11px] font-medium text-neutral-500">Öncelikli Konular:</span>
+                      {group.topTopics.slice(0, 3).map((topic) => (
+                        <span
+                          key={topic}
+                          className="text-[11px] font-medium px-2 py-0.5 rounded-md bg-[#F8F7F3] text-[#14233E] border border-neutral-200/60"
+                        >
+                          {topic}
+                        </span>
+                      ))}
+                      {group.topTopics.length > 3 && (
+                        <span className="text-[11px] text-neutral-400 font-medium">
+                          +{group.topTopics.length - 3} diğer
+                        </span>
+                      )}
+                    </div>
+                  </div>
                 </div>
 
-                <div className="min-w-0 flex-1">
-                  <div className="flex items-center gap-2 flex-wrap mb-1">
-                    <p className="font-semibold text-sm text-neutral-900">
-                      {gap.studentName}
-                    </p>
-                    <span className="text-xs text-neutral-400">
-                      {gap.grade}
-                    </span>
-                    <span className="text-xs font-medium text-neutral-700 bg-white/80 px-2.5 py-0.5 rounded-full border border-neutral-200 shadow-soft-sm">
-                      {gap.subject} — {gap.topic}
-                    </span>
-                  </div>
-
-                  <div className="flex items-start gap-1.5 mt-1 text-xs text-neutral-600 leading-relaxed">
-                    {style.icon}
-                    <span>{gap.detail}</span>
-                  </div>
-
-                  <p className="text-[11px] text-neutral-400 mt-1.5 font-mono">
-                    Son deneme: {gap.lastExam}
-                  </p>
+                <div className="flex items-center gap-2 self-end sm:self-center flex-shrink-0 pt-2 sm:pt-0 border-t sm:border-t-0 border-neutral-100 w-full sm:w-auto justify-between sm:justify-end">
+                  <span className="text-xs font-semibold text-[#315FE8] group-hover:underline">
+                    Öğrenci Karnesi
+                  </span>
+                  <ChevronRight className="h-4 w-4 text-neutral-400 group-hover:text-[#315FE8] group-hover:translate-x-0.5 transition-all" />
                 </div>
               </div>
-
-              <button
-                type="button"
-                onClick={() => onSelectStudent(gap.studentId)}
-                className="self-end sm:self-center flex-shrink-0 flex items-center gap-1 text-xs font-semibold text-primary-700 bg-white border border-primary-200 px-3 py-1.5 rounded-xl hover:bg-primary-50 transition-colors min-h-[32px] shadow-soft-sm whitespace-nowrap"
-              >
-                <span>Öğrenciye Git</span>
-                <ChevronRight className="h-3.5 w-3.5" />
-              </button>
-            </div>
-          );
-        })}
-      </div>
+            );
+          })}
+        </div>
+      )}
     </div>
   );
 };

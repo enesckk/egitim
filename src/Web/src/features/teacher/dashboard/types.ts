@@ -32,3 +32,14 @@ export interface TeacherDashboardViewModel {
   academicGaps: AcademicGapItem[];
   studentNets: TeacherStudentNetItem[];
 }
+
+export interface StudentAttentionGroup {
+  studentId: string;
+  studentName: string;
+  initials: string;
+  grade: string;
+  criticalCount: number;
+  totalCount: number;
+  gaps: AcademicGapItem[];
+  topTopics: string[];
+}
