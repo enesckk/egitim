@@ -1,7 +1,5 @@
 import React from 'react';
-import { Award, TrendingUp, Calendar, ArrowUpRight } from 'lucide-react';
-import { Badge } from '@/components/ui/Badge';
-import { Button } from '@/components/ui/Button';
+import { Award, TrendingUp, Calendar, ChevronRight } from 'lucide-react';
 import { StudentExamItem } from '../types';
 
 export interface LatestExamSummaryCardProps {
@@ -14,91 +12,98 @@ export const LatestExamSummaryCard: React.FC<LatestExamSummaryCardProps> = ({
   onViewAnalysis,
 }) => {
   return (
-    <div className="bg-navy-900 rounded-2xl p-4 sm:p-5 text-white relative overflow-hidden select-none">
-      {/* Decorative Radial */}
+    <div
+      data-testid="latest-exam-hero"
+      className="bg-[#14233E] rounded-2xl p-5 sm:p-6 text-white relative overflow-hidden shadow-xs select-none"
+    >
+      {/* Subtle background glow */}
       <div
-        className="absolute top-0 right-0 w-36 h-36 rounded-full bg-navy-800 -mr-10 -mt-10 opacity-50 pointer-events-none"
+        className="absolute -top-12 -right-12 w-36 h-36 bg-[#315FE8]/25 rounded-full blur-2xl pointer-events-none"
         aria-hidden="true"
       />
 
-      <div className="relative z-10 space-y-3 sm:space-y-4">
+      <div className="relative z-10 space-y-4">
         {/* Top Badges */}
         <div className="flex flex-wrap items-center justify-between gap-2">
           <div className="flex items-center gap-2">
-            <Badge variant="default" size="sm" className="bg-primary-600 text-white font-bold">
+            <span className="px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-[#315FE8] text-white">
               SON DENEME • {exam.type}
-            </Badge>
-            <span className="text-xs text-navy-300 flex items-center gap-1">
-              <Calendar className="h-3 w-3" />
+            </span>
+            <span className="text-xs text-blue-200 flex items-center gap-1 font-medium">
+              <Calendar className="h-3 w-3 text-blue-300" />
               {exam.date}
             </span>
           </div>
 
-          {exam.rankInInstitution && exam.totalStudents && (
-            <div className="flex items-center gap-1 text-xs text-navy-200 bg-navy-800 border border-navy-700 px-2 py-0.5 rounded-md">
-              <Award className="h-3.5 w-3.5 text-warning" />
+          {exam.rankInInstitution && exam.totalStudents ? (
+            <div className="flex items-center gap-1.5 text-xs text-blue-100 bg-white/10 px-2.5 py-1 rounded-full border border-white/10">
+              <Award className="h-3.5 w-3.5 text-amber-300" />
               <span>Kurum Sırası: <strong className="text-white font-mono">{exam.rankInInstitution}/{exam.totalStudents}</strong></span>
             </div>
-          )}
+          ) : null}
         </div>
 
         {/* Title and Total Net Score */}
         <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-3">
           <div>
-            <h2 className="text-white font-serif text-lg sm:text-2xl leading-tight">
+            <h2 className="text-white text-lg sm:text-2xl font-bold tracking-tight leading-tight">
               {exam.title}
             </h2>
-            <p className="text-navy-300 text-xs mt-1">
-              Genel Sınav Değerlendirme & Net Analizi
+            <p className="text-blue-200/80 text-xs mt-1">
+              Genel Sınav Karnesi & Net Başarımı
             </p>
           </div>
 
-          <div className="flex items-baseline gap-2 bg-navy-800/80 border border-navy-700 p-2.5 sm:px-4 sm:py-2 rounded-xl self-start sm:self-auto">
+          <div className="flex items-baseline gap-2 bg-white/10 border border-white/10 p-2.5 sm:px-4 sm:py-2.5 rounded-2xl self-start sm:self-auto">
             <div>
-              <span className="text-[10px] text-navy-300 block uppercase font-medium">Toplam Net</span>
-              <span className="font-mono text-2xl sm:text-3xl font-bold text-white leading-none">
-                {exam.totalNet.toFixed(2)}
+              <span className="text-[10px] text-blue-200 block uppercase font-medium">Toplam Net</span>
+              <span className="text-2xl sm:text-3xl font-bold text-white leading-none">
+                {Math.round(exam.totalNet * 100) / 100}
               </span>
             </div>
-            <span className="text-xs font-mono text-navy-400">/ {exam.maxTotalNet}</span>
-            {exam.netChange > 0 && (
-              <span className="text-xs font-mono font-semibold text-success flex items-center gap-0.5 ml-1">
-                <TrendingUp className="h-3.5 w-3.5" />
-                +{exam.netChange.toFixed(2)}
+            <span className="text-xs text-blue-300 font-medium">net</span>
+            {exam.netChange !== undefined && exam.netChange !== 0 && (
+              <span
+                className={`text-xs font-semibold flex items-center gap-0.5 ml-1.5 ${
+                  exam.netChange > 0 ? 'text-emerald-300' : 'text-rose-300'
+                }`}
+              >
+                {exam.netChange > 0 ? <TrendingUp className="h-3.5 w-3.5" /> : null}
+                {exam.netChange > 0 ? `+${exam.netChange}` : exam.netChange}
               </span>
             )}
           </div>
         </div>
 
         {/* Subject Quick Net Bar */}
-        <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 pt-1 border-t border-navy-800">
-          {exam.subjects.map((sub) => (
-            <div key={sub.subjectName} className="bg-navy-950/60 rounded-xl p-2 sm:p-2.5 border border-navy-800">
-              <span className="text-[11px] text-navy-300 truncate block">{sub.subjectName}</span>
-              <div className="flex items-baseline justify-between mt-1">
-                <span className="font-mono text-sm sm:text-base font-bold text-white">
-                  {sub.net.toFixed(1)}
+        {exam.subjects && exam.subjects.length > 0 && (
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 pt-2 border-t border-white/10">
+            {exam.subjects.map((sub) => (
+              <div key={sub.subjectName} className="bg-white/5 rounded-xl p-2.5">
+                <span className="text-[11px] text-blue-200/90 font-medium block truncate">
+                  {sub.subjectName}
                 </span>
-                <span className="text-[10px] text-navy-400 font-mono">/{sub.maxNet}</span>
+                <span className="text-sm font-bold text-white mt-0.5 block">
+                  {sub.net} net
+                </span>
+                <span className="text-[10px] text-blue-300/70 block mt-0.5">
+                  {sub.correct}D {sub.wrong}Y
+                </span>
               </div>
-            </div>
-          ))}
-        </div>
+            ))}
+          </div>
+        )}
 
         {/* Action Button */}
-        <div className="pt-1 flex items-center justify-between">
-          <span className="text-xs text-navy-300 hidden sm:inline">
-            Koç değerlendirmesi ve kazanım eksikleri hazır
-          </span>
-          <Button
-            variant="subtle"
-            size="sm"
+        <div className="flex justify-end pt-1">
+          <button
+            type="button"
             onClick={() => onViewAnalysis(exam)}
-            rightIcon={<ArrowUpRight className="h-3.5 w-3.5" />}
-            className="w-full sm:w-auto"
+            className="inline-flex items-center gap-1.5 px-4 py-2 rounded-full bg-white/15 hover:bg-white/25 active:scale-95 text-white text-xs font-semibold transition-all cursor-pointer"
           >
-            Detaylı Kazanım Analizini Gör
-          </Button>
+            Sonuç Karnesini İncele
+            <ChevronRight className="w-3.5 h-3.5" />
+          </button>
         </div>
       </div>
     </div>
