@@ -274,11 +274,18 @@ with zipfile.ZipFile('/tmp/template_e2e.xlsx', 'r') as z_in:
     await expect(page.locator('[data-testid="student-notebook-view"]')).toBeVisible({ timeout: 10000 });
     await expect(page.getByText(uniqueNoteTitle)).toBeVisible({ timeout: 10000 });
 
-    // Step 7: Delete notebook entry (clean up)
-    const noteCard = page.locator('div').filter({ hasText: uniqueNoteTitle }).last();
+    // Step 7: Delete notebook entry (clean up with accessible confirmation modal)
+    const noteCard = page.locator('[data-testid="notebook-entry-card"]').filter({ hasText: uniqueNoteTitle }).first();
     const deleteBtn = noteCard.locator('button[title="Sil"]');
     await expect(deleteBtn).toBeVisible();
     await deleteBtn.click();
+
+    // Confirm deletion in modal if modal opens
+    const confirmDeleteBtn = page.getByRole('button', { name: /Evet, Sil/i });
+    if (await confirmDeleteBtn.isVisible({ timeout: 2000 }).catch(() => false)) {
+      await confirmDeleteBtn.click();
+      await expect(page.locator('[role="dialog"]')).not.toBeVisible({ timeout: 5000 });
+    }
 
     // Verify note is removed from UI
     await expect(page.getByText(uniqueNoteTitle)).not.toBeVisible({ timeout: 10000 });
