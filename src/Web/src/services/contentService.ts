@@ -69,6 +69,18 @@ export const contentService = {
     return apiClient.get<StudentMaterialDto[]>('/api/content/materials/student');
   },
 
+  downloadMaterial: async (materialId: string, fileName: string): Promise<void> => {
+    const blob = await apiClient.getBlob(`/api/content/materials/${materialId}/download`);
+    const blobUrl = window.URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = blobUrl;
+    link.download = fileName;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    window.URL.revokeObjectURL(blobUrl);
+  },
+
   downloadMaterialUrl: (materialId: string): string => {
     return `/api/content/materials/${materialId}/download`;
   },
