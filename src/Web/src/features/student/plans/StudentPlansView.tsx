@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { CalendarDays, AlertCircle, RefreshCw } from 'lucide-react';
+import { CalendarDays, AlertCircle, RefreshCw, Filter } from 'lucide-react';
 import { academicService } from '@/services/academicService';
 import { PersistentStudyPlanDetailDto } from '@/features/student/academic/types';
 import { Select } from '@/components/ui/Select';
@@ -24,12 +24,26 @@ export interface StudentPlansViewProps {
 
 const DAY_NAMES_TR = ['Paz', 'Pzt', 'Sal', 'Çar', 'Per', 'Cum', 'Cmt'];
 const SUBJECT_COLORS = [
-  'bg-primary-500',
-  'bg-success',
-  'bg-warning',
-  'bg-attention',
-  'bg-info',
+  'bg-blue-600',
+  'bg-emerald-500',
+  'bg-amber-500',
+  'bg-purple-600',
+  'bg-indigo-500',
 ];
+
+/**
+ * Parses YYYY-MM-DD or ISO timestamp into Date components without timezone shift.
+ */
+function parseSafeLocalDate(dateStr: string): Date {
+  const parts = dateStr.split('T')[0].split('-');
+  if (parts.length === 3) {
+    const y = parseInt(parts[0], 10);
+    const m = parseInt(parts[1], 10) - 1;
+    const d = parseInt(parts[2], 10);
+    return new Date(y, m, d, 12, 0, 0); // Midday prevents midnight timezone rolling
+  }
+  return new Date(dateStr);
+}
 
 function mapPersistentPlanToViewModel(
   detail: PersistentStudyPlanDetailDto,
@@ -37,7 +51,10 @@ function mapPersistentPlanToViewModel(
   goalTitle: string
 ): StudentPlanViewModel {
   const { plan, tasks: rawTasks } = detail;
-  const todayIso = new Date().toISOString().split('T')[0];
+
+  // Format today's local string
+  const now = new Date();
+  const todayDateStr = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
 
   const mappedTasks: PlanTaskItem[] = rawTasks.map((t) => ({
     id: t.id,
@@ -51,35 +68,38 @@ function mapPersistentPlanToViewModel(
       : undefined,
   }));
 
-  const totalDays = Math.max(plan.planDays || 7, ...rawTasks.map((t) => t.dayIndex), 1);
+  const planDaysCount = plan.planDays || 7;
   const days: DayScheduleSummary[] = [];
-  const startDateObj = plan.startDate ? new Date(plan.startDate) : new Date();
 
-  for (let d = 1; d <= totalDays; d++) {
+  // Anchor start date
+  const startDateObj = plan.startDate ? parseSafeLocalDate(plan.startDate) : new Date();
+
+  // 0-BASED DAY INDEX: 0, 1, ..., planDaysCount - 1
+  for (let d = 0; d < planDaysCount; d++) {
     const dayTasks = rawTasks.filter((t) => t.dayIndex === d);
-    const sampleDateStr = dayTasks.find((t) => t.plannedDate)?.plannedDate;
-    const dObj = sampleDateStr
-      ? new Date(sampleDateStr)
-      : new Date(startDateObj.getTime() + (d - 1) * 86400000);
-    const dIso = dObj.toISOString().split('T')[0];
+
+    // Compute distinct calendar date for day d
+    const dObj = new Date(startDateObj.getFullYear(), startDateObj.getMonth(), startDateObj.getDate() + d, 12, 0, 0);
+    const dIso = `${dObj.getFullYear()}-${String(dObj.getMonth() + 1).padStart(2, '0')}-${String(dObj.getDate()).padStart(2, '0')}`;
 
     days.push({
       dayIndex: d,
-      dayName: DAY_NAMES_TR[dObj.getDay()] || `${d}. Gün`,
+      dayName: DAY_NAMES_TR[dObj.getDay()] || `${d + 1}. Gün`,
       dateStr: dObj.toLocaleDateString('tr-TR', { day: 'numeric', month: 'short' }),
       taskCount: dayTasks.length,
       completedCount: dayTasks.filter((t) => t.isCompleted).length,
-      isToday: dIso === todayIso,
+      isToday: dIso === todayDateStr,
     });
   }
 
-  const subjectMap = new Map<string, { completedTasks: number; totalTasks: number; completedMinutes: number }>();
+  // Subject statistics: planned hours vs completed tasks
+  const subjectMap = new Map<string, { completedTasks: number; totalTasks: number; plannedMinutes: number }>();
   for (const t of mappedTasks) {
-    const cur = subjectMap.get(t.subject) || { completedTasks: 0, totalTasks: 0, completedMinutes: 0 };
+    const cur = subjectMap.get(t.subject) || { completedTasks: 0, totalTasks: 0, plannedMinutes: 0 };
     cur.totalTasks += 1;
+    cur.plannedMinutes += t.durationMinutes;
     if (t.status === 'completed') {
       cur.completedTasks += 1;
-      cur.completedMinutes += t.durationMinutes;
     }
     subjectMap.set(t.subject, cur);
   }
@@ -88,7 +108,7 @@ function mapPersistentPlanToViewModel(
     subject,
     completedTasks: stats.completedTasks,
     totalTasks: stats.totalTasks,
-    completedHours: Math.round((stats.completedMinutes / 60) * 10) / 10,
+    completedHours: Math.round((stats.plannedMinutes / 60) * 10) / 10,
     colorClass: SUBJECT_COLORS[idx % SUBJECT_COLORS.length],
   }));
 
@@ -96,8 +116,10 @@ function mapPersistentPlanToViewModel(
   const totalTasks = mappedTasks.length;
   const completionRate = totalTasks > 0 ? Math.round((completedTasks / totalTasks) * 100) : 0;
 
-  const startStr = plan.startDate ? new Date(plan.startDate).toLocaleDateString('tr-TR', { day: 'numeric', month: 'short' }) : '';
-  const endStr = plan.endDate ? new Date(plan.endDate).toLocaleDateString('tr-TR', { day: 'numeric', month: 'short' }) : '';
+  // Format inclusive date range: startDate to (startDate + planDaysCount - 1)
+  const inclusiveEndDateObj = new Date(startDateObj.getFullYear(), startDateObj.getMonth(), startDateObj.getDate() + planDaysCount - 1, 12, 0, 0);
+  const startStr = startDateObj.toLocaleDateString('tr-TR', { day: 'numeric', month: 'short' });
+  const endStr = inclusiveEndDateObj.toLocaleDateString('tr-TR', { day: 'numeric', month: 'short' });
 
   const initials = coachName
     .split(' ')
@@ -113,8 +135,8 @@ function mapPersistentPlanToViewModel(
     academicGoal: goalTitle,
     coachName,
     coachAvatarInitials: initials,
-    currentWeek: `${plan.planDays} Günlük Program`,
-    dateRange: startStr && endStr ? `${startStr} - ${endStr}` : 'Aktif Dönem',
+    currentWeek: `${planDaysCount} Günlük Program`,
+    dateRange: `${startStr} - ${endStr}`,
     completionRate,
     totalTasks,
     completedTasks,
@@ -135,58 +157,84 @@ export const StudentPlansView: React.FC<StudentPlansViewProps> = ({
   const [isLoading, setIsLoading] = useState<boolean>(propIsLoading || (!initialData && !propErrorMessage));
   const [errorMessage, setErrorMessage] = useState<string | undefined>(propErrorMessage);
 
-  const [selectedDayIndex, setSelectedDayIndex] = useState<number>(1);
+  // Default to Day 0 (first day of plan)
+  const [selectedDayIndex, setSelectedDayIndex] = useState<number>(0);
   const [subjectFilter, setSubjectFilter] = useState<string>('');
   const [tasks, setTasks] = useState<PlanTaskItem[]>(initialData?.tasks || []);
-  const [selectedTask, setSelectedTask] = useState<PlanTaskItem | null>(null);
-  const [isDetailOpen, setIsDetailOpen] = useState<boolean>(false);
+  const [activePlanId, setActivePlanId] = useState<string>('');
+  const [historyPlans, setHistoryPlans] = useState<Array<{ id: string; title: string; planDays: number; startDate: string }>>([]);
+  const [selectedTaskForModal, setSelectedTaskForModal] = useState<PlanTaskItem | null>(null);
 
   const fetchPlanData = useCallback(async () => {
-    if (initialData) return;
-
     setIsLoading(true);
     setErrorMessage(undefined);
 
     try {
       const studentId = await academicService.getCurrentStudentId();
-      setResolvedStudentId(studentId);
-
       if (!studentId) {
-        setPlanData(undefined);
-        setTasks([]);
+        setErrorMessage('Öğrenci profili bulunamadı.');
+        setIsLoading(false);
         return;
       }
+      setResolvedStudentId(studentId);
 
-      const [activePlanRes, student360Res] = await Promise.allSettled([
+      const [detail, historyList] = await Promise.all([
         academicService.getActiveStudyPlan(studentId),
-        academicService.getStudent360(studentId),
+        academicService.listStudyPlans(studentId).catch(() => []),
       ]);
 
-      if (activePlanRes.status === 'fulfilled' && activePlanRes.value && activePlanRes.value.tasks?.length > 0) {
-        const s360 = student360Res.status === 'fulfilled' ? student360Res.value : null;
-        const primaryCoach = s360?.coaches?.find((c) => c.isPrimary) || s360?.coaches?.[0];
-        const coachName = primaryCoach?.name || 'Akademik Danışman';
-        const goalTitle = s360?.currentGoals?.[0]?.title || 'Akademik Zeka Hedef Programı';
+      setHistoryPlans(historyList || []);
 
-        const vm = mapPersistentPlanToViewModel(activePlanRes.value, coachName, goalTitle);
+      if (detail && detail.plan) {
+        setActivePlanId(detail.plan.id);
+        const vm = mapPersistentPlanToViewModel(
+          detail,
+          'Ahmet Koç',
+          'TYT & AYT Hedef Geliştirme'
+        );
         setPlanData(vm);
         setTasks(vm.tasks);
 
-        const todayDay = vm.days.find((d) => d.isToday) || vm.days[0];
-        if (todayDay) {
+        // Find today's dayIndex if it exists in the plan, else default to 0
+        const todayDay = vm.days.find((d) => d.isToday);
+        if (todayDay !== undefined) {
           setSelectedDayIndex(todayDay.dayIndex);
+        } else {
+          setSelectedDayIndex(0);
         }
       } else {
         setPlanData(undefined);
         setTasks([]);
       }
-    } catch {
-      setPlanData(undefined);
-      setTasks([]);
+    } catch (err: any) {
+      setErrorMessage(err?.response?.data?.detail || err?.message || 'Çalışma planı yüklenirken bir sorun oluştu.');
     } finally {
       setIsLoading(false);
     }
-  }, [initialData]);
+  }, []);
+
+  const handleSelectHistoryPlan = async (planId: string) => {
+    if (!resolvedStudentId || !planId) return;
+    setIsLoading(true);
+    try {
+      setActivePlanId(planId);
+      const detail = await academicService.getStudyPlanDetail(resolvedStudentId, planId);
+      if (detail && detail.plan) {
+        const vm = mapPersistentPlanToViewModel(
+          detail,
+          'Ahmet Koç',
+          'Geçmiş Çalışma Programı'
+        );
+        setPlanData(vm);
+        setTasks(vm.tasks);
+        setSelectedDayIndex(0);
+      }
+    } catch (err: any) {
+      setErrorMessage('Seçilen plan yüklenemedi.');
+    } finally {
+      setIsLoading(false);
+    }
+  };
 
   useEffect(() => {
     if (initialData) {
@@ -246,80 +294,39 @@ export const StudentPlansView: React.FC<StudentPlansViewProps> = ({
           };
         });
       } catch {
-        // Fallback to local toggle if API fails
+        // Fallback
       }
-      return;
-    }
-
-    setTasks((prev) =>
-      prev.map((t) => {
-        if (t.id === id) {
-          if (t.status === 'completed') {
-            return { ...t, status: 'pending', completedAt: undefined };
-          } else if (t.status === 'pending') {
-            return { ...t, status: 'in_progress' };
-          } else {
-            return {
-              ...t,
-              status: 'completed',
-              completedAt: new Date().toLocaleTimeString('tr-TR', {
-                hour: '2-digit',
-                minute: '2-digit',
-              }),
-            };
-          }
-        }
-        return t;
-      })
-    );
-  };
-
-  const handleOpenDetail = (task: PlanTaskItem) => {
-    setSelectedTask(task);
-    setIsDetailOpen(true);
-  };
-
-  const handleRetry = () => {
-    if (onRetry) {
-      onRetry();
     } else {
-      fetchPlanData();
+      const newStatus: PlanTaskStatus = target.status === 'completed' ? 'pending' : 'completed';
+      setTasks((prev) => prev.map((t) => (t.id === id ? { ...t, status: newStatus } : t)));
     }
   };
 
-  const activeData = planData || initialData;
-  const activeLoading = propIsLoading || isLoading;
-  const activeError = propErrorMessage || errorMessage;
-
-  // Loading State
-  if (activeLoading) {
+  if (isLoading) {
     return (
-      <div className="max-w-5xl mx-auto space-y-4 select-none" data-testid="student-plans-loading">
-        <Skeleton className="h-44 w-full rounded-2xl" />
+      <div className="space-y-4 max-w-5xl mx-auto select-none" data-testid="student-plans-loading">
+        <Skeleton className="h-10 w-48 rounded-xl" />
+        <Skeleton className="h-32 w-full rounded-2xl" />
         <Skeleton className="h-16 w-full rounded-2xl" />
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
-          <div className="lg:col-span-2 space-y-3">
-            <Skeleton className="h-24 w-full rounded-2xl" />
-            <Skeleton className="h-24 w-full rounded-2xl" />
-            <Skeleton className="h-24 w-full rounded-2xl" />
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          <div className="md:col-span-2 space-y-3">
+            <Skeleton className="h-20 w-full rounded-2xl" />
+            <Skeleton className="h-20 w-full rounded-2xl" />
           </div>
-          <div>
-            <Skeleton className="h-64 w-full rounded-2xl" />
-          </div>
+          <Skeleton className="h-48 w-full rounded-2xl" />
         </div>
       </div>
     );
   }
 
-  // Error State
-  if (activeError) {
+  if (errorMessage && !planData) {
     return (
-      <div className="max-w-5xl mx-auto py-8 space-y-4" data-testid="student-plans-error">
+      <div className="max-w-5xl mx-auto py-8 space-y-4 select-none" data-testid="student-plans-error">
         <Alert variant="danger" icon={<AlertCircle className="h-5 w-5" />} title="Plan Yüklenemedi">
-          {activeError}
+          {errorMessage}
         </Alert>
         <div className="text-center pt-2">
-          <Button variant="primary" size="sm" onClick={handleRetry} leftIcon={<RefreshCw className="h-4 w-4" />}>
+          <Button variant="primary" size="sm" onClick={onRetry || fetchPlanData} leftIcon={<RefreshCw className="h-4 w-4" />}>
             Tekrar Dene
           </Button>
         </div>
@@ -327,140 +334,149 @@ export const StudentPlansView: React.FC<StudentPlansViewProps> = ({
     );
   }
 
-  const hasTasks = activeData && tasks.length > 0;
-
-  if (!hasTasks) {
+  if (!planData) {
     return (
-      <div className="max-w-5xl mx-auto select-none space-y-4" data-testid="student-plans-view">
-        <div className="border-b border-neutral-100 pb-3 sm:pb-4">
-          <h1 className="font-serif text-2xl sm:text-3xl text-neutral-900 tracking-tight leading-tight">
-            Çalışma Planları
-          </h1>
-          <p className="text-neutral-500 text-xs sm:text-sm mt-0.5">
-            Haftalık ve günlük akademik hedefler
-          </p>
-        </div>
-
-        {/* Always render Coach Tasks Card so coach-assigned tasks are visible even without an active weekly plan */}
-        <StudentCoachTasksCard studentId={resolvedStudentId || undefined} />
-
-        <div className="bg-white rounded-2xl border border-neutral-200/80 p-6 sm:p-8 shadow-soft-sm text-center">
-          <div className="w-12 h-12 rounded-2xl bg-navy-50 text-navy-800 flex items-center justify-center mx-auto mb-4 border border-navy-100">
-            <CalendarDays className="h-6 w-6 text-primary-600" />
-          </div>
-          <h2 className="text-lg font-semibold text-neutral-900">
-            Aktif Çalışma Planı Bulunmuyor
-          </h2>
-          <p className="text-xs sm:text-sm text-neutral-600 max-w-md mx-auto mt-2 leading-relaxed">
-            Sizin için atanmış bir haftalık çalışma planı henüz bulunmuyor. Danışman koçunuz veya branş öğretmeniniz program hazırladığında ders ve konu bazlı görevleriniz burada listelenecektir.
-          </p>
-        </div>
+      <div className="max-w-5xl mx-auto py-12 select-none" data-testid="student-plans-empty">
+        <EmptyState
+          icon={<CalendarDays className="h-12 w-12 text-neutral-300" />}
+          title="Aktif Çalışma Planı Bulunmuyor"
+          description="Akademik analiz sayfasından zayıf konularına özel haftalık plan teklifi oluşturabilir veya koçunun senin için hazırlayacağı programı bekleyebilirsin."
+          action={
+            <Button
+              variant="primary"
+              size="sm"
+              onClick={() => (window.location.href = '/student/academic')}
+            >
+              Akademik Analize Git
+            </Button>
+          }
+        />
       </div>
     );
   }
 
-  const filteredTasks = tasks.filter((t) => {
+  // Selected Day Tasks (Filtered by selected 0-based dayIndex)
+  const currentDayTasks = tasks.filter((t) => {
     const matchesDay = t.dayIndex === selectedDayIndex;
     const matchesSubject = !subjectFilter || t.subject === subjectFilter;
     return matchesDay && matchesSubject;
   });
 
-  const selectedDay = activeData.days.find((d) => d.dayIndex === selectedDayIndex) || activeData.days[0];
-  const uniqueSubjects = Array.from(new Set(tasks.map((t) => t.subject).filter(Boolean)));
-  const subjectOptions =
-    uniqueSubjects.length > 0
-      ? uniqueSubjects.map((s) => ({ value: s, label: s }))
-      : [
-          { value: 'Matematik', label: 'Matematik' },
-          { value: 'Türkçe', label: 'Türkçe' },
-          { value: 'Fizik', label: 'Fizik' },
-          { value: 'Kimya', label: 'Kimya' },
-        ];
+  const subjectsInPlan = Array.from(new Set(tasks.map((t) => t.subject)));
 
   return (
-    <div className="max-w-5xl mx-auto select-none space-y-3.5 sm:space-y-4" data-testid="student-plans-view">
-      {/* 1. Plan Overview Hero Card */}
-      <PlanHeaderCard plan={activeData} />
+    <div className="max-w-5xl mx-auto space-y-4 sm:space-y-5 select-none" data-testid="student-plans-view">
+      {/* 1. Header Row & Plan History Switcher */}
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-neutral-200/60 pb-3 sm:pb-4">
+        <div>
+          <h1 className="text-xl sm:text-2xl font-bold text-[#14233E] tracking-tight">
+            Çalışma Planım
+          </h1>
+          <p className="text-neutral-500 text-xs sm:text-sm mt-0.5">
+            Haftalık hedeflerin ve koçunun atadığı çalışma görevleri
+          </p>
+        </div>
 
-      {/* 2. Day Selector */}
+        {historyPlans.length > 1 && (
+          <div className="flex items-center gap-2">
+            <span className="text-xs text-neutral-400">Plan Seç:</span>
+            <Select
+              options={historyPlans.map((hp) => ({
+                value: hp.id,
+                label: `${hp.title || 'Plan'} (${new Date(hp.startDate).toLocaleDateString('tr-TR', { day: 'numeric', month: 'short' })})`,
+              }))}
+              value={activePlanId}
+              onChange={(e) => handleSelectHistoryPlan(e.target.value)}
+              className="text-xs min-h-[36px] py-1 bg-white border-neutral-200/80 rounded-xl"
+            />
+          </div>
+        )}
+      </div>
+
+      {/* 2. Compact Navy Plan Header Card */}
+      <PlanHeaderCard plan={planData} />
+
+      {/* 3. Seven-Day Schedule Selector Row (0-based indexing) */}
       <DaySelectorRow
-        days={activeData.days}
+        days={planData.days}
         selectedDayIndex={selectedDayIndex}
-        onSelectDay={setSelectedDayIndex}
+        onSelectDay={(idx) => setSelectedDayIndex(idx)}
       />
 
-      {/* 3. Main Content & Sidebar */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-3.5 sm:gap-4">
-        {/* Left Column: Daily Tasks */}
-        <div className="lg:col-span-2 space-y-3">
-          {/* Koç Görevleri Section */}
-          <StudentCoachTasksCard studentId={resolvedStudentId || undefined} />
-
-          {/* Day Title & Filter Bar */}
-          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 bg-white rounded-2xl border border-neutral-100 p-3 sm:px-4">
-            <div className="flex items-center gap-2">
-              <CalendarDays className="h-4 w-4 text-primary-600" />
-              <h3 className="text-sm font-semibold text-neutral-900">
-                {selectedDay?.dayName} Günü Görevleri ({selectedDay?.dateStr})
+      {/* 4. Main Two-Column Layout (Tasks on Left, Sidebars on Right) */}
+      <div className="grid grid-cols-1 lg:grid-cols-12 gap-4 sm:gap-5">
+        {/* Left Column (lg:col-span-8): Daily Tasks & Coach Tasks */}
+        <div className="lg:col-span-8 space-y-4">
+          {/* Day Task Header & Filter */}
+          <div className="flex items-center justify-between">
+            <div>
+              <h3 className="text-sm font-bold text-[#14233E]">
+                {planData.days.find((d) => d.dayIndex === selectedDayIndex)?.dayName || `${selectedDayIndex + 1}. Gün`} Görevleri
               </h3>
+              <span className="text-[11px] text-neutral-400">
+                {planData.days.find((d) => d.dayIndex === selectedDayIndex)?.dateStr} • {currentDayTasks.filter((t) => t.status === 'completed').length}/{currentDayTasks.length} Tamamlandı
+              </span>
             </div>
 
-            <div className="flex items-center gap-2">
-              <Select
-                options={subjectOptions}
-                value={subjectFilter}
-                onChange={(e) => setSubjectFilter(e.target.value)}
-                placeholder="Tüm Dersler"
-                className="text-xs min-h-[34px] py-1 pl-2.5 pr-7"
-              />
-            </div>
+            {subjectsInPlan.length > 1 && (
+              <div className="flex items-center gap-1.5">
+                <Filter className="w-3.5 h-3.5 text-neutral-400" />
+                <select
+                  value={subjectFilter}
+                  onChange={(e) => setSubjectFilter(e.target.value)}
+                  className="text-xs bg-white border border-neutral-200/80 rounded-xl px-2.5 py-1.5 text-neutral-700 focus:outline-none focus:ring-1 focus:ring-[#315FE8]"
+                >
+                  <option value="">Tüm Dersler</option>
+                  {subjectsInPlan.map((s) => (
+                    <option key={s} value={s}>
+                      {s}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            )}
           </div>
 
-          {/* Task List or Empty State */}
-          {filteredTasks.length > 0 ? (
-            <div className="space-y-2.5">
-              {filteredTasks.map((task) => (
+          {/* Daily Task List */}
+          {currentDayTasks.length > 0 ? (
+            <div className="space-y-3">
+              {currentDayTasks.map((task) => (
                 <PlanTaskCard
                   key={task.id}
                   task={task}
                   onToggleStatus={handleToggleStatus}
-                  onViewDetails={handleOpenDetail}
+                  onViewDetails={(t) => setSelectedTaskForModal(t)}
                 />
               ))}
             </div>
           ) : (
-            <EmptyState
-              icon={<CalendarDays className="h-6 w-6 text-neutral-400" />}
-              title="Bu Gün İçin Görev Yok"
-              description={
-                subjectFilter
-                  ? `Seçili filtreye (${subjectFilter}) uygun görev bulunamadı.`
-                  : 'Bu gün için planlanmış herhangi bir çalışma görevi bulunmuyor.'
-              }
-              action={
-                subjectFilter ? (
-                  <Button size="sm" variant="secondary" onClick={() => setSubjectFilter('')}>
-                    Filtreyi Temizle
-                  </Button>
-                ) : undefined
-              }
-            />
+            <div className="bg-white rounded-2xl border border-neutral-200/70 p-6 text-center text-xs text-neutral-400">
+              Bu gün için planlanmış çalışma görevi bulunmuyor. Diğer günleri inceleyebilirsin.
+            </div>
           )}
+
+          {/* Dedicated Coach Tasks Section */}
+          <StudentCoachTasksCard studentId={resolvedStudentId || undefined} />
         </div>
 
-        {/* Right Sidebar: Subject Progress Targets */}
-        <div className="space-y-3.5 sm:space-y-4">
-          <PlanSubjectProgressCard subjects={activeData.subjectProgress} />
+        {/* Right Column (lg:col-span-4): Subject Distribution & Progress */}
+        <div className="lg:col-span-4 space-y-4">
+          <PlanSubjectProgressCard subjects={planData.subjectProgress} />
         </div>
       </div>
 
-      {/* Task Detail Modal */}
-      <TaskDetailModal
-        task={selectedTask}
-        isOpen={isDetailOpen}
-        onClose={() => setIsDetailOpen(false)}
-        onToggleStatus={handleToggleStatus}
-      />
+      {/* Task Details Modal */}
+      {selectedTaskForModal && (
+        <TaskDetailModal
+          task={selectedTaskForModal}
+          isOpen={true}
+          onClose={() => setSelectedTaskForModal(null)}
+          onToggleStatus={(id) => {
+            handleToggleStatus(id);
+            setSelectedTaskForModal(null);
+          }}
+        />
+      )}
     </div>
   );
 };

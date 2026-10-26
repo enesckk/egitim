@@ -1,6 +1,5 @@
 import React, { useEffect, useState } from 'react';
 import { Sparkles, CheckCircle2, Clock, Calendar } from 'lucide-react';
-import { Badge } from '@/components/ui/Badge';
 import { coachTaskService, CoachTaskDto, CoachTaskStatus } from '@/services/coachTaskService';
 import { academicService } from '@/services/academicService';
 import { cn } from '@/lib/utils';
@@ -78,85 +77,63 @@ export const StudentCoachTasksCard: React.FC<StudentCoachTasksCardProps> = ({ st
   }
 
   return (
-    <div className="bg-white rounded-2xl border border-attention/30 p-4 shadow-soft-sm space-y-3 select-none">
+    <div className="bg-white rounded-2xl border border-purple-200/80 p-5 shadow-xs space-y-3 select-none">
       {/* Header Badge */}
-      <div className="flex items-center justify-between border-b border-purple-50 pb-2.5">
+      <div className="flex items-center justify-between border-b border-purple-100 pb-3">
         <div className="flex items-center gap-2">
-          <Badge variant="attention" size="md">
-            <Sparkles className="h-3.5 w-3.5 mr-1" />
-            Koç Görevleri
-          </Badge>
-          <span className="text-xs text-neutral-500 font-medium">
-            Koçunuz tarafından özel atanan birebir takip görevleri
+          <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold bg-purple-50 text-purple-700 border border-purple-100">
+            <Sparkles className="h-3.5 w-3.5" />
+            Koçumdan Özel Görevler
+          </span>
+          <span className="text-xs text-neutral-400">
+            {tasks.filter((t) => t.isCompleted).length}/{tasks.length} tamamlandı
           </span>
         </div>
-        <span className="font-mono text-xs text-purple-700 font-bold">
-          {tasks.filter((t) => t.isCompleted).length}/{tasks.length}
-        </span>
       </div>
 
-      {/* List */}
-      <div className="space-y-2">
+      {/* Task list */}
+      <div className="space-y-2.5">
         {tasks.map((task) => {
-          const isCompleted = task.status === CoachTaskStatus.Completed;
-          const isCancelled = task.status === CoachTaskStatus.Cancelled;
+          const isDone = task.isCompleted || task.status === CoachTaskStatus.Completed;
 
           return (
             <div
               key={task.id}
               className={cn(
-                'rounded-xl border p-3 flex items-start justify-between gap-3 transition-colors',
-                isCompleted
-                  ? 'bg-neutral-50/60 border-neutral-100 opacity-75'
-                  : isCancelled
-                  ? 'bg-neutral-50 border-neutral-200 opacity-50'
-                  : 'bg-purple-50/20 border-purple-100 hover:border-purple-200'
+                'p-3.5 rounded-xl border transition-all flex items-start gap-3',
+                isDone
+                  ? 'bg-neutral-50/60 border-neutral-200/60 opacity-75'
+                  : 'bg-purple-50/20 border-purple-100 hover:border-purple-300'
               )}
             >
-              {/* Checkbox Toggle */}
               <button
                 type="button"
-                disabled={isCancelled}
                 onClick={() => handleToggleCompletion(task)}
-                className="mt-0.5 flex-shrink-0 flex items-center justify-center min-h-[28px] min-w-[28px] rounded-lg hover:bg-purple-100 transition-colors"
-                aria-label={isCompleted ? 'Tamamlandı olarak işaretli' : 'Görevi tamamla'}
+                className="mt-0.5 flex-shrink-0 min-h-[32px] min-w-[32px] rounded-lg flex items-center justify-center hover:bg-white transition-colors"
+                aria-label={isDone ? 'Tamamlandı' : 'Tamamla'}
               >
-                {isCompleted ? (
-                  <CheckCircle2 className="h-5 w-5 text-success stroke-[2.2]" />
+                {isDone ? (
+                  <CheckCircle2 className="h-5 w-5 text-emerald-600" />
                 ) : (
-                  <span className="w-4 h-4 rounded-md border-2 border-purple-300 bg-white" />
+                  <div className="h-4 w-4 rounded-full border-2 border-purple-400 hover:border-purple-600 transition-colors" />
                 )}
               </button>
 
-              {/* Task Details */}
               <div className="flex-1 min-w-0">
-                <div className="flex flex-wrap items-center gap-1.5 mb-0.5">
+                <div className="flex items-center gap-2 mb-1">
+                  <span className="text-xs font-bold text-neutral-800">{task.title}</span>
                   {task.subjectName && (
-                    <span className="text-[10px] font-semibold uppercase tracking-wider text-purple-800 bg-purple-100 px-1.5 py-0.5 rounded">
+                    <span className="text-[10px] bg-white border border-neutral-200 px-2 py-0.5 rounded-md text-neutral-500 font-medium">
                       {task.subjectName}
                     </span>
                   )}
-                  {isCancelled && (
-                    <Badge variant="secondary" size="sm">İptal Edildi</Badge>
-                  )}
                 </div>
 
-                <h4
-                  className={cn(
-                    'text-xs sm:text-sm font-semibold text-neutral-900 leading-tight',
-                    isCompleted && 'line-through text-neutral-500'
-                  )}
-                >
-                  {task.title}
-                </h4>
-
                 {task.description && (
-                  <p className="text-xs text-neutral-600 mt-1 leading-relaxed">
-                    💡 {task.description}
-                  </p>
+                  <p className="text-xs text-neutral-600 leading-relaxed mt-0.5">{task.description}</p>
                 )}
 
-                <div className="flex items-center gap-3 text-[11px] text-neutral-400 mt-1.5">
+                <div className="flex items-center gap-3 mt-2 text-[11px] text-neutral-400">
                   {task.durationMinutes && (
                     <span className="flex items-center gap-1">
                       <Clock className="h-3 w-3" />
@@ -166,7 +143,7 @@ export const StudentCoachTasksCard: React.FC<StudentCoachTasksCardProps> = ({ st
                   {task.dueDate && (
                     <span className="flex items-center gap-1">
                       <Calendar className="h-3 w-3" />
-                      Son Tarih: {new Date(task.dueDate).toLocaleDateString('tr-TR')}
+                      {new Date(task.dueDate).toLocaleDateString('tr-TR', { day: 'numeric', month: 'short' })}
                     </span>
                   )}
                 </div>

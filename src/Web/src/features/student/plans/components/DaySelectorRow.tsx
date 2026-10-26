@@ -14,42 +14,57 @@ export const DaySelectorRow: React.FC<DaySelectorRowProps> = ({
   onSelectDay,
 }) => {
   return (
-    <div className="bg-white rounded-2xl border border-neutral-100 p-2.5 sm:p-3 flex gap-1.5 sm:gap-2 overflow-x-auto select-none">
+    <div className="bg-white rounded-2xl border border-neutral-200/70 p-2 sm:p-2.5 flex gap-1.5 sm:gap-2 overflow-x-auto no-scrollbar shadow-xs select-none">
       {days.map((day) => {
         const isSelected = day.dayIndex === selectedDayIndex;
         const isAllDone = day.taskCount > 0 && day.completedCount === day.taskCount;
+        const hasTasks = day.taskCount > 0;
 
         return (
           <button
             key={day.dayIndex}
+            data-testid={`day-selector-${day.dayIndex}`}
             type="button"
             onClick={() => onSelectDay(day.dayIndex)}
             className={cn(
-              'flex-1 min-w-[44px] py-2 px-1 rounded-xl flex flex-col items-center justify-center transition-all min-h-[52px]',
+              'flex-1 min-w-[46px] py-2 sm:py-2.5 px-1 rounded-xl flex flex-col items-center justify-center transition-all min-h-[58px] cursor-pointer focus:outline-none',
               isSelected
-                ? 'bg-primary-600 text-white shadow-soft-sm font-semibold'
+                ? 'bg-[#14233E] text-white shadow-sm font-semibold'
                 : day.isToday
-                ? 'bg-primary-50 text-primary-700 border border-primary-200 font-medium'
-                : 'bg-neutral-50 text-neutral-600 hover:bg-neutral-100'
+                ? 'bg-blue-50 text-[#315FE8] border border-blue-200/80 font-medium'
+                : 'bg-neutral-50/80 text-neutral-600 hover:bg-neutral-100/80'
             )}
           >
-            <span className="text-[10px] uppercase font-medium opacity-80 leading-none mb-1">
+            <span
+              className={cn(
+                'text-[10px] uppercase font-semibold leading-none mb-1 tracking-wider',
+                isSelected ? 'text-blue-200' : 'text-neutral-400'
+              )}
+            >
               {day.dayName}
             </span>
-            <span className="font-mono text-xs sm:text-sm leading-none font-bold">
+            <span
+              data-testid="day-date-number"
+              className={cn(
+                'text-xs sm:text-sm leading-none font-bold',
+                isSelected ? 'text-white' : 'text-[#14233E]'
+              )}
+            >
               {day.dateStr.split(' ')[0]}
             </span>
             <span
               className={cn(
-                'text-[9px] mt-1 font-mono leading-none',
+                'text-[10px] mt-1.5 font-medium leading-none',
                 isSelected
-                  ? 'text-primary-100'
+                  ? 'text-blue-100'
                   : isAllDone
-                  ? 'text-success font-semibold'
-                  : 'text-neutral-400'
+                  ? 'text-emerald-600 font-semibold'
+                  : hasTasks
+                  ? 'text-neutral-500'
+                  : 'text-neutral-300'
               )}
             >
-              {day.completedCount}/{day.taskCount}
+              {hasTasks ? `${day.completedCount}/${day.taskCount}` : '—'}
             </span>
           </button>
         );

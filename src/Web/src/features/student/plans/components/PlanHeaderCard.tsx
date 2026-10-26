@@ -9,51 +9,52 @@ export interface PlanHeaderCardProps {
 
 export const PlanHeaderCard: React.FC<PlanHeaderCardProps> = ({ plan }) => {
   return (
-    <div className="bg-navy-900 rounded-2xl p-4 sm:p-5 text-white relative overflow-hidden select-none">
+    <div className="bg-[#14233E] rounded-2xl p-5 sm:p-6 text-white relative overflow-hidden shadow-xs select-none">
+      {/* Subtle background glow */}
       <div
-        className="absolute top-0 right-0 w-36 h-36 rounded-full bg-navy-800 -mr-10 -mt-10 opacity-50 pointer-events-none"
+        className="absolute -top-12 -right-12 w-36 h-36 bg-[#315FE8]/25 rounded-full blur-2xl pointer-events-none"
         aria-hidden="true"
       />
 
-      <div className="relative z-10 space-y-3">
+      <div className="relative z-10 space-y-3.5">
         {/* Week and Academic Goal Badges */}
         <div className="flex flex-wrap items-center justify-between gap-2">
-          <div className="flex items-center gap-1.5 bg-navy-800 text-primary-300 px-2.5 py-1 rounded-lg text-xs font-medium border border-navy-700">
+          <div className="flex items-center gap-1.5 bg-white/10 text-blue-200 px-3 py-1 rounded-full text-xs font-semibold border border-white/10">
             <Calendar className="h-3.5 w-3.5" />
-            <span>{plan.currentWeek} ({plan.dateRange})</span>
+            <span data-testid="plan-date-range">{plan.currentWeek} ({plan.dateRange})</span>
           </div>
 
-          <div className="flex items-center gap-1.5 text-navy-300 text-xs">
-            <UserCheck className="h-3.5 w-3.5 text-primary-400" />
-            <span>Koç: <strong className="text-white font-medium">{plan.coachName}</strong></span>
+          <div className="flex items-center gap-1.5 text-blue-200/90 text-xs font-medium">
+            <UserCheck className="h-3.5 w-3.5 text-blue-300" />
+            <span>Koç: <strong className="text-white font-semibold">{plan.coachName}</strong></span>
           </div>
         </div>
 
         {/* Title */}
         <div>
-          <h2 className="text-white font-serif text-lg sm:text-xl leading-tight">
+          <h2 className="text-white text-lg sm:text-xl font-bold tracking-tight leading-tight">
             {plan.title}
           </h2>
-          <p className="text-navy-300 text-xs mt-0.5">
+          <p className="text-blue-100/80 text-xs mt-1">
             Hedef: {plan.academicGoal}
           </p>
         </div>
 
         {/* Progress Bar & Stats */}
-        <div className="pt-1">
-          <div className="flex items-center justify-between text-xs mb-1.5">
-            <span className="text-navy-300">Haftalık Tamamlanma</span>
+        <div className="pt-1.5">
+          <div className="flex items-center justify-between text-xs mb-2">
+            <span className="text-blue-200 font-medium">Plan İlerlemesi</span>
             <div className="flex items-center gap-2">
-              <span className="font-mono text-white font-semibold">
+              <span className="text-white font-bold">
                 {plan.completedTasks}/{plan.totalTasks} Görev
               </span>
-              <span className="font-mono text-success font-semibold flex items-center gap-0.5">
-                <CheckCircle2 className="h-3 w-3" />
+              <span className="text-emerald-400 font-bold flex items-center gap-1">
+                <CheckCircle2 className="h-3.5 w-3.5" />
                 %{plan.completionRate}
               </span>
             </div>
           </div>
-          <Progress value={plan.completionRate} variant="primary" size="md" />
+          <Progress value={plan.completionRate} variant="primary" size="md" className="bg-white/15 h-2.5 rounded-full" />
         </div>
       </div>
     </div>
