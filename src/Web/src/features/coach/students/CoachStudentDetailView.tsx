@@ -1,29 +1,38 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { useParams, useNavigate, useSearchParams } from 'react-router-dom';
-import { ArrowLeft, MessageSquare, AlertCircle, RefreshCw, CheckCircle2, AlertTriangle, XCircle } from 'lucide-react';
-import { cn } from '@/lib/utils';
-import { academicService } from '@/services/academicService';
+import {
+  ArrowLeft,
+  MessageSquare,
+  AlertCircle,
+  PlusCircle,
+  CheckCircle2,
+  AlertTriangle,
+  XCircle,
+  Clock,
+} from 'lucide-react';
+import { academicService, StudentSummaryDto } from '@/services/academicService';
 import { coachTaskService, CoachTaskStatus } from '@/services/coachTaskService';
 import { coachNoteService } from '@/services/coachNoteService';
 import { examService } from '@/services/examService';
 import { Button } from '@/components/ui/Button';
-import { Tabs } from '@/components/ui/Tabs';
+import { Tabs, TabItem } from '@/components/ui/Tabs';
 import { Alert } from '@/components/ui/Alert';
 import { Skeleton } from '@/components/ui/Skeleton';
 import { CoachStudentExamsTab } from '@/components/coach/CoachStudentExamsTab';
 import { StudentOverviewTab } from './components/StudentOverviewTab';
-import { StudentPlanTab } from './components/StudentPlanTab';
 import { CoachTasksTab } from './components/CoachTasksTab';
+import { StudentPlanTab } from './components/StudentPlanTab';
 import { CoachPrivateNotesTab } from './components/CoachPrivateNotesTab';
 import {
   AssignedStudentDetail,
   CoachPrivateNote,
   StudentPlanTaskReview,
   StudentStatus,
+  CoachStudentsViewModel,
 } from './types';
 
 export interface CoachStudentDetailViewProps {
-  initialStudents?: AssignedStudentDetail[];
+  initialStudents?: CoachStudentsViewModel;
   isLoading?: boolean;
   errorMessage?: string;
   onRetry?: () => void;
@@ -37,22 +46,22 @@ const STATUS_MAP: Record<
 > = {
   takipte: {
     label: 'Takipte',
-    icon: <CheckCircle2 className="h-3.5 w-3.5 text-success" />,
-    badgeClass: 'bg-success-light text-success-dark border-green-200',
+    icon: <CheckCircle2 className="h-3.5 w-3.5 text-emerald-600" />,
+    badgeClass: 'bg-emerald-50 text-emerald-700 border-emerald-200',
   },
   dikkat: {
     label: 'Dikkat',
-    icon: <AlertTriangle className="h-3.5 w-3.5 text-warning" />,
-    badgeClass: 'bg-warning-light text-warning-dark border-amber-200',
+    icon: <AlertTriangle className="h-3.5 w-3.5 text-amber-600" />,
+    badgeClass: 'bg-amber-50 text-amber-700 border-amber-200',
   },
   kritik: {
     label: 'Kritik',
-    icon: <XCircle className="h-3.5 w-3.5 text-danger" />,
-    badgeClass: 'bg-danger-light text-danger-dark border-red-200',
+    icon: <XCircle className="h-3.5 w-3.5 text-rose-600" />,
+    badgeClass: 'bg-rose-50 text-rose-700 border-rose-200',
   },
   plansiz: {
-    label: 'Plan Yok',
-    icon: <AlertTriangle className="h-3.5 w-3.5 text-neutral-400" />,
+    label: 'Aktif Plan Yok',
+    icon: <Clock className="h-3.5 w-3.5 text-neutral-500" />,
     badgeClass: 'bg-neutral-100 text-neutral-600 border-neutral-200',
   },
 };
@@ -65,46 +74,44 @@ export const CoachStudentDetailView: React.FC<CoachStudentDetailViewProps> = ({
 }) => {
   const { studentId } = useParams<{ studentId: string }>();
   const navigate = useNavigate();
-  const [searchParams] = useSearchParams();
-  const initialTab = searchParams.get('tab') || 'overview';
+  const [searchParams, setSearchParams] = useSearchParams();
 
-  const [activeTab, setActiveTab] = useState(initialTab);
-  const [student, setStudent] = useState<AssignedStudentDetail | null>(
-    () => initialStudents?.find((s) => s.id === studentId) || null
-  );
-  const [examCount, setExamCount] = useState<number | undefined>(undefined);
-  const [isLoading, setIsLoading] = useState<boolean>(
-    propIsLoading || (!initialStudents && !propErrorMessage)
-  );
+  const tabParam = searchParams.get('tab') || 'overview';
+  const [activeTab, setActiveTab] = useState(tabParam);
+  const [student, setStudent] = useState<AssignedStudentDetail | null>(null);
+  const [isLoading, setIsLoading] = useState(propIsLoading || !initialStudents);
   const [errorMessage, setErrorMessage] = useState<string | undefined>(propErrorMessage);
+  const [examCount, setExamCount] = useState<number | undefined>(undefined);
+
+  // Sync tab with URL
+  const handleTabChange = (newTab: string) => {
+    setActiveTab(newTab);
+    setSearchParams({ tab: newTab });
+  };
 
   const fetchStudentDetail = useCallback(async () => {
-    if (initialStudents) {
-      setStudent(initialStudents.find((s) => s.id === studentId) || null);
-      setIsLoading(false);
-      return;
-    }
+    if (!studentId) return;
 
-    if (!studentId) {
-      setStudent(null);
-      setIsLoading(false);
-      return;
+    if (initialStudents?.students) {
+      const found = initialStudents.students.find((s) => s.id === studentId);
+      if (found) {
+        setStudent(found);
+        setIsLoading(false);
+        return;
+      }
     }
 
     setIsLoading(true);
     setErrorMessage(undefined);
 
     try {
-      let baseStudentDto = null;
-      let goalExamName = 'TYT / AYT';
+      let baseStudentDto: StudentSummaryDto | null = null;
+      let goalExamName = 'YKS (TYT/AYT)';
 
       try {
-        const s360 = await academicService.getStudent360(studentId);
-        baseStudentDto = s360.student;
-        if (s360.examTypes && s360.examTypes.length > 0) {
-          goalExamName = s360.examTypes.map((e) => e.name).join(' / ');
-        } else if (s360.recentExam?.examType) {
-          goalExamName = s360.recentExam.examType;
+        const studentDetail = await academicService.getStudent360(studentId);
+        if (studentDetail?.student) {
+          baseStudentDto = studentDetail.student;
         }
       } catch {
         baseStudentDto = await academicService.getStudent(studentId);
@@ -146,42 +153,31 @@ export const CoachStudentDetailView: React.FC<CoachStudentDetailViewProps> = ({
           : [];
 
       const weeklyPlanTasks: StudentPlanTaskReview[] = [];
-      let adherence = 100;
+      let adherence: number | undefined = undefined;
       let weeklyHours = 0;
-      let hasPlanMetrics = false;
+      let hasActivePlan = false;
 
-      if (activePlan && activePlan.tasks?.length > 0) {
-        hasPlanMetrics = true;
+      if (activePlan && activePlan.plan) {
+        hasActivePlan = true;
         adherence = Math.round((activePlan.plan.taskProgressRate || 0) * 100);
         weeklyHours = Math.round(((activePlan.plan.completedTaskMinutes || 0) / 60) * 10) / 10;
         const startObj = activePlan.plan.startDate ? new Date(activePlan.plan.startDate) : new Date();
 
-        for (const t of activePlan.tasks) {
-          const dObj = t.plannedDate
-            ? new Date(t.plannedDate)
-            : new Date(startObj.getTime() + (t.dayIndex - 1) * 86400000);
-          weeklyPlanTasks.push({
-            id: t.id,
-            dayName: DAY_NAMES_FULL_TR[dObj.getDay()] || `${t.dayIndex}. Gün`,
-            subject: t.subjectName || (t.nodeType === 'QuestionStyle' ? 'Soru Stili' : 'Genel Çalışma'),
-            topic: t.titleSnapshot || t.topicName || t.learningOutcomeName || 'Çalışma Görevi',
-            durationMinutes: t.durationMinutes,
-            status: t.isCompleted ? 'completed' : 'pending',
-            isCoachAssigned: false,
-          });
-        }
-      } else if (coachTasks.length > 0) {
-        const nonCancelled = coachTasks.filter((c) => c.status !== CoachTaskStatus.Cancelled);
-        if (nonCancelled.length > 0) {
-          hasPlanMetrics = true;
-          const doneCount = nonCancelled.filter(
-            (c) => c.isCompleted || c.status === CoachTaskStatus.Completed
-          ).length;
-          adherence = Math.round((doneCount / nonCancelled.length) * 100);
-          const doneMins = nonCancelled
-            .filter((c) => c.isCompleted || c.status === CoachTaskStatus.Completed)
-            .reduce((sum, c) => sum + (c.durationMinutes || 30), 0);
-          weeklyHours = Math.round((doneMins / 60) * 10) / 10;
+        if (Array.isArray(activePlan.tasks)) {
+          for (const t of activePlan.tasks) {
+            const dObj = t.plannedDate
+              ? new Date(t.plannedDate)
+              : new Date(startObj.getTime() + (t.dayIndex - 1) * 86400000);
+            weeklyPlanTasks.push({
+              id: t.id,
+              dayName: DAY_NAMES_FULL_TR[dObj.getDay()] || `${t.dayIndex}. Gün`,
+              subject: t.subjectName || (t.nodeType === 'QuestionStyle' ? 'Soru Stili' : 'Genel Çalışma'),
+              topic: t.titleSnapshot || t.topicName || t.learningOutcomeName || 'Çalışma Görevi',
+              durationMinutes: t.durationMinutes,
+              status: t.isCompleted ? 'completed' : 'pending',
+              isCoachAssigned: false,
+            });
+          }
         }
       }
 
@@ -199,10 +195,11 @@ export const CoachStudentDetailView: React.FC<CoachStudentDetailViewProps> = ({
         });
       }
 
-      let status: StudentStatus = 'takipte';
-      if (hasPlanMetrics) {
+      let status: StudentStatus = 'plansiz';
+      if (hasActivePlan && typeof adherence === 'number') {
         if (adherence < 40) status = 'kritik';
         else if (adherence < 70) status = 'dikkat';
+        else status = 'takipte';
       }
 
       const fullName =
@@ -226,13 +223,12 @@ export const CoachStudentDetailView: React.FC<CoachStudentDetailViewProps> = ({
         initials,
         grade: baseStudentDto.gradeLevel ? `${baseStudentDto.gradeLevel}. Sınıf` : '12. Sınıf',
         field: baseStudentDto.schoolName || 'Genel Alan',
+        schoolName: baseStudentDto.schoolName || undefined,
         exam: goalExamName,
         status,
+        hasActivePlan,
         planAdherence: adherence,
         weeklyStudyHours: weeklyHours,
-        lastActivity: baseStudentDto.createdAt
-          ? new Date(baseStudentDto.createdAt).toLocaleDateString('tr-TR')
-          : 'Aktif',
         privateNotes: prev?.id === baseStudentDto.id && prev.privateNotes.length > 0 ? prev.privateNotes : privateNotes,
         weeklyPlanTasks,
         recentExams: [],
@@ -248,23 +244,22 @@ export const CoachStudentDetailView: React.FC<CoachStudentDetailViewProps> = ({
     fetchStudentDetail();
   }, [fetchStudentDetail]);
 
-  const handleAddPrivateNote = async (newNoteData: Omit<CoachPrivateNote, 'id' | 'createdAt'>) => {
-    if (!studentId) return;
+  const handleAddPrivateNote = async (note: Omit<CoachPrivateNote, 'id' | 'createdAt'>) => {
+    if (!studentId || !student) return;
     try {
       const created = await coachNoteService.createPrivateNote(studentId, {
-        category: newNoteData.category,
-        content: newNoteData.content,
+        category: note.category,
+        content: note.content,
       });
 
-      const formatted: CoachPrivateNote = {
+      const newNote: CoachPrivateNote = {
         id: created.id,
-        category: created.category,
+        category: created.category as CoachPrivateNote['category'],
         content: created.content,
-        createdAt: created.createdAt ? new Date(created.createdAt).toLocaleDateString('tr-TR') : 'Bugün',
-        updatedAt: created.updatedAt ?? undefined,
+        createdAt: 'Bugün',
       };
 
-      setStudent((prev) => (prev ? { ...prev, privateNotes: [formatted, ...prev.privateNotes] } : prev));
+      setStudent((prev) => (prev ? { ...prev, privateNotes: [newNote, ...prev.privateNotes] } : null));
     } catch (err) {
       console.error('Failed to create coach private note:', err);
       throw err;
@@ -272,10 +267,11 @@ export const CoachStudentDetailView: React.FC<CoachStudentDetailViewProps> = ({
   };
 
   const handleDeletePrivateNote = async (noteId: string) => {
+    if (!student) return;
     try {
       await coachNoteService.deletePrivateNote(noteId);
       setStudent((prev) =>
-        prev ? { ...prev, privateNotes: prev.privateNotes.filter((n) => n.id !== noteId) } : prev
+        prev ? { ...prev, privateNotes: prev.privateNotes.filter((n) => n.id !== noteId) } : null
       );
     } catch (err) {
       console.error('Failed to delete coach private note:', err);
@@ -283,111 +279,151 @@ export const CoachStudentDetailView: React.FC<CoachStudentDetailViewProps> = ({
     }
   };
 
-  const activeLoading = propIsLoading || isLoading;
-  const activeError = propErrorMessage || errorMessage;
-
-  // Loading State
-  if (activeLoading) {
+  if (isLoading) {
     return (
-      <div className="max-w-5xl mx-auto space-y-4 select-none" data-testid="coach-student-detail-loading">
-        <Skeleton className="h-10 w-32 rounded-xl" />
-        <Skeleton className="h-32 w-full rounded-2xl" />
-        <Skeleton className="h-12 w-full rounded-xl" />
-        <Skeleton className="h-64 w-full rounded-2xl" />
-      </div>
-    );
-  }
-
-  // Error State
-  if (activeError || !student) {
-    return (
-      <div className="max-w-5xl mx-auto py-8 space-y-4 select-none" data-testid="coach-student-detail-error">
-        <Alert variant="danger" icon={<AlertCircle className="h-5 w-5" />} title="Öğrenci Bulunamadı">
-          {activeError || 'İstenen öğrenci kaydına ulaşılamadı veya yetkiniz bulunmuyor.'}
-        </Alert>
-        <div className="flex justify-center gap-2 pt-2">
-          {onRetry && (
-            <Button variant="secondary" size="sm" onClick={onRetry} leftIcon={<RefreshCw className="h-4 w-4" />}>
-              Tekrar Dene
-            </Button>
-          )}
-          <Button variant="primary" size="sm" onClick={() => navigate('/coach/students')} leftIcon={<ArrowLeft className="h-4 w-4" />}>
-            Öğrenci Listesine Dön
-          </Button>
+      <div className="max-w-6xl mx-auto space-y-4 select-none p-4" data-testid="coach-student-detail-loading">
+        <Skeleton className="h-6 w-36 rounded-lg" />
+        <Skeleton className="h-28 w-full rounded-3xl" />
+        <Skeleton className="h-12 w-full rounded-2xl" />
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+          <Skeleton className="h-28 rounded-2xl" />
+          <Skeleton className="h-28 rounded-2xl" />
+          <Skeleton className="h-28 rounded-2xl" />
         </div>
       </div>
     );
   }
 
-  const statusInfo = STATUS_MAP[student.status];
+  if (errorMessage || !student) {
+    return (
+      <div className="max-w-6xl mx-auto py-8 space-y-4 select-none p-4" data-testid="coach-student-detail-error">
+        <Alert variant="danger" icon={<AlertCircle className="h-5 w-5" />} title="Öğrenci Detayı Yüklenemedi">
+          {errorMessage || 'Öğrenci bulunamadı veya bu öğrenciye erişim yetkiniz bulunmamaktadır.'}
+        </Alert>
+        <div className="text-center pt-2">
+          {onRetry ? (
+            <Button
+              variant="primary"
+              size="sm"
+              onClick={onRetry}
+              leftIcon={<ArrowLeft className="h-4 w-4" />}
+            >
+              Tekrar Dene
+            </Button>
+          ) : (
+            <Button
+              variant="primary"
+              size="sm"
+              onClick={() => navigate('/coach/students')}
+              leftIcon={<ArrowLeft className="h-4 w-4" />}
+            >
+              Öğrenci Listesine Dön
+            </Button>
+          )}
+        </div>
+      </div>
+    );
+  }
 
-  const detailTabs = [
-    { id: 'overview', label: 'Özet', count: undefined },
-    { id: 'tasks', label: 'Görevler', count: undefined },
-    { id: 'plan', label: 'Plan İnceleme', count: student.weeklyPlanTasks.length },
-    { id: 'exams', label: 'Denemeler', count: examCount ?? student.recentExams.length },
-    { id: 'notes', label: '🔒 Koça Özel Notlar', count: student.privateNotes.length },
+  const statusInfo = STATUS_MAP[student.status] || STATUS_MAP.plansiz;
+
+  const detailTabs: TabItem[] = [
+    { id: 'overview', label: 'Özet' },
+    {
+      id: 'tasks',
+      label: 'Görevler',
+      count: student.weeklyPlanTasks.filter((t) => t.isCoachAssigned).length || undefined,
+    },
+    {
+      id: 'plan',
+      label: 'Çalışma Planı',
+      count: student.weeklyPlanTasks.filter((t) => !t.isCoachAssigned).length || undefined,
+    },
+    { id: 'exams', label: 'Denemeler', count: examCount },
+    {
+      id: 'notes',
+      label: 'Özel Notlar',
+      count: student.privateNotes.length || undefined,
+    },
   ];
 
   return (
-    <div className="max-w-5xl mx-auto select-none space-y-4 sm:space-y-6" data-testid="coach-student-detail-view">
+    <div className="max-w-6xl mx-auto select-none space-y-4 sm:space-y-6 p-4" data-testid="coach-student-detail-view">
       {/* Back Button */}
       <div>
         <button
           type="button"
           onClick={() => navigate('/coach/students')}
-          className="inline-flex items-center gap-1.5 text-xs font-semibold text-neutral-500 hover:text-primary-600 transition-colors py-1 px-2 rounded-lg hover:bg-neutral-100"
+          className="inline-flex items-center gap-1.5 text-xs font-semibold text-neutral-500 hover:text-primary-600 transition-colors py-1 px-2.5 rounded-xl hover:bg-neutral-100 cursor-pointer"
         >
           <ArrowLeft className="h-3.5 w-3.5" />
-          Öğrenci Listesine Dön
+          Atanmış Öğrencilerime Dön
         </button>
       </div>
 
-      {/* 1. Student Identity Header Card */}
-      <div className="bg-white rounded-2xl border border-neutral-100 p-4 sm:p-6 flex flex-col sm:flex-row sm:items-center justify-between gap-4 shadow-soft-sm">
-        <div className="flex items-center gap-4 min-w-0">
-          <div className="w-14 h-14 sm:w-16 sm:h-16 rounded-2xl bg-navy-900 text-white font-semibold text-xl flex items-center justify-center flex-shrink-0">
-            {student.initials}
-          </div>
-          <div className="min-w-0">
-            <div className="flex flex-wrap items-center gap-2">
-              <h1 className="font-serif text-xl sm:text-2xl font-bold text-neutral-900 leading-tight truncate">
-                {student.name}
-              </h1>
-              <span
-                className={cn(
-                  'inline-flex items-center gap-1 text-[10px] font-semibold uppercase px-2 py-0.5 rounded-full border',
-                  statusInfo.badgeClass
-                )}
-              >
-                {statusInfo.icon}
-                {statusInfo.label}
-              </span>
+      {/* 1. Student Identity Header Banner */}
+      <div className="bg-[#14233E] rounded-3xl p-5 sm:p-7 text-white shadow-soft-sm relative overflow-hidden border border-navy-800">
+        <div className="relative z-10 flex flex-col md:flex-row md:items-center justify-between gap-4">
+          <div className="flex items-center gap-4 min-w-0">
+            <div className="w-14 h-14 sm:w-16 sm:h-16 rounded-2xl bg-white/10 text-white font-bold text-xl flex items-center justify-center shrink-0 border border-white/15 shadow-soft-xs">
+              {student.initials}
             </div>
-            <p className="text-xs sm:text-sm text-neutral-500 truncate mt-0.5">
-              {student.grade} • {student.field} ({student.exam}) — Son Etkinlik: {student.lastActivity}
-            </p>
-          </div>
-        </div>
 
-        <div className="flex items-center gap-2 self-start sm:self-center">
-          <Button
-            variant="secondary"
-            size="sm"
-            onClick={() => navigate(`/coach/messages?studentId=${student.id}`)}
-            leftIcon={<MessageSquare className="h-3.5 w-3.5" />}
-          >
-            Mesaj Gönder
-          </Button>
+            <div className="min-w-0 flex-1">
+              <div className="flex flex-wrap items-center gap-2">
+                <h1 className="font-serif text-xl sm:text-2xl font-bold tracking-tight text-white leading-tight truncate">
+                  {student.name}
+                </h1>
+
+                <span className="text-xs px-2.5 py-0.5 rounded-full bg-navy-800/80 text-blue-300 border border-navy-700 font-medium">
+                  {student.grade}
+                </span>
+
+                <span
+                  className={`inline-flex items-center gap-1 text-[11px] font-bold px-2.5 py-0.5 rounded-full border ${statusInfo.badgeClass}`}
+                >
+                  {statusInfo.icon}
+                  {student.hasActivePlan && typeof student.planAdherence === 'number'
+                    ? `%${student.planAdherence} Uyum`
+                    : statusInfo.label}
+                </span>
+              </div>
+
+              <p className="text-xs sm:text-sm text-navy-200 mt-1 truncate">
+                {student.schoolName || student.field || 'Kayıtlı Öğrenci'} • {student.exam}
+              </p>
+            </div>
+          </div>
+
+          <div className="flex items-center gap-2.5 shrink-0 flex-wrap">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => handleTabChange('tasks')}
+              leftIcon={<PlusCircle className="h-4 w-4" />}
+              className="bg-white/10 hover:bg-white/15 text-white border-white/20 text-xs rounded-xl"
+            >
+              Görev Ata
+            </Button>
+            <Button
+              variant="primary"
+              size="sm"
+              onClick={() => navigate(`/coach/messages?studentId=${student.id}`)}
+              leftIcon={<MessageSquare className="h-4 w-4" />}
+              className="bg-[#315FE8] hover:bg-blue-600 text-white text-xs rounded-xl shadow-soft-xs"
+            >
+              Mesaj Gönder
+            </Button>
+          </div>
         </div>
       </div>
 
-      {/* 2. Detail Tabs */}
-      <div className="bg-white rounded-2xl border border-neutral-100 px-4 pt-1 shadow-soft-sm">
+      {/* 2. Scrollable Segmented Detail Tabs */}
+      <div className="bg-white rounded-2xl border border-neutral-200/80 px-4 pt-1 shadow-soft-xs overflow-x-auto scrollbar-none">
         <Tabs
           tabs={detailTabs}
           activeId={activeTab}
-          onChange={setActiveTab}
+          onChange={handleTabChange}
         />
       </div>
 
@@ -413,3 +449,5 @@ export const CoachStudentDetailView: React.FC<CoachStudentDetailViewProps> = ({
     </div>
   );
 };
+
+export default CoachStudentDetailView;
