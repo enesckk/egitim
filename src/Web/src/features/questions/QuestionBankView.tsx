@@ -1,6 +1,6 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
+import { useNavigate } from 'react-router-dom';
 import {
-  Card,
   Button,
   Input,
   Select,
@@ -23,6 +23,9 @@ import {
 } from '@/types/question';
 import { questionService } from '@/services/questionService';
 import { academicService } from '@/services/academicService';
+import { teacherService, TeacherMeDto } from '@/services/teacherService';
+import { examService } from '@/services/examService';
+import { ExamDto } from '@/types/exam';
 import { useAuth } from '@/auth';
 import { QuestionFormModal } from './components/QuestionFormModal';
 import { QuestionDetailModal } from './components/QuestionDetailModal';
@@ -40,6 +43,10 @@ import {
   ChevronRight,
   BookOpen,
   RotateCcw,
+  Layers,
+  ChevronDown,
+  ChevronUp,
+  FileSpreadsheet,
 } from 'lucide-react';
 
 interface QuestionBankViewProps {
@@ -47,8 +54,14 @@ interface QuestionBankViewProps {
 }
 
 export const QuestionBankView: React.FC<QuestionBankViewProps> = ({ role }) => {
+  const navigate = useNavigate();
   const { user } = useAuth();
   const isSuperAdmin = user?.role === 'admin';
+
+  // Teacher specific state
+  const [teacherProfile, setTeacherProfile] = useState<TeacherMeDto | null>(null);
+  const [availableExams, setAvailableExams] = useState<ExamDto[]>([]);
+  const [isAssemblyModalOpen, setIsAssemblyModalOpen] = useState(false);
 
   // Data states
   const [questions, setQuestions] = useState<QuestionDto[]>([]);
@@ -68,11 +81,11 @@ export const QuestionBankView: React.FC<QuestionBankViewProps> = ({ role }) => {
   const [difficulty, setDifficulty] = useState<string>('all');
   const [sourceType, setSourceType] = useState<string>('all');
   const [sourceYear, setSourceYear] = useState<string>('');
+  const [showAdvancedFilters, setShowAdvancedFilters] = useState<boolean>(false);
 
   // Taxonomy Filter states
   const [subjects, setSubjects] = useState<TaxonomyDto[]>([]);
   const [topics, setTopics] = useState<TaxonomyDto[]>([]);
-  const [subTopics, setSubTopics] = useState<TaxonomyDto[]>([]);
   const [selectedSubjectId, setSelectedSubjectId] = useState<string>('');
   const [selectedTopicId, setSelectedTopicId] = useState<string>('');
   const [selectedSubTopicId, setSelectedSubTopicId] = useState<string>('');
@@ -101,7 +114,26 @@ export const QuestionBankView: React.FC<QuestionBankViewProps> = ({ role }) => {
     return () => clearTimeout(handler);
   }, [searchText]);
 
-  // Load initial subjects
+  // Load teacher profile & authorized exams when role is teacher
+  useEffect(() => {
+    if (role === 'teacher') {
+      teacherService
+        .getMe()
+        .then((me) => {
+          setTeacherProfile(me);
+        })
+        .catch(() => {});
+
+      examService
+        .getExams({ page: 1, pageSize: 20 })
+        .then((res) => {
+          setAvailableExams(res.items || []);
+        })
+        .catch(() => {});
+    }
+  }, [role]);
+
+  // Load initial subjects & set default teacher assigned subject if applicable
   useEffect(() => {
     academicService
       .getTaxonomy('subjects')
@@ -110,16 +142,24 @@ export const QuestionBankView: React.FC<QuestionBankViewProps> = ({ role }) => {
         const map: Record<string, string> = {};
         data.forEach((s) => (map[s.id] = s.name));
         setSubjectNames(map);
+
+        // If teacher has assigned subjects, find matching subject and select it by default once
+        if (role === 'teacher' && teacherProfile && teacherProfile.subjects && teacherProfile.subjects.length > 0) {
+          const teacherSubjectNames = teacherProfile.subjects.map((ts) => ts.subjectName.toLowerCase());
+          const matched = data.find((s) => teacherSubjectNames.includes(s.name.toLowerCase()));
+          if (matched && !selectedSubjectId) {
+            setSelectedSubjectId(matched.id);
+          }
+        }
       })
       .catch(() => {});
-  }, []);
+  }, [role, teacherProfile, selectedSubjectId]);
 
   // Load topics when subject filter changes
   useEffect(() => {
     if (!selectedSubjectId) {
       setTopics([]);
       setSelectedTopicId('');
-      setSubTopics([]);
       setSelectedSubTopicId('');
       return;
     }
@@ -140,15 +180,13 @@ export const QuestionBankView: React.FC<QuestionBankViewProps> = ({ role }) => {
   // Load subTopics when topic filter changes
   useEffect(() => {
     if (!selectedTopicId) {
-      setSubTopics([]);
       setSelectedSubTopicId('');
       return;
     }
 
     academicService
       .getTaxonomy('sub-topics', selectedTopicId)
-      .then(setSubTopics)
-      .catch(() => setSubTopics([]));
+      .catch(() => {});
   }, [selectedTopicId]);
 
   // Fetch Questions
@@ -271,9 +309,7 @@ export const QuestionBankView: React.FC<QuestionBankViewProps> = ({ role }) => {
 
   // Security & Immutability Helpers
   const canEditQuestion = (q: QuestionDto | QuestionDetailDto): boolean => {
-    // Global questions cannot be edited by normal institution users
     if (q.institutionId === null && !isSuperAdmin) return false;
-    // Published & Archived questions are immutable
     if (q.status !== QuestionStatus.Draft) return false;
     return true;
   };
@@ -319,162 +355,291 @@ export const QuestionBankView: React.FC<QuestionBankViewProps> = ({ role }) => {
 
   const totalPages = Math.max(1, Math.ceil(totalCount / pageSize));
 
-  return (
-    <div className="space-y-6 pb-12">
-      {/* Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-        <div>
-          <h1 className="text-2xl font-bold text-neutral-900 tracking-tight flex items-center gap-2">
-            <BookOpen className="h-6 w-6 text-primary-600" />
-            Soru Bankası
-          </h1>
-          <p className="text-xs text-neutral-500 mt-1">
-            {role === 'admin' ? 'Kurumsal ve global soru havuzunu yönetin.' : 'Sınavlar için soruları inceleyin ve oluşturun.'}
-          </p>
-        </div>
+  // Authoritative subjects for teacher display
+  const teacherSubjectsDisplay = useMemo(() => {
+    if (teacherProfile && teacherProfile.subjects && teacherProfile.subjects.length > 0) {
+      return teacherProfile.subjects.map((s) => s.subjectName).join(', ');
+    }
+    return 'Matematik';
+  }, [teacherProfile]);
 
-        <Button
-          variant="primary"
-          size="sm"
-          onClick={() => {
-            setEditingQuestion(null);
-            setIsFormOpen(true);
-          }}
-          className="flex items-center gap-1.5 self-start sm:self-auto"
-        >
-          <Plus className="h-4 w-4" />
-          <span>Yeni Soru Oluştur</span>
-        </Button>
-      </div>
+  return (
+    <div className="w-full max-w-6xl mx-auto select-none space-y-5 sm:space-y-6 pb-12" data-testid="question-bank-view">
+      {/* 1. Header with Real Scope & Statistics */}
+      {role === 'teacher' ? (
+        <div className="bg-white rounded-2xl border border-neutral-200/80 p-5 sm:p-6 shadow-soft-sm">
+          <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-5">
+            <div className="space-y-2 max-w-2xl">
+              <div className="flex items-center gap-2.5 flex-wrap">
+                <h1 className="font-serif text-2xl sm:text-3xl font-bold text-neutral-900 tracking-tight">
+                  Soru Bankası & Deneme Montajı
+                </h1>
+                <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold bg-primary-50 text-primary-700 border border-primary-200">
+                  <BookOpen className="h-3.5 w-3.5" />
+                  {teacherSubjectsDisplay}
+                </span>
+              </div>
+              <p className="text-xs sm:text-sm text-neutral-500 leading-relaxed">
+                Kurumsal ve genel soru havuzundan branşınıza uygun soruları filtreleyin, yeni sorular ekleyin ve sınav montajı yapın
+              </p>
+            </div>
+
+            <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3 border-t lg:border-t-0 lg:border-l border-neutral-200/80 pt-4 lg:pt-0 lg:pl-6">
+              <div className="bg-[#F8F7F3] p-3 rounded-xl border border-neutral-200/80 min-w-[120px]">
+                <span className="text-[10px] uppercase font-bold text-neutral-500 tracking-wider block">
+                  Havuz Sorusu
+                </span>
+                <div className="flex items-center gap-1.5 mt-0.5">
+                  <Layers className="h-4 w-4 text-primary-600 flex-shrink-0" />
+                  <span className="font-mono text-lg font-bold text-neutral-900">
+                    {totalCount}
+                  </span>
+                  <span className="text-xs text-neutral-500">Soru</span>
+                </div>
+              </div>
+
+              <div className="flex items-center gap-2">
+                {availableExams.length > 0 && (
+                  <Button
+                    variant="secondary"
+                    size="sm"
+                    onClick={() => setIsAssemblyModalOpen(true)}
+                    leftIcon={<FileSpreadsheet className="h-4 w-4 text-primary-600" />}
+                    className="h-11 px-3 text-xs font-semibold bg-[#F8F7F3] border-neutral-200 hover:bg-primary-50 hover:text-primary-700"
+                    id="btn-exam-assembly"
+                  >
+                    Sınav Montajı
+                  </Button>
+                )}
+
+                <Button
+                  variant="primary"
+                  size="sm"
+                  onClick={() => {
+                    setEditingQuestion(null);
+                    setIsFormOpen(true);
+                  }}
+                  leftIcon={<Plus className="h-4 w-4" />}
+                  className="h-11 px-4 text-xs font-semibold shadow-soft-sm"
+                  id="btn-create-question"
+                >
+                  Yeni Soru Ekle
+                </Button>
+              </div>
+            </div>
+          </div>
+        </div>
+      ) : (
+        /* Admin Default Header */
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+          <div>
+            <h1 className="text-2xl font-bold text-neutral-900 tracking-tight flex items-center gap-2">
+              <BookOpen className="h-6 w-6 text-primary-600" />
+              Soru Bankası
+            </h1>
+            <p className="text-xs text-neutral-500 mt-1">
+              Kurumsal ve global soru havuzunu yönetin.
+            </p>
+          </div>
+
+          <Button
+            variant="primary"
+            size="sm"
+            onClick={() => {
+              setEditingQuestion(null);
+              setIsFormOpen(true);
+            }}
+            className="flex items-center gap-1.5 self-start sm:self-auto"
+          >
+            <Plus className="h-4 w-4" />
+            <span>Yeni Soru Oluştur</span>
+          </Button>
+        </div>
+      )}
 
       {error && <Alert variant="danger">{error}</Alert>}
 
-      {/* Filter Bar Card */}
-      <Card className="p-4 space-y-4">
-        <div className="flex items-center justify-between gap-2 border-b border-neutral-100 pb-3">
-          <div className="flex items-center gap-2 text-sm font-semibold text-neutral-700">
-            <Filter className="h-4 w-4 text-primary-600" />
-            <span>Arama ve Filtreler</span>
-          </div>
-          <Button variant="ghost" size="sm" onClick={handleResetFilters} className="text-xs text-neutral-500 hover:text-neutral-800">
-            <RotateCcw className="h-3.5 w-3.5 mr-1" /> Filtreleri Sıfırla
-          </Button>
-        </div>
-
-        {/* Row 1: Search & Pool & Status & Difficulty */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
-          <div className="relative">
-            <Search className="absolute left-3 top-2.5 h-4 w-4 text-neutral-400" />
+      {/* 2. Simplified Filters Bar */}
+      <div className="bg-white p-4 sm:p-5 rounded-2xl border border-neutral-200/80 shadow-soft-sm space-y-3.5">
+        <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-3">
+          {/* Search Box */}
+          <div className="relative flex-1 min-w-0">
+            <Search className="absolute left-3.5 top-3 h-4 w-4 text-neutral-400" />
             <Input
-              placeholder="Soru metninde ara..."
+              placeholder="Soru metninde veya kazanımda ara..."
               value={searchText}
               onChange={(e) => setSearchText(e.target.value)}
-              className="pl-9 text-xs"
+              className="pl-10 text-xs bg-[#F8F7F3] border-neutral-200 w-full"
             />
           </div>
 
-          <Select
-            value={poolType}
-            onChange={(e) => {
-              setPoolType(e.target.value as 'all' | 'global' | 'institution');
-              setPage(1);
-            }}
-            className="text-xs"
-          >
-            <option value="all">Tüm Havuzlar (Global + Kurum)</option>
-            <option value="global">Sadece Global Havuz</option>
-            <option value="institution">Sadece Kurum Havuzu</option>
-          </Select>
+          <div className="flex items-center justify-between sm:justify-start gap-2 flex-wrap">
+            {/* Pool Filter Chips */}
+            <div className="inline-flex rounded-xl bg-[#F8F7F3] p-1 border border-neutral-200/80 flex-wrap">
+              <button
+                type="button"
+                onClick={() => {
+                  setPoolType('all');
+                  setPage(1);
+                }}
+                className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-all ${
+                  poolType === 'all'
+                    ? 'bg-white text-neutral-900 shadow-2xs font-semibold'
+                    : 'text-neutral-600 hover:text-neutral-900'
+                }`}
+              >
+                Tüm Havuzlar
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  setPoolType('institution');
+                  setPage(1);
+                }}
+                className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-all ${
+                  poolType === 'institution'
+                    ? 'bg-white text-neutral-900 shadow-2xs font-semibold'
+                    : 'text-neutral-600 hover:text-neutral-900'
+                }`}
+              >
+                Kurum Havuzu
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  setPoolType('global');
+                  setPage(1);
+                }}
+                className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-all ${
+                  poolType === 'global'
+                    ? 'bg-white text-neutral-900 shadow-2xs font-semibold'
+                    : 'text-neutral-600 hover:text-neutral-900'
+                }`}
+              >
+                Genel Havuz
+              </button>
+            </div>
 
-          <Select
-            value={status}
-            onChange={(e) => {
-              setStatus(e.target.value);
-              setPage(1);
-            }}
-            className="text-xs"
-          >
-            <option value="all">Tüm Durumlar</option>
-            <option value={QuestionStatus.Draft}>Taslak</option>
-            <option value={QuestionStatus.Published}>Yayımlandı</option>
-            <option value={QuestionStatus.Archived}>Arşivlendi</option>
-          </Select>
+            {/* Toggle Advanced Filters */}
+            <div className="flex items-center gap-2">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setShowAdvancedFilters(!showAdvancedFilters)}
+                className="text-xs text-neutral-700 bg-white border-neutral-200 hover:bg-neutral-50"
+              >
+                <Filter className="h-3.5 w-3.5 mr-1 text-primary-600" />
+                <span>Filtreler</span>
+                {showAdvancedFilters ? (
+                  <ChevronUp className="h-3.5 w-3.5 ml-1 text-neutral-400" />
+                ) : (
+                  <ChevronDown className="h-3.5 w-3.5 ml-1 text-neutral-400" />
+                )}
+              </Button>
 
-          <Select
-            value={difficulty}
-            onChange={(e) => {
-              setDifficulty(e.target.value);
-              setPage(1);
-            }}
-            className="text-xs"
-          >
-            <option value="all">Tüm Zorluklar</option>
-            <option value={DifficultyLevel.Easy}>Kolay</option>
-            <option value={DifficultyLevel.Medium}>Orta</option>
-            <option value={DifficultyLevel.Hard}>Zor</option>
-          </Select>
+              {(selectedSubjectId || selectedTopicId || difficulty !== 'all' || status !== 'all' || debouncedSearch) && (
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={handleResetFilters}
+                  className="text-xs text-neutral-500 hover:text-neutral-800"
+                >
+                  <RotateCcw className="h-3.5 w-3.5 mr-1" /> Temizle
+                </Button>
+              )}
+            </div>
+          </div>
         </div>
 
-        {/* Row 2: Taxonomy Filters (Subject, Topic, SubTopic) */}
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-          <Select
-            value={selectedSubjectId}
-            onChange={(e) => {
-              setSelectedSubjectId(e.target.value);
-              setPage(1);
-            }}
-            className="text-xs"
-          >
-            <option value="">Tüm Dersler</option>
-            {subjects.map((s) => (
-              <option key={s.id} value={s.id}>
-                {s.name}
-              </option>
-            ))}
-          </Select>
+        {/* Collapsible Advanced Filters */}
+        {showAdvancedFilters && (
+          <div className="pt-3 border-t border-neutral-100 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 animate-fadeIn">
+            {/* Subject Selector */}
+            <div>
+              <label className="text-[11px] font-semibold text-neutral-600 block mb-1">Ders / Branş</label>
+              <Select
+                value={selectedSubjectId}
+                onChange={(e) => {
+                  setSelectedSubjectId(e.target.value);
+                  setPage(1);
+                }}
+                className="text-xs bg-[#F8F7F3] border-neutral-200"
+              >
+                <option value="">Tüm Dersler</option>
+                {subjects.map((s) => (
+                  <option key={s.id} value={s.id}>
+                    {s.name}
+                  </option>
+                ))}
+              </Select>
+            </div>
 
-          <Select
-            value={selectedTopicId}
-            onChange={(e) => {
-              setSelectedTopicId(e.target.value);
-              setPage(1);
-            }}
-            disabled={!selectedSubjectId}
-            className="text-xs"
-          >
-            <option value="">Tüm Konular</option>
-            {topics.map((t) => (
-              <option key={t.id} value={t.id}>
-                {t.name}
-              </option>
-            ))}
-          </Select>
+            {/* Topic Selector */}
+            <div>
+              <label className="text-[11px] font-semibold text-neutral-600 block mb-1">Konu</label>
+              <Select
+                value={selectedTopicId}
+                onChange={(e) => {
+                  setSelectedTopicId(e.target.value);
+                  setPage(1);
+                }}
+                disabled={!selectedSubjectId}
+                className="text-xs bg-[#F8F7F3] border-neutral-200"
+              >
+                <option value="">Tüm Konular</option>
+                {topics.map((t) => (
+                  <option key={t.id} value={t.id}>
+                    {t.name}
+                  </option>
+                ))}
+              </Select>
+            </div>
 
-          <Select
-            value={selectedSubTopicId}
-            onChange={(e) => {
-              setSelectedSubTopicId(e.target.value);
-              setPage(1);
-            }}
-            disabled={!selectedTopicId}
-            className="text-xs"
-          >
-            <option value="">Tüm Alt Konular</option>
-            {subTopics.map((st) => (
-              <option key={st.id} value={st.id}>
-                {st.name}
-              </option>
-            ))}
-          </Select>
-        </div>
-      </Card>
+            {/* Difficulty Selector */}
+            <div>
+              <label className="text-[11px] font-semibold text-neutral-600 block mb-1">Zorluk Seviyesi</label>
+              <Select
+                value={difficulty}
+                onChange={(e) => {
+                  setDifficulty(e.target.value);
+                  setPage(1);
+                }}
+                className="text-xs bg-[#F8F7F3] border-neutral-200"
+              >
+                <option value="all">Tüm Zorluklar</option>
+                <option value={DifficultyLevel.Easy}>Kolay</option>
+                <option value={DifficultyLevel.Medium}>Orta</option>
+                <option value={DifficultyLevel.Hard}>Zor</option>
+              </Select>
+            </div>
 
-      {/* Main Content Area */}
+            {/* Status Selector */}
+            <div>
+              <label className="text-[11px] font-semibold text-neutral-600 block mb-1">Durum</label>
+              <Select
+                value={status}
+                onChange={(e) => {
+                  setStatus(e.target.value);
+                  setPage(1);
+                }}
+                className="text-xs bg-[#F8F7F3] border-neutral-200"
+              >
+                <option value="all">Tüm Durumlar</option>
+                <option value={QuestionStatus.Draft}>Taslak</option>
+                <option value={QuestionStatus.Published}>Yayımlandı</option>
+                <option value={QuestionStatus.Archived}>Arşivlendi</option>
+              </Select>
+            </div>
+          </div>
+        )}
+      </div>
+
+      {/* 3. Main Content Area */}
       {isLoading ? (
         <LoadingState message="Sorular yükleniyor..." />
       ) : questions.length === 0 ? (
         <EmptyState
-          icon={<BookOpen className="h-6 w-6 text-neutral-400" />}
+          icon={<BookOpen className="h-8 w-8 text-neutral-400" />}
           title={debouncedSearch || selectedSubjectId ? 'Filtrelere uygun soru bulunamadı' : 'Henüz soru bulunmuyor'}
           description={
             debouncedSearch || selectedSubjectId
@@ -495,35 +660,39 @@ export const QuestionBankView: React.FC<QuestionBankViewProps> = ({ role }) => {
           }
         />
       ) : (
-        <div className="space-y-3">
+        <div className="space-y-4">
           {/* Results Summary */}
           <div className="flex items-center justify-between text-xs text-neutral-500 px-1">
-            <span>Toplam <strong>{totalCount}</strong> soru bulundu.</span>
-            <span>Sayfa {page} / {totalPages}</span>
+            <span>
+              Toplam <strong className="text-neutral-800">{totalCount}</strong> soru listeleniyor.
+            </span>
+            <span>
+              Sayfa {page} / {totalPages}
+            </span>
           </div>
 
           {/* Question List Cards */}
-          <div className="space-y-3">
+          <div className="space-y-3.5">
             {questions.map((q) => {
               const canEdit = canEditQuestion(q);
               const reason = getCannotEditReason(q);
 
               return (
-                <Card
+                <div
                   key={q.id}
-                  className="p-4 hover:border-neutral-300 transition-colors flex flex-col md:flex-row md:items-center justify-between gap-4"
+                  className="bg-white rounded-2xl border border-neutral-200/80 p-4 sm:p-5 shadow-soft-sm hover:border-primary-300 transition-colors flex flex-col md:flex-row md:items-center justify-between gap-4"
                 >
                   <div className="space-y-2 flex-1 min-w-0">
-                    {/* Metadata Badges Header */}
+                    {/* Metadata Header */}
                     <div className="flex flex-wrap items-center gap-2 text-xs">
                       {q.institutionId === null ? (
-                        <Badge variant="info" className="flex items-center gap-1">
-                          <Globe className="h-3 w-3" /> Global
-                        </Badge>
+                        <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-semibold bg-sky-50 text-sky-700 border border-sky-200">
+                          <Globe className="h-3 w-3" /> Genel Havuz
+                        </span>
                       ) : (
-                        <Badge variant="secondary" className="flex items-center gap-1">
+                        <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-semibold bg-primary-50 text-primary-700 border border-primary-200">
                           <Building2 className="h-3 w-3" /> Kurumsal
-                        </Badge>
+                        </span>
                       )}
 
                       {getStatusBadge(q.status)}
@@ -545,7 +714,7 @@ export const QuestionBankView: React.FC<QuestionBankViewProps> = ({ role }) => {
                         {q.styles.map((s) => (
                           <span
                             key={s.id}
-                            className="inline-flex items-center px-2 py-0.5 rounded text-[11px] font-medium bg-purple-50 text-purple-700 border border-purple-200"
+                            className="inline-flex items-center px-2 py-0.5 rounded text-[11px] font-medium bg-[#F8F7F3] text-neutral-700 border border-neutral-200"
                           >
                             {s.name}
                           </span>
@@ -554,11 +723,11 @@ export const QuestionBankView: React.FC<QuestionBankViewProps> = ({ role }) => {
                     )}
 
                     {/* Sub-info */}
-                    <div className="flex items-center gap-4 text-xs text-neutral-400">
-                      <span>{q.optionCount} Şık (A–E)</span>
-                      <span>Oluşturulma: {new Date(q.createdAt).toLocaleDateString('tr-TR')}</span>
+                    <div className="flex flex-wrap items-center gap-4 text-[11px] text-neutral-400 font-mono">
+                      <span>{q.optionCount} Şık</span>
+                      <span>Kayıt: {new Date(q.createdAt).toLocaleDateString('tr-TR')}</span>
                       {!canEdit && reason && (
-                        <span className="flex items-center gap-1 text-amber-700 bg-amber-50 px-2 py-0.5 rounded text-[11px]">
+                        <span className="flex items-center gap-1 text-amber-700 bg-amber-50 px-2 py-0.5 rounded text-[11px] font-sans">
                           <Lock className="h-3 w-3" /> {reason}
                         </span>
                       )}
@@ -571,9 +740,9 @@ export const QuestionBankView: React.FC<QuestionBankViewProps> = ({ role }) => {
                       variant="ghost"
                       size="sm"
                       onClick={() => handleOpenDetail(q.id)}
-                      className="text-neutral-600 hover:text-neutral-900"
+                      className="text-neutral-600 hover:text-neutral-900 text-xs"
                     >
-                      <Eye className="h-4 w-4 mr-1" /> Detay
+                      <Eye className="h-3.5 w-3.5 mr-1 text-primary-600" /> İncele
                     </Button>
 
                     <Button
@@ -581,6 +750,7 @@ export const QuestionBankView: React.FC<QuestionBankViewProps> = ({ role }) => {
                       size="sm"
                       disabled={!canEdit}
                       onClick={() => handleOpenEdit(q.id)}
+                      className="text-xs"
                     >
                       <Edit2 className="h-3.5 w-3.5 mr-1" /> Düzenle
                     </Button>
@@ -591,30 +761,31 @@ export const QuestionBankView: React.FC<QuestionBankViewProps> = ({ role }) => {
                         size="sm"
                         disabled={q.institutionId === null && !isSuperAdmin}
                         onClick={() => setArchivingQuestion(q)}
-                        className="text-amber-700 hover:bg-amber-50 hover:text-amber-800"
+                        className="text-amber-700 hover:bg-amber-50 hover:text-amber-800 text-xs"
                       >
                         <Archive className="h-3.5 w-3.5 mr-1" /> Arşivle
                       </Button>
                     )}
                   </div>
-                </Card>
+                </div>
               );
             })}
           </div>
 
-          {/* Pagination Controls */}
+          {/* 4. Pagination Controls */}
           {totalPages > 1 && (
-            <div className="flex items-center justify-between border-t border-neutral-200 pt-4 px-1">
+            <div className="bg-white rounded-2xl border border-neutral-200/80 p-4 shadow-soft-sm flex items-center justify-between">
               <Button
                 variant="outline"
                 size="sm"
                 disabled={page <= 1}
                 onClick={() => setPage((p) => Math.max(1, p - 1))}
+                className="text-xs"
               >
                 <ChevronLeft className="h-4 w-4 mr-1" /> Önceki
               </Button>
 
-              <span className="text-xs text-neutral-600">
+              <span className="text-xs font-semibold text-neutral-700">
                 Sayfa {page} / {totalPages}
               </span>
 
@@ -623,12 +794,67 @@ export const QuestionBankView: React.FC<QuestionBankViewProps> = ({ role }) => {
                 size="sm"
                 disabled={page >= totalPages}
                 onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
+                className="text-xs"
               >
                 Sonraki <ChevronRight className="h-4 w-4 ml-1" />
               </Button>
             </div>
           )}
         </div>
+      )}
+
+      {/* 5. Exam Assembly Target Selection Modal */}
+      {isAssemblyModalOpen && (
+        <Modal
+          isOpen={isAssemblyModalOpen}
+          onClose={() => setIsAssemblyModalOpen(false)}
+          title="Deneme Sınavı Montajı"
+          subtitle="Soru eklemek istediğiniz aktif sınavı seçiniz"
+          headerVariant="dark"
+          footer={
+            <div className="flex justify-end gap-2 w-full">
+              <Button variant="secondary" size="sm" onClick={() => setIsAssemblyModalOpen(false)}>
+                Kapat
+              </Button>
+            </div>
+          }
+        >
+          <div className="space-y-3 py-2">
+            {availableExams.length === 0 ? (
+              <p className="text-xs text-neutral-500 text-center py-4">
+                Montaj yapılabilecek kayıtlı sınav bulunmuyor.
+              </p>
+            ) : (
+              <div className="space-y-2 max-h-72 overflow-y-auto pr-1">
+                {availableExams.map((exam) => (
+                  <div
+                    key={exam.id}
+                    className="p-3 bg-[#F8F7F3] rounded-xl border border-neutral-200/80 flex items-center justify-between gap-3 hover:border-primary-300 transition-colors"
+                  >
+                    <div>
+                      <h4 className="text-xs font-bold text-neutral-900">{exam.title}</h4>
+                      <p className="text-[11px] text-neutral-500 font-mono">
+                        {exam.examTypeName || 'Sınav'} • {new Date(exam.examDate).toLocaleDateString('tr-TR')}
+                      </p>
+                    </div>
+
+                    <Button
+                      variant="primary"
+                      size="sm"
+                      onClick={() => {
+                        setIsAssemblyModalOpen(false);
+                        navigate(`/exams/${exam.id}/questions`);
+                      }}
+                      className="text-xs shrink-0"
+                    >
+                      Soruları Yönet
+                    </Button>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        </Modal>
       )}
 
       {/* Form Modal (Create / Edit) */}
@@ -673,8 +899,9 @@ export const QuestionBankView: React.FC<QuestionBankViewProps> = ({ role }) => {
         onClose={() => setArchivingQuestion(null)}
         title="Soruyu Arşivle"
         subtitle="Bu işlem soruyu aktif aramadan kaldıracaktır."
+        headerVariant="dark"
         footer={
-          <div className="flex items-center justify-end gap-2">
+          <div className="flex items-center justify-end gap-2 w-full">
             <Button
               variant="outline"
               size="sm"
@@ -695,12 +922,12 @@ export const QuestionBankView: React.FC<QuestionBankViewProps> = ({ role }) => {
           </div>
         }
       >
-        <div className="space-y-3">
-          <p className="text-sm text-neutral-800 font-medium">
+        <div className="space-y-3 py-2 text-xs text-neutral-700">
+          <p className="font-medium text-neutral-900">
             Soru arşivlenecektir. Geçmiş sınav ve sonuç kayıtları etkilenmeyecektir.
           </p>
           {archivingQuestion && (
-            <div className="p-3 bg-neutral-50 rounded-lg text-xs text-neutral-600 border border-neutral-200 line-clamp-3">
+            <div className="p-3 bg-[#F8F7F3] rounded-xl text-xs text-neutral-600 border border-neutral-200 line-clamp-3">
               "{archivingQuestion.content}"
             </div>
           )}
