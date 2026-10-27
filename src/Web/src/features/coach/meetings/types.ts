@@ -14,6 +14,8 @@ export interface CoachMeetingItem {
   locationType: 'Online Video' | 'Yüz Yüze • Kurum';
   status: MeetingStatus;
   notes?: string;
+  startTime?: string;
+  endTime?: string;
 }
 
 export interface CoachMeetingsViewModel {
