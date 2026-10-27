@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Search, GraduationCap, AlertCircle, RefreshCw } from 'lucide-react';
+import { Search, GraduationCap, AlertCircle, RefreshCw, Layers } from 'lucide-react';
 import { Input } from '@/components/ui/Input';
 import { Select } from '@/components/ui/Select';
 import { Button } from '@/components/ui/Button';
@@ -13,12 +13,17 @@ import { teacherService } from '@/services/teacherService';
 import { ClassroomDto } from '@/services/adminService';
 
 function mapClassroomToDetail(c: ClassroomDto): TeacherClassDetail {
+  const teacherNames = (c.teachers || []).map((t) => t.fullName).filter(Boolean);
+  const teacherTitles = (c.teachers || []).map((t) => t.title).filter(Boolean);
+  const subjectDisplay = teacherTitles.length > 0 ? teacherTitles.join(', ') : 'Branş Dersi';
+
   return {
     id: c.id,
     name: c.name,
     grade: c.gradeLevel ? `${c.gradeLevel}. Sınıf` : '12. Sınıf',
     branch: c.branch || 'Genel Şube',
-    subject: (c.teachers || []).map((t) => t.fullName).join(', ') || 'Branş Dersi',
+    teacherName: teacherNames.length > 0 ? teacherNames.join(', ') : null,
+    subject: subjectDisplay,
     studentCount: c.studentCount || 0,
     averageNet: null,
     attentionRequiredCount: 0,
@@ -91,12 +96,16 @@ export const TeacherClassesView: React.FC<TeacherClassesViewProps> = ({
   // Loading State
   if (activeLoading) {
     return (
-      <div className="max-w-5xl mx-auto space-y-4 select-none" data-testid="teacher-classes-loading">
-        <Skeleton className="h-16 w-1/3 rounded-xl" />
+      <div className="w-full max-w-6xl mx-auto space-y-5 select-none" data-testid="teacher-classes-loading">
+        <div className="flex items-center justify-between">
+          <Skeleton className="h-10 w-48 rounded-xl" />
+          <Skeleton className="h-7 w-24 rounded-full" />
+        </div>
+        <Skeleton className="h-14 w-full rounded-2xl" />
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-          <Skeleton className="h-48 w-full rounded-2xl" />
-          <Skeleton className="h-48 w-full rounded-2xl" />
-          <Skeleton className="h-48 w-full rounded-2xl" />
+          <Skeleton className="h-52 w-full rounded-2xl" />
+          <Skeleton className="h-52 w-full rounded-2xl" />
+          <Skeleton className="h-52 w-full rounded-2xl" />
         </div>
       </div>
     );
@@ -105,7 +114,7 @@ export const TeacherClassesView: React.FC<TeacherClassesViewProps> = ({
   // Error State
   if (activeError) {
     return (
-      <div className="max-w-5xl mx-auto py-8 space-y-4" data-testid="teacher-classes-error">
+      <div className="w-full max-w-6xl mx-auto py-8 space-y-4" data-testid="teacher-classes-error">
         <Alert variant="danger" icon={<AlertCircle className="h-5 w-5" />} title="Sınıflar Yüklenemedi">
           {activeError}
         </Alert>
@@ -122,6 +131,7 @@ export const TeacherClassesView: React.FC<TeacherClassesViewProps> = ({
     const matchesSearch =
       cls.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
       cls.branch.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      (cls.teacherName && cls.teacherName.toLowerCase().includes(searchQuery.toLowerCase())) ||
       cls.subject.toLowerCase().includes(searchQuery.toLowerCase());
 
     const matchesGrade = !gradeFilter || cls.grade.startsWith(gradeFilter);
@@ -129,45 +139,64 @@ export const TeacherClassesView: React.FC<TeacherClassesViewProps> = ({
     return matchesSearch && matchesGrade;
   });
 
-  return (
-    <div className="max-w-5xl mx-auto select-none space-y-4 sm:space-y-6" data-testid="teacher-classes-view">
-      {/* Header */}
-      <div>
-        <h1 className="font-serif text-2xl sm:text-3xl text-neutral-900 leading-tight">
-          Atanmış Sınıflar & Gruplar
-        </h1>
-        <p className="text-xs text-neutral-400 mt-0.5">
-          Ders verdiğiniz şubelerin akademik başarı, net ortalamaları ve konu kazanım takibi
-        </p>
-      </div>
+  const totalStudentsEnrolled = activeData.classes.reduce((sum, c) => sum + (c.studentCount || 0), 0);
 
-      {/* Filter Bar */}
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5">
-        <div className="sm:col-span-2">
-          <Input
-            placeholder="Sınıf adı, alan veya ders ara..."
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-            leftIcon={<Search className="h-4 w-4 text-neutral-400" />}
-          />
+  return (
+    <div className="w-full max-w-6xl mx-auto select-none space-y-4 sm:space-y-6" data-testid="teacher-classes-view">
+      {/* Premium Header */}
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 bg-white p-4 sm:p-6 rounded-2xl border border-neutral-200/80 shadow-soft-sm">
+        <div>
+          <div className="flex items-center gap-2.5 flex-wrap">
+            <h1 className="font-serif text-2xl sm:text-3xl font-bold text-neutral-900 tracking-tight">
+              Sınıflarım
+            </h1>
+            <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold bg-primary-50 text-primary-700 border border-primary-200">
+              <Layers className="h-3.5 w-3.5" />
+              {activeData.classes.length} Atanmış Şube
+            </span>
+          </div>
+          <p className="text-xs sm:text-sm text-neutral-500 mt-1">
+            Ders verdiğiniz sınıfların öğrenci listesi, akademik takip durumu ve şube analizleri
+          </p>
         </div>
 
-        <Select
-          options={[
-            { value: '12', label: '12. Sınıflar (YKS)' },
-            { value: '11', label: '11. Sınıflar' },
-            { value: '10', label: '10. Sınıflar' },
-            { value: '9', label: '9. Sınıflar' },
-          ]}
-          value={gradeFilter}
-          onChange={(e) => setGradeFilter(e.target.value)}
-          placeholder="Tüm Kademeler"
-        />
+        <div className="flex items-center gap-2.5 self-start sm:self-center bg-[#F8F7F3] px-3.5 py-2 rounded-xl border border-neutral-200/80 text-xs text-neutral-600">
+          <GraduationCap className="h-4 w-4 text-primary-600 flex-shrink-0" />
+          <span>Toplam Kayıtlı: <strong className="font-semibold text-neutral-900">{totalStudentsEnrolled} Öğrenci</strong></span>
+        </div>
+      </div>
+
+      {/* Filter and Search Bar */}
+      <div className="bg-white p-3.5 sm:p-4 rounded-2xl border border-neutral-200/80 shadow-soft-sm">
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+          <div className="sm:col-span-2">
+            <Input
+              placeholder="Sınıf adı, şube veya ders ara..."
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              leftIcon={<Search className="h-4 w-4 text-neutral-400" />}
+              className="bg-[#F8F7F3] border-neutral-200 focus:bg-white"
+            />
+          </div>
+
+          <Select
+            options={[
+              { value: '12', label: '12. Sınıflar (YKS)' },
+              { value: '11', label: '11. Sınıflar' },
+              { value: '10', label: '10. Sınıflar' },
+              { value: '9', label: '9. Sınıflar' },
+            ]}
+            value={gradeFilter}
+            onChange={(e) => setGradeFilter(e.target.value)}
+            placeholder="Tüm Kademeler"
+            className="bg-[#F8F7F3] border-neutral-200"
+          />
+        </div>
       </div>
 
       {/* Classes Grid */}
       {filteredClasses.length > 0 ? (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-5">
           {filteredClasses.map((cls) => (
             <ClassCard
               key={cls.id}
@@ -178,9 +207,9 @@ export const TeacherClassesView: React.FC<TeacherClassesViewProps> = ({
         </div>
       ) : (
         <EmptyState
-          icon={<GraduationCap className="h-6 w-6 text-neutral-400" />}
+          icon={<GraduationCap className="h-8 w-8 text-neutral-400" />}
           title="Sınıf Bulunamadı"
-          description="Arama kriterlerinize uygun atanmış şube veya grup kaydı bulunmuyor."
+          description="Arama kriterlerinize veya seçilen kademeye uygun atanmış şube kaydı bulunmuyor."
         />
       )}
     </div>

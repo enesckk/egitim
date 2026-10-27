@@ -1,6 +1,7 @@
 export interface ClassStudentItem {
   id: string;
   studentId: string;
+  studentNumber?: string | null;
   name: string;
   initials: string;
   mathNet: number | null;
@@ -22,6 +23,7 @@ export interface TeacherClassDetail {
   name: string;
   grade: string;
   branch: string;
+  teacherName?: string | null;
   subject: string;
   studentCount: number;
   averageNet?: number | null;

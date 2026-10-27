@@ -235,7 +235,12 @@ export const adminService = {
     page?: number;
     pageSize?: number;
   }): Promise<ClassroomDto[]> => {
-    return apiClient.get<ClassroomDto[]>('/api/v1/classrooms', { params });
+    return apiClient.get<ClassroomDto[]>('/api/v1/classrooms', {
+      params: {
+        pageSize: 200,
+        ...params,
+      },
+    });
   },
 
   getClassroom: (id: string): Promise<ClassroomDetailDto> => {

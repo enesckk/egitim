@@ -35,7 +35,7 @@ export const messagingService = {
     return apiClient.get<ConversationSummaryDto[]>('/api/v1/communication/messages/conversations');
   },
 
-  async getConversationMessages(conversationId: string, page = 1, pageSize = 50): Promise<MessageDto[]> {
+  async getConversationMessages(conversationId: string, page = 1, pageSize = 200): Promise<MessageDto[]> {
     return apiClient.get<MessageDto[]>(
       `/api/v1/communication/messages/conversations/${conversationId}?page=${page}&pageSize=${pageSize}`
     );
