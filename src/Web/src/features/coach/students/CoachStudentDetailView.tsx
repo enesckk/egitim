@@ -50,6 +50,11 @@ const STATUS_MAP: Record<
     icon: <XCircle className="h-3.5 w-3.5 text-danger" />,
     badgeClass: 'bg-danger-light text-danger-dark border-red-200',
   },
+  plansiz: {
+    label: 'Plan Yok',
+    icon: <AlertTriangle className="h-3.5 w-3.5 text-neutral-400" />,
+    badgeClass: 'bg-neutral-100 text-neutral-600 border-neutral-200',
+  },
 };
 
 export const CoachStudentDetailView: React.FC<CoachStudentDetailViewProps> = ({

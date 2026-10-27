@@ -1,4 +1,6 @@
-export type StudentStatus = 'takipte' | 'dikkat' | 'kritik';
+export type StudentStatus = 'takipte' | 'dikkat' | 'kritik' | 'plansiz';
+export type StudentPlanStatus = 'active' | 'no_plan';
+export type StudentComplianceStatus = StudentStatus;
 
 export interface CoachPrivateNote {
   id: string;
@@ -26,7 +28,7 @@ export interface StudentExamReviewItem {
   date: string;
   totalNet: number;
   netChange: number;
-  subjectsSummary: string; // e.g. "Mat: 33.25 | Tr: 35.00 | Fen: 16.50"
+  subjectsSummary: string;
   weakTopics: string[];
 }
 
@@ -36,11 +38,15 @@ export interface AssignedStudentDetail {
   initials: string;
   grade: string;
   field: string;
+  schoolName?: string;
   exam: string;
-  status: StudentStatus;
-  planAdherence: number;
-  weeklyStudyHours: number;
-  lastActivity: string;
+  status: StudentComplianceStatus;
+  hasActivePlan?: boolean;
+  planAdherence?: number;
+  weeklyStudyHours?: number;
+  totalTasks?: number;
+  completedTasks?: number;
+  lastActivity?: string;
   privateNotes: CoachPrivateNote[];
   weeklyPlanTasks: StudentPlanTaskReview[];
   recentExams: StudentExamReviewItem[];
