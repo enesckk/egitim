@@ -4,9 +4,9 @@ export interface TeacherStudentTopicPerformance {
   topic: string;
   masteryPercentage: number;
   solvedQuestionCount: number;
-  accuracyRate: number; // e.g. 74 (%)
+  accuracyRate: number;
   status: 'mastered' | 'improving' | 'needs_work';
-  lastPracticedDate: string;
+  lastPracticedDate?: string;
 }
 
 export interface TeacherStudentExamDetail {
@@ -22,18 +22,37 @@ export interface TeacherStudentExamDetail {
   incorrectTopics: string[];
 }
 
+export interface TeacherStudentAcademicGap {
+  id: string;
+  subject: string;
+  topic: string;
+  severity: 'critical' | 'warning' | 'info';
+  detail: string;
+  lastExam?: string;
+}
+
+export interface TeacherStudentSubjectSummary {
+  subjectName: string;
+  totalNet?: number | null;
+  accuracy?: number | null;
+  examCount?: number;
+}
+
 export interface TeacherStudentDetailModel {
   id: string;
   name: string;
   initials: string;
   grade: string;
   classBranch: string;
+  studentNumber?: string | null;
   assignedSubjects: string[];
   mathAverageNet?: number | null;
   physicsAverageNet?: number | null;
   overallAcademicStatus: 'takipte' | 'dikkat' | 'kritik';
   topicPerformances: TeacherStudentTopicPerformance[];
   recentExamResults: TeacherStudentExamDetail[];
+  academicGaps?: TeacherStudentAcademicGap[];
+  subjectSummaries?: TeacherStudentSubjectSummary[];
 }
 
 export interface TeacherStudentsViewModel {
