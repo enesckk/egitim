@@ -155,6 +155,13 @@ with zipfile.ZipFile('/tmp/template_e2e.xlsx', 'r') as z_in:
     await expect(page.getByText('Tekil Öğrenci Manuel Sonuç Girişi')).toBeVisible({ timeout: 10000 });
 
     // Step 3: Select Student (Ahmet Yılmaz)
+    // Use search input to isolate Ahmet Yılmaz reliably regardless of pagination or alphabetical order
+    const searchInput = page.locator('#student-search-input');
+    if (await searchInput.isVisible()) {
+      await searchInput.fill('Ahmet Yılmaz');
+      await page.waitForTimeout(300);
+    }
+
     const studentSelect = page.locator('#single-student-select');
     await expect(studentSelect).toBeVisible();
     await studentSelect.selectOption('d0000000-0000-0000-0000-000000000007');
@@ -444,13 +451,15 @@ with zipfile.ZipFile('/tmp/template_e2e.xlsx', 'r') as z_in:
     const uniqueMeetingType = `E2E Hedef Seansı ${Date.now().toString().slice(-4)}`;
     await page.locator('#görüşme-konusu').fill(uniqueMeetingType);
     await page.locator('textarea[placeholder*="Görüşmede ele alınacak"]').fill('Deneme analizi ve hedef belirleme');
-    // Set a dynamic day offset to avoid overlapping with previously created E2E meetings
-    const randomHour = Math.floor(Math.random() * 8) + 9; // 09:00 - 17:00
-    const randomMinute = Math.random() > 0.5 ? '00' : '30';
+    // Use an isolated future year slot (e.g. 2027) so consecutive test runs never collide on same date/hour
     const futureDate = new Date();
-    futureDate.setDate(futureDate.getDate() + Math.floor(Math.random() * 20) + 2);
-    await page.locator('#tarih').fill(futureDate.toISOString().split('T')[0]);
-    await page.locator('#saat').fill(`${randomHour.toString().padStart(2, '0')}:${randomMinute}`);
+    futureDate.setFullYear(2027);
+    // Unique day of year based on timestamp
+    const dayOffset = (Date.now() % 200) + 1;
+    futureDate.setMonth(0, 1 + dayOffset);
+    const dateStr = futureDate.toISOString().split('T')[0];
+    await page.locator('#tarih').fill(dateStr);
+    await page.locator('#saat').fill('10:00');
 
     // Submit meeting
     const submitBtn = page.locator('button:has-text("Görüşmeyi Kaydet")');

@@ -1,5 +1,5 @@
-import React, { useState, useEffect } from 'react';
-import { User, AlertCircle, CheckCircle2, Calculator, Info } from 'lucide-react';
+import React, { useState, useEffect, useCallback } from 'react';
+import { User, AlertCircle, CheckCircle2, Calculator, Info, Search, ChevronLeft, ChevronRight } from 'lucide-react';
 import { Card } from '@/components/ui/Card';
 import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
@@ -33,37 +33,58 @@ export const SingleManualEntryForm: React.FC<SingleManualEntryFormProps> = ({
 }) => {
   const [students, setStudents] = useState<StudentOption[]>([]);
   const [selectedStudentId, setSelectedStudentId] = useState<string>('');
+  const [selectedStudentSummary, setSelectedStudentSummary] = useState<StudentOption | null>(null);
   const [loadingStudents, setLoadingStudents] = useState<boolean>(true);
+  const [searchTerm, setSearchTerm] = useState<string>('');
+  const [page, setPage] = useState<number>(1);
+  const [totalPages, setTotalPages] = useState<number>(1);
+  const [totalCount, setTotalCount] = useState<number>(0);
 
   const [sectionInputs, setSectionInputs] = useState<Record<string, SectionInputState>>({});
   const [isSubmitting, setIsSubmitting] = useState<boolean>(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
-  useEffect(() => {
-    const fetchStudents = async () => {
-      try {
-        setLoadingStudents(true);
-        const res = await apiClient.get<{ items: { id: string; studentNumber: string; firstName: string; lastName: string }[] }>(
-          '/api/v1/students?pageSize=500'
-        );
-        if (res && res.items) {
-          setStudents(
-            res.items.map((s) => ({
-              id: s.id,
-              studentNumber: s.studentNumber,
-              fullName: `${s.firstName} ${s.lastName}`,
-            }))
-          );
-        }
-      } catch {
-        // Fallback option if students fetch is forbidden or empty
-      } finally {
-        setLoadingStudents(false);
+  const fetchStudents = useCallback(async (searchQuery: string, pageNumber: number) => {
+    try {
+      setLoadingStudents(true);
+      const params: Record<string, string | number> = {
+        page: pageNumber,
+        pageSize: 50,
+      };
+      if (searchQuery.trim()) {
+        params.searchTerm = searchQuery.trim();
       }
-    };
 
-    fetchStudents();
+      const res = await apiClient.get<{
+        items: { id: string; studentNumber: string; firstName: string; lastName: string }[];
+        page: number;
+        pageSize: number;
+        totalCount: number;
+        totalPages: number;
+      }>('/api/v1/students', { params });
 
+      if (res && res.items) {
+        const mapped = res.items.map((s) => ({
+          id: s.id,
+          studentNumber: s.studentNumber,
+          fullName: `${s.firstName} ${s.lastName}`,
+        }));
+        setStudents(mapped);
+        setTotalPages(res.totalPages || 1);
+        setTotalCount(res.totalCount || mapped.length);
+      }
+    } catch {
+      // Fallback option if students fetch is forbidden or empty
+    } finally {
+      setLoadingStudents(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    fetchStudents(searchTerm, page);
+  }, [fetchStudents, searchTerm, page]);
+
+  useEffect(() => {
     // Initialize section input state
     const initialInputs: Record<string, SectionInputState> = {};
     exam.sections.forEach((sec) => {
@@ -75,6 +96,19 @@ export const SingleManualEntryForm: React.FC<SingleManualEntryFormProps> = ({
     });
     setSectionInputs(initialInputs);
   }, [exam]);
+
+  const handleSearchChange = (val: string) => {
+    setSearchTerm(val);
+    setPage(1);
+  };
+
+  const handleStudentSelect = (id: string) => {
+    setSelectedStudentId(id);
+    const found = students.find((s) => s.id === id);
+    if (found) {
+      setSelectedStudentSummary(found);
+    }
+  };
 
   const handleScoreChange = (sectionId: string, field: 'correct' | 'wrong' | 'blank', value: number) => {
     const cleanValue = Math.max(0, Math.floor(isNaN(value) ? 0 : value));
@@ -178,28 +212,76 @@ export const SingleManualEntryForm: React.FC<SingleManualEntryFormProps> = ({
 
       {/* Öğrenci Seçimi */}
       <Card className="p-6 space-y-4">
-        <label htmlFor="single-student-select" className="block text-sm font-semibold text-gray-900 dark:text-white flex items-center gap-2">
-          <User className="h-4 w-4 text-navy-600" />
-          Öğrenci Seçin <span className="text-red-500">*</span>
-        </label>
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+          <label htmlFor="single-student-select" className="block text-sm font-semibold text-gray-900 dark:text-white flex items-center gap-2">
+            <User className="h-4 w-4 text-navy-600" />
+            Öğrenci Seçin <span className="text-red-500">*</span>
+          </label>
+          <div className="relative w-full sm:w-64">
+            <Search className="absolute left-3 top-2.5 h-3.5 w-3.5 text-gray-400" />
+            <input
+              id="student-search-input"
+              type="text"
+              placeholder="Öğrenci adı / soyadı ara..."
+              value={searchTerm}
+              onChange={(e) => handleSearchChange(e.target.value)}
+              className="w-full pl-9 pr-3 py-1.5 text-xs rounded-lg border border-gray-300 dark:border-gray-700 bg-white dark:bg-navy-950 text-gray-900 dark:text-white focus:ring-2 focus:ring-navy-500 focus:outline-none"
+            />
+          </div>
+        </div>
 
         {loadingStudents ? (
-          <div className="text-xs text-gray-500">Öğrenciler yükleniyor...</div>
+          <div className="text-xs text-gray-500 py-3 text-center">Öğrenciler yükleniyor...</div>
         ) : (
-          <select
-            id="single-student-select"
-            value={selectedStudentId}
-            onChange={(e) => setSelectedStudentId(e.target.value)}
-            required
-            className="w-full rounded-xl border border-gray-300 dark:border-gray-700 bg-white dark:bg-navy-950 px-4 py-2.5 text-sm text-gray-900 dark:text-white focus:ring-2 focus:ring-navy-500 focus:outline-none"
-          >
-            <option value="">-- Lütfen Öğrenci Seçiniz --</option>
-            {students.map((st) => (
-              <option key={st.id} value={st.id}>
-                {st.fullName} ({st.studentNumber || 'No yok'})
-              </option>
-            ))}
-          </select>
+          <div className="space-y-2">
+            <select
+              id="single-student-select"
+              value={selectedStudentId}
+              onChange={(e) => handleStudentSelect(e.target.value)}
+              required
+              className="w-full rounded-xl border border-gray-300 dark:border-gray-700 bg-white dark:bg-navy-950 px-4 py-2.5 text-sm text-gray-900 dark:text-white focus:ring-2 focus:ring-navy-500 focus:outline-none"
+            >
+              <option value="">-- Lütfen Öğrenci Seçiniz ({totalCount} Öğrenci) --</option>
+              {selectedStudentSummary && !students.some((s) => s.id === selectedStudentSummary.id) && (
+                <option value={selectedStudentSummary.id}>
+                  {selectedStudentSummary.fullName} ({selectedStudentSummary.studentNumber || 'No yok'}) [Seçili]
+                </option>
+              )}
+              {students.map((st) => (
+                <option key={st.id} value={st.id}>
+                  {st.fullName} ({st.studentNumber || 'No yok'})
+                </option>
+              ))}
+            </select>
+
+            {totalPages > 1 && (
+              <div className="flex items-center justify-between text-xs text-gray-500 px-1 pt-1">
+                <span>
+                  Toplam {totalCount} kayıt • Sayfa {page} / {totalPages}
+                </span>
+                <div className="flex items-center gap-1">
+                  <button
+                    type="button"
+                    disabled={page <= 1}
+                    onClick={() => setPage((p) => Math.max(1, p - 1))}
+                    className="p-1 rounded hover:bg-gray-100 dark:hover:bg-gray-800 disabled:opacity-40"
+                    title="Önceki Sayfa"
+                  >
+                    <ChevronLeft className="h-4 w-4" />
+                  </button>
+                  <button
+                    type="button"
+                    disabled={page >= totalPages}
+                    onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
+                    className="p-1 rounded hover:bg-gray-100 dark:hover:bg-gray-800 disabled:opacity-40"
+                    title="Sonraki Sayfa"
+                  >
+                    <ChevronRight className="h-4 w-4" />
+                  </button>
+                </div>
+              </div>
+            )}
+          </div>
         )}
       </Card>
 

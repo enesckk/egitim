@@ -95,7 +95,8 @@ public class ListStudentsHandler
             var term = query.SearchTerm.Trim();
             source = source.Where(s =>
                 s.FirstName.Contains(term) ||
-                s.LastName.Contains(term));
+                s.LastName.Contains(term) ||
+                (s.FirstName + " " + s.LastName).Contains(term));
         }
 
         // Order by name
