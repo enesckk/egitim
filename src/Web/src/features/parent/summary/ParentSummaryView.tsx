@@ -115,14 +115,20 @@ export const ParentSummaryView: React.FC<ParentSummaryViewProps> = ({
         grade: baseStudent.gradeLevel ? `${baseStudent.gradeLevel}. Sınıf` : '12. Sınıf',
         track: baseStudent.schoolName || 'Sayısal',
         examFocus: s360?.examTypes?.[0]?.name || s360?.recentExam?.examType || 'TYT / AYT',
-        coachName: primaryCoach?.name || 'Akademik Danışman',
+        coachName: primaryCoach?.name || 'Kurum Danışmanı',
         coachTitle: 'Öğrenci Koçu',
+        studentNumber: baseStudent.studentNumber ?? null,
       };
 
       const todayJsDay = new Date().getDay(); // 0=Sun, 1=Mon...
       const todayMondayIdx = todayJsDay === 0 ? 6 : todayJsDay - 1;
 
-      let planAdherencePercentage = 0;
+      let planAdherencePercentage: number | null = null;
+      let hasActivePlan = false;
+      let planTitle: string | undefined;
+      let completedTasksCount = 0;
+      let totalTasksCount = 0;
+
       const weeklyActivity: DayActivityItem[] = WEEK_DAYS_TR.map((day, idx) => ({
         day,
         done: false,
@@ -130,30 +136,41 @@ export const ParentSummaryView: React.FC<ParentSummaryViewProps> = ({
         today: idx === todayMondayIdx,
       }));
 
-      if (activePlan && activePlan.tasks?.length > 0) {
-        planAdherencePercentage = Math.round((activePlan.plan.taskProgressRate || 0) * 100);
+      if (activePlan && activePlan.plan) {
+        hasActivePlan = true;
+        planTitle = `Haftalık Çalışma Planı (${activePlan.plan.planDays} Gün)`;
+        const tasks = activePlan.tasks || [];
+        totalTasksCount = tasks.length > 0 ? tasks.length : activePlan.plan.totalTaskCount;
+        completedTasksCount = tasks.length > 0
+          ? tasks.filter((t) => t.isCompleted).length
+          : activePlan.plan.completedTaskCount;
+
+        planAdherencePercentage =
+          totalTasksCount > 0
+            ? Math.round((completedTasksCount / totalTasksCount) * 100)
+            : Math.round((activePlan.plan.taskProgressRate || 0) * 100);
+
+        // Daily activity mapping strictly from actual tasks
         for (let idx = 0; idx < 7; idx++) {
-          const dayTasks = activePlan.tasks.filter((t) => t.dayIndex === idx + 1);
-          const completedTasks = dayTasks.filter((t) => t.isCompleted);
-          const mins = completedTasks.reduce((sum, t) => sum + t.durationMinutes, 0);
+          const dayTasks = tasks.filter((t) => t.dayIndex === idx + 1);
+          const doneTasks = dayTasks.filter((t) => t.isCompleted);
+          const mins = doneTasks.reduce((sum, t) => sum + (t.durationMinutes || 0), 0);
           weeklyActivity[idx] = {
             day: WEEK_DAYS_TR[idx],
-            done: completedTasks.length > 0,
+            done: doneTasks.length > 0,
             hours: Math.round((mins / 60) * 10) / 10,
             today: idx === todayMondayIdx,
           };
         }
       } else if (coachTasks.length > 0) {
-        const doneTasks = coachTasks.filter(
+        // Fallback to coach tasks completion count if no study plan exists
+        const doneCoachTasks = coachTasks.filter(
           (t) => t.isCompleted || t.status === CoachTaskStatus.Completed
         );
-        planAdherencePercentage = Math.round((doneTasks.length / coachTasks.length) * 100);
-        doneTasks.forEach((t, idx) => {
-          const slot = idx % 7;
-          weeklyActivity[slot].done = true;
-          weeklyActivity[slot].hours =
-            Math.round((weeklyActivity[slot].hours + (t.durationMinutes || 30) / 60) * 10) / 10;
-        });
+        completedTasksCount = doneCoachTasks.length;
+        totalTasksCount = coachTasks.length;
+        planAdherencePercentage = Math.round((completedTasksCount / totalTasksCount) * 100);
+        planTitle = 'Koçluk Görevleri Takibi';
       }
 
       const strongSubjects = classifications
@@ -215,6 +232,7 @@ export const ParentSummaryView: React.FC<ParentSummaryViewProps> = ({
           }),
           label: s360.recentExam.title,
           note: `Toplam Net: ${s360.recentExam.totalNet}`,
+          type: 'exam',
         });
       }
 
@@ -230,6 +248,7 @@ export const ParentSummaryView: React.FC<ParentSummaryViewProps> = ({
             : 'Haftalık Görev',
           label: ct.title,
           note: ct.isCompleted ? 'Tamamlandı' : 'Koç Görevi',
+          type: 'task',
         });
       });
 
@@ -241,6 +260,10 @@ export const ParentSummaryView: React.FC<ParentSummaryViewProps> = ({
         }),
         weeklyActivity,
         planAdherencePercentage,
+        hasActivePlan,
+        planTitle,
+        completedTasksCount,
+        totalTasksCount,
         academicStatus,
         upcomingEvents,
       });
@@ -276,11 +299,13 @@ export const ParentSummaryView: React.FC<ParentSummaryViewProps> = ({
   // Loading State
   if (activeLoading) {
     return (
-      <div className="max-w-2xl mx-auto px-4 sm:px-6 py-6 space-y-4 select-none" data-testid="parent-summary-loading">
-        <Skeleton className="h-10 w-48 rounded-xl" />
-        <Skeleton className="h-24 w-full rounded-2xl" />
+      <div className="max-w-6xl mx-auto space-y-4 select-none p-4" data-testid="parent-summary-loading">
+        <Skeleton className="h-28 w-full rounded-3xl" />
         <Skeleton className="h-44 w-full rounded-2xl" />
-        <Skeleton className="h-64 w-full rounded-2xl" />
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <Skeleton className="h-64 w-full rounded-2xl" />
+          <Skeleton className="h-64 w-full rounded-2xl" />
+        </div>
       </div>
     );
   }
@@ -288,7 +313,7 @@ export const ParentSummaryView: React.FC<ParentSummaryViewProps> = ({
   // Error State
   if (activeError) {
     return (
-      <div className="max-w-2xl mx-auto px-4 sm:px-6 py-10 space-y-4 select-none" data-testid="parent-summary-error">
+      <div className="max-w-6xl mx-auto py-8 space-y-4 select-none p-4" data-testid="parent-summary-error">
         <Alert
           variant="danger"
           icon={<AlertCircle className="h-5 w-5" />}
@@ -313,7 +338,7 @@ export const ParentSummaryView: React.FC<ParentSummaryViewProps> = ({
   // Empty State
   if (!activeData || !activeData.student) {
     return (
-      <div className="max-w-2xl mx-auto px-4 sm:px-6 py-6 select-none space-y-4" data-testid="parent-summary-empty">
+      <div className="max-w-6xl mx-auto select-none space-y-4 p-4" data-testid="parent-summary-empty">
         <div className="mb-2">
           <h1 className="font-serif text-2xl sm:text-3xl text-neutral-900 leading-tight">
             Öğrenci Özeti
@@ -329,45 +354,58 @@ export const ParentSummaryView: React.FC<ParentSummaryViewProps> = ({
   }
 
   return (
-    <div className="max-w-2xl mx-auto px-4 sm:px-6 py-6 select-none space-y-4" data-testid="parent-summary-view">
+    <div className="max-w-6xl mx-auto select-none space-y-4 sm:space-y-6 p-4" data-testid="parent-summary-view">
       {/* 1. Page Header */}
-      <div className="mb-2">
-        <h1 className="font-serif text-2xl sm:text-3xl text-neutral-900 leading-tight">
-          Öğrenci Özeti
-        </h1>
-        <p className="text-xs sm:text-sm text-neutral-400 mt-0.5">
-          Güncellendi: {activeData.lastUpdated}
-        </p>
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-1">
+        <div>
+          <h1 className="font-serif text-2xl sm:text-3xl font-bold text-navy-950 tracking-tight">
+            Öğrenci Özeti
+          </h1>
+          <p className="text-xs sm:text-sm text-neutral-500 mt-0.5">
+            Çocuğunuzun güncel akademik performansı, haftalık çalışma durumu ve koçluk etkinlikleri
+          </p>
+        </div>
+        <div className="text-xs text-neutral-400 self-start sm:self-auto bg-neutral-100/80 px-2.5 py-1 rounded-full border border-neutral-200">
+          Son Güncelleme: {activeData.lastUpdated}
+        </div>
       </div>
 
-      {/* 2. Child Identity Hero Card */}
+      {/* 2. Child Identity Hero Banner */}
       <ChildHeroCard student={activeData.student} />
 
-      {/* 3. Weekly Summary Card */}
+      {/* 2. Weekly Progress & Activity Card */}
       <WeeklyActivityCard
         activity={activeData.weeklyActivity}
         planAdherencePercentage={activeData.planAdherencePercentage}
+        hasActivePlan={activeData.hasActivePlan}
+        planTitle={activeData.planTitle}
+        completedTasksCount={activeData.completedTasksCount}
+        totalTasksCount={activeData.totalTasksCount}
       />
 
-      {/* 4. AI Academic Summary for Parent */}
+      {/* 3. AI Academic Summary for Parent */}
       {activeData.student?.id && (
         <AcademicAiSummaryCard studentId={activeData.student.id} audience="parent" />
       )}
 
-      {/* 5. Question Style Performance for Parent (simplified read-only) */}
+      {/* 4. Question Style Analytics for Parent (Read-only) */}
       {activeData.student?.id && (
-        <QuestionStyleAnalyticsSection
-          studentId={activeData.student.id}
-          isReadOnly
-          simplified
-        />
+        <div className="bg-white rounded-2xl border border-neutral-200/80 p-4 sm:p-5 shadow-soft-xs">
+          <QuestionStyleAnalyticsSection
+            studentId={activeData.student.id}
+            isReadOnly
+            simplified
+          />
+        </div>
       )}
 
-      {/* 6. Academic Status Qualitative Cards */}
-      <AcademicStatusCard items={activeData.academicStatus} />
-
-      {/* 7. Upcoming Events */}
-      <UpcomingCard events={activeData.upcomingEvents} />
+      {/* 5. Academic Status & Upcoming Events Grid */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+        <AcademicStatusCard items={activeData.academicStatus} />
+        <UpcomingCard events={activeData.upcomingEvents} />
+      </div>
     </div>
   );
 };
+
+export default ParentSummaryView;

@@ -12,35 +12,41 @@ export const AcademicStatusCard: React.FC<AcademicStatusCardProps> = ({ items })
     switch (type) {
       case 'strengthening':
         return {
-          icon: <TrendingUp className="h-4 w-4 text-success" />,
-          cardBg: 'bg-success-light border-green-200',
-          labelColor: 'text-success-dark',
+          icon: <TrendingUp className="h-4 w-4 text-emerald-600" />,
+          cardBg: 'bg-emerald-50/60 border-emerald-200/80',
+          labelColor: 'text-emerald-800',
         };
       case 'developing':
         return {
-          icon: <Award className="h-4 w-4 text-primary-600" />,
-          cardBg: 'bg-primary-50 border-primary-100',
-          labelColor: 'text-primary-700',
+          icon: <Award className="h-4 w-4 text-blue-600" />,
+          cardBg: 'bg-blue-50/60 border-blue-200/80',
+          labelColor: 'text-blue-800',
         };
       case 'priority':
         return {
-          icon: <AlertTriangle className="h-4 w-4 text-warning" />,
-          cardBg: 'bg-warning-light border-amber-200',
-          labelColor: 'text-warning-dark',
+          icon: <AlertTriangle className="h-4 w-4 text-amber-600" />,
+          cardBg: 'bg-amber-50/60 border-amber-200/80',
+          labelColor: 'text-amber-800',
         };
       case 'repetition':
         return {
-          icon: <RefreshCw className="h-4 w-4 text-attention" />,
-          cardBg: 'bg-attention-light border-purple-200',
-          labelColor: 'text-attention-dark',
+          icon: <RefreshCw className="h-4 w-4 text-purple-600" />,
+          cardBg: 'bg-purple-50/60 border-purple-200/80',
+          labelColor: 'text-purple-800',
         };
     }
   };
 
   return (
-    <div className="select-none">
-      <h2 className="font-semibold text-neutral-800 text-sm mb-3 px-1">Akademik Durum</h2>
-      <div className="space-y-2.5">
+    <div className="bg-white rounded-2xl border border-neutral-200/80 p-4 sm:p-5 shadow-soft-xs select-none space-y-3.5">
+      <div className="flex items-center justify-between">
+        <h2 className="font-bold text-neutral-900 text-sm sm:text-base">
+          Akademik Durum ve Ders Odakları
+        </h2>
+        <span className="text-xs text-neutral-400">Son deneme analizleri bazlı</span>
+      </div>
+
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
         {items.map((item) => {
           const config = getCategoryConfig(item.categoryType);
 
@@ -48,21 +54,21 @@ export const AcademicStatusCard: React.FC<AcademicStatusCardProps> = ({ items })
             <div
               key={item.category}
               className={cn(
-                'rounded-xl border p-3.5 sm:p-4 flex items-start gap-3 transition-colors',
+                'rounded-xl border p-3.5 flex items-start gap-3 transition-colors',
                 config.cardBg
               )}
             >
-              <div className="mt-0.5 flex-shrink-0">{config.icon}</div>
+              <div className="mt-0.5 shrink-0">{config.icon}</div>
               <div className="flex-1 min-w-0">
                 <div className="flex items-center gap-2 mb-1 flex-wrap">
-                  <span className={cn('text-xs font-semibold', config.labelColor)}>
+                  <span className={cn('text-xs font-bold', config.labelColor)}>
                     {item.category}
                   </span>
                   <div className="flex flex-wrap gap-1">
                     {item.subjects.map((s) => (
                       <span
                         key={s}
-                        className="text-xs font-medium text-neutral-700 bg-white/80 px-2 py-0.5 rounded-full border border-neutral-100/50"
+                        className="text-xs font-medium text-neutral-800 bg-white px-2 py-0.5 rounded-full border border-neutral-200 shadow-soft-xs"
                       >
                         {s}
                       </span>
