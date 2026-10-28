@@ -1,9 +1,18 @@
 import React, { useState, useEffect } from 'react';
-import { X, CheckCircle2, AlertTriangle, XCircle, UserCheck } from 'lucide-react';
-import { cn } from '@/lib/utils';
+import {
+  X,
+  UserCheck,
+  CheckCircle2,
+  AlertCircle,
+  Building2,
+  Calendar,
+  GraduationCap,
+  Users,
+} from 'lucide-react';
 import { Button } from '@/components/ui/Button';
 import { AdminStudentDirectoryItem } from '../types';
 import { adminService, CoachSummaryDto } from '@/services/adminService';
+import { academicService, Student360Dto } from '@/services/academicService';
 
 export interface StudentModalProps {
   student: AdminStudentDirectoryItem;
@@ -22,19 +31,30 @@ export const StudentModal: React.FC<StudentModalProps> = ({
   const [assignSuccess, setAssignSuccess] = useState(false);
   const [assignError, setAssignError] = useState<string | null>(null);
 
+  const [student360, setStudent360] = useState<Student360Dto | null>(null);
+  const [isLoading360, setIsLoading360] = useState(true);
+
   useEffect(() => {
-    adminService
-      .listCoaches({ page: 1, pageSize: 50 })
-      .then((res) => {
-        setCoaches(res?.items || []);
-      })
-      .catch(() => {
-        // Ignored in offline/mock mode
-      });
-  }, []);
+    let active = true;
+    setIsLoading360(true);
+
+    Promise.all([
+      adminService.listCoaches({ page: 1, pageSize: 50 }).catch(() => null),
+      academicService.getStudent360(student.id).catch(() => null),
+    ]).then(([coachRes, s360]) => {
+      if (!active) return;
+      if (coachRes?.items) setCoaches(coachRes.items);
+      if (s360) setStudent360(s360);
+      setIsLoading360(false);
+    });
+
+    return () => {
+      active = false;
+    };
+  }, [student.id]);
 
   const handleAssignCoach = async () => {
-    if (!selectedCoachId) return;
+    if (!selectedCoachId || isAssigning) return;
     setIsAssigning(true);
     setAssignError(null);
     setAssignSuccess(false);
@@ -42,6 +62,8 @@ export const StudentModal: React.FC<StudentModalProps> = ({
     try {
       await adminService.assignCoach(student.id, selectedCoachId);
       setAssignSuccess(true);
+      const updated360 = await academicService.getStudent360(student.id).catch(() => null);
+      if (updated360) setStudent360(updated360);
       if (onStudentUpdated) {
         onStudentUpdated();
       }
@@ -52,30 +74,8 @@ export const StudentModal: React.FC<StudentModalProps> = ({
     }
   };
 
-  const getStatusBadge = (status: AdminStudentDirectoryItem['status']) => {
-    switch (status) {
-      case 'takipte':
-        return {
-          label: 'Takipte',
-          icon: <CheckCircle2 className="h-3.5 w-3.5 text-success" />,
-          badge: 'bg-success-light text-success-dark border-green-200',
-        };
-      case 'dikkat':
-        return {
-          label: 'Dikkat',
-          icon: <AlertTriangle className="h-3.5 w-3.5 text-warning" />,
-          badge: 'bg-warning-light text-warning-dark border-amber-200',
-        };
-      case 'kritik':
-        return {
-          label: 'Kritik',
-          icon: <XCircle className="h-3.5 w-3.5 text-danger" />,
-          badge: 'bg-danger-light text-danger-dark border-red-200',
-        };
-    }
-  };
-
-  const statusConfig = getStatusBadge(student.status);
+  const assignedCoach = student360?.coaches?.find((c) => c.isPrimary) || student360?.coaches?.[0];
+  const linkedParent = student360?.parents?.[0];
 
   return (
     <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-4">
@@ -83,93 +83,115 @@ export const StudentModal: React.FC<StudentModalProps> = ({
         className="absolute inset-0 bg-navy-950/40 backdrop-blur-xs transition-opacity"
         onClick={onClose}
       />
-      <div className="relative w-full max-w-md bg-white rounded-2xl shadow-2xl overflow-hidden select-none border border-neutral-100">
-        {/* Header */}
-        <div className="bg-navy-900 px-6 py-5 text-white">
+      <div className="relative w-full max-w-lg bg-white rounded-3xl shadow-2xl overflow-hidden select-none border border-neutral-200 animate-fadeIn">
+        {/* Header Banner */}
+        <div className="bg-[#14233E] px-6 py-5 text-white">
           <div className="flex items-start justify-between">
             <div className="flex items-center gap-3">
-              <div className="w-10 h-10 rounded-full bg-navy-700 text-white text-sm font-semibold flex items-center justify-center flex-shrink-0">
+              <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-primary-500 to-primary-700 text-white text-base font-bold flex items-center justify-center shrink-0 shadow-soft-xs">
                 {student.initials}
               </div>
               <div className="min-w-0">
-                <p className="text-white font-semibold leading-tight truncate">{student.name}</p>
-                <p className="text-navy-300 text-xs mt-0.5">
-                  {student.grade}. Sınıf · {student.exam} · {student.field}
+                <p className="text-white font-serif font-bold text-lg leading-tight truncate">
+                  {student.name}
+                </p>
+                <p className="text-neutral-300 text-xs mt-0.5 font-medium">
+                  {student.grade} · {student.exam}
+                  {student.studentNumber ? ` · No: #${student.studentNumber}` : ''}
                 </p>
               </div>
             </div>
             <button
               type="button"
               onClick={onClose}
-              className="text-navy-300 hover:text-white p-1 rounded-lg hover:bg-navy-800 transition-colors"
+              className="text-neutral-400 hover:text-white p-1.5 rounded-xl hover:bg-white/10 transition-colors"
               aria-label="Kapat"
             >
-              <X className="h-4 w-4" />
+              <X className="h-5 w-5" />
             </button>
           </div>
         </div>
 
-        {/* Body */}
-        <div className="p-6 space-y-4">
-          <div className="flex items-center gap-3">
-            <span
-              className={cn(
-                'inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold border',
-                statusConfig.badge
-              )}
-            >
-              {statusConfig.icon}
-              {statusConfig.label}
-            </span>
-          </div>
+        {/* Modal Body */}
+        <div className="p-6 space-y-4 max-h-[75vh] overflow-y-auto">
+          {/* Status & School Card */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            <div className="bg-[#F8F7F3] p-3.5 rounded-2xl border border-neutral-200/80">
+              <span className="text-[11px] font-bold text-neutral-400 uppercase tracking-wider block">
+                Öğrenci Durumu
+              </span>
+              <div className="flex items-center gap-2 mt-1">
+                <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-bold bg-emerald-50 text-emerald-700 border border-emerald-200">
+                  <CheckCircle2 className="h-3 w-3" />
+                  {student.status === 'Active' ? 'Aktif Kayıt' : student.status}
+                </span>
+              </div>
+            </div>
 
-          <div className="grid grid-cols-2 gap-3">
-            <div className="bg-surface-alt rounded-xl p-3 border border-neutral-100">
-              <p className="text-xs text-neutral-400 mb-1">Plan Uyumu</p>
-              <p
-                className={cn(
-                  'font-mono text-xl font-bold',
-                  student.planAdherence >= 80
-                    ? 'text-success'
-                    : student.planAdherence >= 50
-                    ? 'text-warning-dark'
-                    : 'text-danger'
-                )}
-              >
-                %{student.planAdherence}
+            <div className="bg-[#F8F7F3] p-3.5 rounded-2xl border border-neutral-200/80">
+              <span className="text-[11px] font-bold text-neutral-400 uppercase tracking-wider block">
+                Kayıt Tarihi
+              </span>
+              <p className="text-xs font-semibold text-neutral-800 mt-1 flex items-center gap-1.5">
+                <Calendar className="h-3.5 w-3.5 text-neutral-400" />
+                {student.createdAt
+                  ? new Date(student.createdAt).toLocaleDateString('tr-TR', {
+                      day: 'numeric',
+                      month: 'long',
+                      year: 'numeric',
+                    })
+                  : '—'}
               </p>
             </div>
-            <div className="bg-surface-alt rounded-xl p-3 border border-neutral-100">
-              <p className="text-xs text-neutral-400 mb-1">Son Aktivite</p>
-              <p className="text-sm font-semibold text-neutral-800">{student.lastActivity}</p>
-            </div>
           </div>
 
-          <div className="space-y-1.5 text-xs text-neutral-600 bg-neutral-50 p-3 rounded-xl">
-            {student.coach && (
-              <div>
-                <span className="text-neutral-400">Atanmış Koç:</span>{' '}
-                <strong className="text-neutral-800">{student.coach}</strong>
-              </div>
-            )}
-            {student.branch && (
-              <div>
-                <span className="text-neutral-400">Kayıtlı Şube:</span>{' '}
-                <strong className="text-neutral-800">{student.branch} Şubesi</strong>
-              </div>
-            )}
+          {/* School & Parent Info */}
+          <div className="space-y-2 text-xs text-neutral-700 bg-neutral-50/80 p-4 rounded-2xl border border-neutral-200/70">
+            <div className="flex items-center justify-between pb-2 border-b border-neutral-200/60">
+              <span className="text-neutral-400 font-medium flex items-center gap-1.5">
+                <Building2 className="h-3.5 w-3.5 text-neutral-400" />
+                Kayıtlı Okul:
+              </span>
+              <span className="font-semibold text-neutral-800">
+                {student.schoolName || 'Kurum İçi Öğrenci'}
+              </span>
+            </div>
+
+            <div className="flex items-center justify-between pb-2 border-b border-neutral-200/60">
+              <span className="text-neutral-400 font-medium flex items-center gap-1.5">
+                <GraduationCap className="h-3.5 w-3.5 text-neutral-400" />
+                Danışman Koç:
+              </span>
+              <span className="font-semibold text-neutral-800">
+                {isLoading360 ? 'Yükleniyor...' : assignedCoach ? assignedCoach.name : 'Atanmamış'}
+              </span>
+            </div>
+
+            <div className="flex items-center justify-between">
+              <span className="text-neutral-400 font-medium flex items-center gap-1.5">
+                <Users className="h-3.5 w-3.5 text-neutral-400" />
+                Bağlı Veli:
+              </span>
+              <span className="font-semibold text-neutral-800">
+                {isLoading360
+                  ? 'Yükleniyor...'
+                  : linkedParent
+                  ? `${linkedParent.name} (${linkedParent.relationshipType || 'Veli'})`
+                  : 'Veli Tanımlanmamış'}
+              </span>
+            </div>
           </div>
 
           {/* Coach Assignment Section */}
-          <div className="pt-2 border-t border-neutral-100 space-y-2">
-            <label className="text-xs font-semibold text-neutral-700 block">
-              Koç Ata veya Değiştir
+          <div className="pt-3 border-t border-neutral-100 space-y-2.5">
+            <label className="text-xs font-bold text-navy-950 uppercase tracking-wider block">
+              Danışman Koç Ata / Değiştir
             </label>
-            <div className="flex items-center gap-2">
+            <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2">
               <select
                 value={selectedCoachId}
                 onChange={(e) => setSelectedCoachId(e.target.value)}
-                className="flex-1 px-3 py-2 text-xs rounded-xl border border-neutral-200 bg-white text-neutral-800 focus:outline-none focus:ring-2 focus:ring-primary-500"
+                className="flex-1 px-3.5 py-2.5 text-xs rounded-xl border border-neutral-200 bg-white text-neutral-800 focus:outline-none focus:ring-2 focus:ring-primary-500 font-medium"
               >
                 <option value="">Koç seçiniz...</option>
                 {coaches.map((c) => (
@@ -183,24 +205,33 @@ export const StudentModal: React.FC<StudentModalProps> = ({
                 size="sm"
                 onClick={handleAssignCoach}
                 disabled={!selectedCoachId || isAssigning}
-                leftIcon={<UserCheck className="h-3.5 w-3.5" />}
+                leftIcon={<UserCheck className="h-4 w-4" />}
+                className="bg-[#315FE8] hover:bg-blue-700 rounded-xl font-semibold h-10 px-4"
               >
                 {isAssigning ? 'Atanıyor...' : 'Ata'}
               </Button>
             </div>
+
             {assignSuccess && (
-              <p className="text-xs text-success font-medium">Koç başarıyla atandı.</p>
+              <p className="text-xs text-emerald-700 bg-emerald-50 border border-emerald-200 p-2.5 rounded-xl font-medium flex items-center gap-1.5">
+                <CheckCircle2 className="h-4 w-4 shrink-0" />
+                Koç ataması başarıyla güncellendi.
+              </p>
             )}
+
             {assignError && (
-              <p className="text-xs text-danger font-medium">{assignError}</p>
+              <p className="text-xs text-rose-700 bg-rose-50 border border-rose-200 p-2.5 rounded-xl font-medium flex items-center gap-1.5">
+                <AlertCircle className="h-4 w-4 shrink-0" />
+                {assignError}
+              </p>
             )}
           </div>
 
-          <div className="pt-2">
+          <div className="pt-3 border-t border-neutral-100">
             <Button
               variant="secondary"
               size="md"
-              className="w-full"
+              className="w-full rounded-xl font-semibold"
               onClick={onClose}
             >
               Kapat
@@ -211,3 +242,5 @@ export const StudentModal: React.FC<StudentModalProps> = ({
     </div>
   );
 };
+
+export default StudentModal;

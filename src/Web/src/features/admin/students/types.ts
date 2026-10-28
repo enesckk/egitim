@@ -1,32 +1,29 @@
-export type StudentStatus = 'takipte' | 'dikkat' | 'kritik';
+export type StudentStatus = 'Active' | 'Inactive';
 
 export interface AdminStudentDirectoryItem {
   id: string;
   name: string;
   initials: string;
   grade: string;
+  gradeLevel?: number | null;
   exam: string;
-  field: string;
-  status: StudentStatus;
-  planAdherence: number;
-  lastActivity: string;
-  lastActivityDays: number;
-  coach: string;
-  branch: string;
+  schoolName?: string | null;
+  studentNumber?: string | null;
+  status: string;
+  enrollmentDate?: string | null;
+  createdAt: string;
 }
 
 export interface AdminStudentFilterState {
   search: string;
   grade: string;
-  exam: string;
-  field: string;
   status: string;
-  adherence: string;
-  activity: string;
-  coach: string;
-  branch: string;
 }
 
 export interface AdminStudentDirectoryViewModel {
   students: AdminStudentDirectoryItem[];
+  totalCount?: number;
+  page?: number;
+  pageSize?: number;
+  totalPages?: number;
 }

@@ -1,16 +1,14 @@
 import React, { useState, useMemo, useEffect, useCallback } from 'react';
 import {
   Search,
-  Filter,
   CheckCircle2,
-  AlertTriangle,
-  XCircle,
   ChevronRight,
+  ChevronLeft,
   AlertCircle,
   RefreshCw,
   UserPlus,
+  GraduationCap,
 } from 'lucide-react';
-import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/Button';
 import { Alert } from '@/components/ui/Alert';
 import { Skeleton } from '@/components/ui/Skeleton';
@@ -21,46 +19,14 @@ import {
   AdminStudentDirectoryItem,
   AdminStudentDirectoryViewModel,
   AdminStudentFilterState,
-  StudentStatus,
 } from './types';
 import { StudentModal } from './components/StudentModal';
 
 const EMPTY_FILTERS: AdminStudentFilterState = {
   search: '',
   grade: '',
-  exam: '',
-  field: '',
   status: '',
-  adherence: '',
-  activity: '',
-  coach: '',
-  branch: '',
 };
-
-const STATUS_CONFIG = {
-  takipte: {
-    label: 'Takipte',
-    icon: <CheckCircle2 className="h-3.5 w-3.5 text-success" />,
-    badge: 'bg-success-light text-success-dark border-green-200',
-  },
-  dikkat: {
-    label: 'Dikkat',
-    icon: <AlertTriangle className="h-3.5 w-3.5 text-warning" />,
-    badge: 'bg-warning-light text-warning-dark border-amber-200',
-  },
-  kritik: {
-    label: 'Kritik',
-    icon: <XCircle className="h-3.5 w-3.5 text-danger" />,
-    badge: 'bg-danger-light text-danger-dark border-red-200',
-  },
-};
-
-const ADHERENCE_COLOR = (v: number) =>
-  v >= 80
-    ? 'text-success font-bold'
-    : v >= 50
-    ? 'text-warning-dark font-semibold'
-    : 'text-danger font-bold';
 
 function mapStudentSummaryToItem(dto: StudentSummaryDto): AdminStudentDirectoryItem {
   const fullName = dto.fullName || `${dto.firstName || ''} ${dto.lastName || ''}`.trim() || 'Öğrenci';
@@ -80,14 +46,13 @@ function mapStudentSummaryToItem(dto: StudentSummaryDto): AdminStudentDirectoryI
     name: fullName,
     initials,
     grade: dto.gradeLevel ? `${dto.gradeLevel}. Sınıf` : '12. Sınıf',
+    gradeLevel: dto.gradeLevel,
     exam: 'YKS',
-    field: dto.schoolName || 'Genel Alan',
-    status: 'takipte' as StudentStatus,
-    planAdherence: 85,
-    lastActivity: dto.createdAt ? new Date(dto.createdAt).toLocaleDateString('tr-TR') : 'Aktif',
-    lastActivityDays: 0,
-    coach: '',
-    branch: 'Merkez',
+    schoolName: dto.schoolName,
+    studentNumber: dto.studentNumber,
+    status: dto.status || 'Active',
+    enrollmentDate: dto.enrollmentDate,
+    createdAt: dto.createdAt,
   };
 }
 
@@ -108,8 +73,13 @@ export const StudentDirectoryView: React.FC<StudentDirectoryViewProps> = ({
   const [isLoading, setIsLoading] = useState<boolean>(propIsLoading || (!initialData && !propErrorMessage));
   const [errorMessage, setErrorMessage] = useState<string | undefined>(propErrorMessage);
 
+  // Pagination & Filters
+  const [page, setPage] = useState<number>(1);
+  const pageSize = 100;
+  const [totalCount, setTotalCount] = useState<number>(0);
+  const [totalPages, setTotalPages] = useState<number>(1);
+
   const [filters, setFilters] = useState<AdminStudentFilterState>(EMPTY_FILTERS);
-  const [filtersOpen, setFiltersOpen] = useState(false);
   const [selectedStudent, setSelectedStudent] = useState<AdminStudentDirectoryItem | null>(null);
 
   // New Student Modal state
@@ -119,7 +89,9 @@ export const StudentDirectoryView: React.FC<StudentDirectoryViewProps> = ({
   const [newEmail, setNewEmail] = useState('');
   const [newPassword, setNewPassword] = useState('Ogrenci@123!');
   const [newGradeLevel, setNewGradeLevel] = useState('12');
-  const [newTargetExam, setNewTargetExam] = useState('YKS');
+  const [newSchoolName, setNewSchoolName] = useState('');
+  const [newStudentNumber, setNewStudentNumber] = useState('');
+  const [newTargetExam] = useState('YKS');
   const [isCreating, setIsCreating] = useState(false);
   const [createError, setCreateError] = useState<string | null>(null);
 
@@ -129,16 +101,23 @@ export const StudentDirectoryView: React.FC<StudentDirectoryViewProps> = ({
     setErrorMessage(undefined);
 
     try {
-      const res = await adminService.listStudents({ page: 1, pageSize: 100 });
+      const res = await adminService.listStudents({
+        page,
+        pageSize,
+        searchTerm: filters.search.trim() || undefined,
+      });
+
       const items = (res?.items || []).map(mapStudentSummaryToItem);
       setData({ students: items });
+      setTotalCount(res?.totalCount || items.length);
+      setTotalPages(res?.totalPages || 1);
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : 'Öğrenci listesi alınamadı.';
       setErrorMessage(msg);
     } finally {
       setIsLoading(false);
     }
-  }, [initialData]);
+  }, [initialData, page, filters.search]);
 
   useEffect(() => {
     if (initialData) {
@@ -159,8 +138,8 @@ export const StudentDirectoryView: React.FC<StudentDirectoryViewProps> = ({
 
   const handleCreateStudent = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!newFirstName || !newLastName || !newEmail || !newPassword) {
-      setCreateError('Lütfen tüm zorunlu alanları doldurunuz.');
+    if (!newFirstName.trim() || !newLastName.trim()) {
+      setCreateError('Lütfen ad ve soyad alanlarını doldurunuz.');
       return;
     }
 
@@ -168,22 +147,24 @@ export const StudentDirectoryView: React.FC<StudentDirectoryViewProps> = ({
     setCreateError(null);
 
     try {
-      // Backend-atomic provisioning: Creates user and student profile transactionally
       await adminService.createStudent({
         firstName: newFirstName.trim(),
         lastName: newLastName.trim(),
-        email: newEmail.trim(),
-        password: newPassword,
-        targetExam: newTargetExam,
+        email: newEmail.trim() || undefined,
+        password: newPassword || undefined,
         gradeLevel: parseInt(newGradeLevel, 10) || 12,
+        schoolName: newSchoolName.trim() || undefined,
+        studentNumber: newStudentNumber.trim() || undefined,
+        targetExam: newTargetExam || 'YKS',
       });
 
-      // Reset form and refresh list
       setIsAddModalOpen(false);
       setNewFirstName('');
       setNewLastName('');
       setNewEmail('');
-      setNewPassword('Ogrenci@123!');
+      setNewSchoolName('');
+      setNewStudentNumber('');
+      setPage(1);
       await fetchStudents();
     } catch (err: unknown) {
       setCreateError(err instanceof Error ? err.message : 'Öğrenci kaydı oluşturulamadı.');
@@ -196,62 +177,29 @@ export const StudentDirectoryView: React.FC<StudentDirectoryViewProps> = ({
   const activeLoading = propIsLoading || isLoading;
   const activeError = propErrorMessage || errorMessage;
 
-  const activeFilterCount = Object.entries(filters).filter(
-    ([k, v]) => v !== '' && k !== 'search'
-  ).length;
-
-  const setFilter = (key: keyof AdminStudentFilterState, value: string) => {
-    setFilters((prev) => ({ ...prev, [key]: value }));
-  };
-
-  const clearFilters = () => setFilters(EMPTY_FILTERS);
-
-  const filtered = useMemo(() => {
+  const filteredStudents = useMemo(() => {
     return activeData.students.filter((s) => {
-      if (
-        filters.search &&
-        !s.name.toLowerCase().includes(filters.search.toLowerCase()) &&
-        !s.coach?.toLowerCase().includes(filters.search.toLowerCase())
-      ) {
+      if (filters.grade && s.gradeLevel !== parseInt(filters.grade, 10)) {
         return false;
       }
-      if (filters.grade && s.grade !== filters.grade) return false;
-      if (filters.exam && s.exam !== filters.exam) return false;
-      if (filters.field && s.field !== filters.field) return false;
-      if (filters.status && s.status !== filters.status) return false;
-      if (filters.adherence) {
-        if (filters.adherence === 'high' && s.planAdherence < 80) return false;
-        if (filters.adherence === 'mid' && (s.planAdherence < 50 || s.planAdherence >= 80)) return false;
-        if (filters.adherence === 'low' && s.planAdherence >= 50) return false;
+      if (filters.status && s.status.toLowerCase() !== filters.status.toLowerCase()) {
+        return false;
       }
-      if (filters.activity) {
-        if (filters.activity === '1' && s.lastActivityDays > 1) return false;
-        if (filters.activity === '3' && s.lastActivityDays > 3) return false;
-        if (filters.activity === '7' && s.lastActivityDays > 7) return false;
-        if (filters.activity === '7+' && s.lastActivityDays <= 7) return false;
-      }
-      if (filters.coach && s.coach !== filters.coach) return false;
-      if (filters.branch && s.branch !== filters.branch) return false;
       return true;
     });
-  }, [activeData.students, filters]);
-
-  const coaches = useMemo(
-    () => [...new Set(activeData.students.map((s) => s.coach).filter(Boolean))],
-    [activeData.students]
-  );
-  const branches = useMemo(
-    () => [...new Set(activeData.students.map((s) => s.branch).filter(Boolean))],
-    [activeData.students]
-  );
+  }, [activeData.students, filters.grade, filters.status]);
 
   // Loading State
   if (activeLoading) {
     return (
-      <div className="max-w-6xl mx-auto space-y-4 select-none" data-testid="admin-students-loading">
+      <div className="max-w-6xl mx-auto space-y-4 select-none p-4" data-testid="admin-students-loading">
         <Skeleton className="h-10 w-48 rounded-xl" />
-        <Skeleton className="h-12 w-full rounded-xl" />
-        <Skeleton className="h-96 w-full rounded-2xl" />
+        <Skeleton className="h-12 w-full rounded-2xl" />
+        <div className="space-y-2">
+          {Array.from({ length: 5 }).map((_, i) => (
+            <Skeleton key={i} className="h-16 w-full rounded-2xl" />
+          ))}
+        </div>
       </div>
     );
   }
@@ -259,7 +207,7 @@ export const StudentDirectoryView: React.FC<StudentDirectoryViewProps> = ({
   // Error State
   if (activeError) {
     return (
-      <div className="max-w-6xl mx-auto py-10 space-y-4 select-none" data-testid="admin-students-error">
+      <div className="max-w-6xl mx-auto py-10 space-y-4 select-none p-4" data-testid="admin-students-error">
         <Alert
           variant="danger"
           icon={<AlertCircle className="h-5 w-5" />}
@@ -282,236 +230,175 @@ export const StudentDirectoryView: React.FC<StudentDirectoryViewProps> = ({
   }
 
   return (
-    <div className="max-w-6xl mx-auto select-none space-y-4 sm:space-y-6" data-testid="admin-students-view">
+    <div className="max-w-6xl mx-auto select-none space-y-4 sm:space-y-6 p-4" data-testid="admin-students-view">
       {/* 1. Header */}
-      <div className="flex items-start justify-between">
+      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 border-b border-neutral-200/70 pb-4">
         <div>
-          <h1 className="font-serif text-2xl sm:text-3xl text-neutral-900 leading-tight">
-            Öğrenciler
-          </h1>
-          <p className="text-xs sm:text-sm text-neutral-400 mt-0.5">
-            Kurum geneli {filtered.length} kayıtlı öğrenci
+          <div className="flex items-center gap-2.5 flex-wrap">
+            <h1 className="font-serif text-2xl sm:text-3xl font-bold text-navy-950 tracking-tight leading-tight">
+              Öğrenciler
+            </h1>
+            <span className="text-xs font-bold text-primary-700 bg-primary-50 px-2.5 py-0.5 rounded-full border border-primary-100">
+              {filteredStudents.length !== (totalCount || activeData.students.length)
+                ? `${filteredStudents.length} / ${totalCount || activeData.students.length} Kayıtlı Öğrenci`
+                : `${totalCount || activeData.students.length} Kayıtlı Öğrenci`}
+            </span>
+          </div>
+          <p className="text-xs sm:text-sm text-neutral-500 mt-1">
+            Kuruma kayıtlı öğrencilerin akademik profil, koçluk ataması ve kademe takibi
           </p>
         </div>
+
         <Button
           variant="primary"
           size="sm"
           onClick={() => setIsAddModalOpen(true)}
           leftIcon={<UserPlus className="h-4 w-4" />}
+          className="bg-[#315FE8] hover:bg-blue-700 rounded-xl shadow-soft-xs font-semibold w-full md:w-auto shrink-0 py-2.5 px-4"
         >
           Yeni Öğrenci Ekle
         </Button>
       </div>
 
-      {/* 2. Search + Filter Bar */}
-      <div className="flex items-center gap-3">
-        <div className="relative flex-1 max-w-sm">
+      {/* 2. Filters & Search Bar */}
+      <div className="bg-white p-3.5 sm:p-4 rounded-2xl border border-neutral-200/80 shadow-soft-xs flex flex-col md:flex-row items-stretch md:items-center justify-between gap-3">
+        <div className="relative flex-1 w-full min-w-0 md:max-w-md">
           <Search className="h-4 w-4 absolute left-3.5 top-1/2 -translate-y-1/2 text-neutral-400 pointer-events-none" />
           <input
             type="search"
-            placeholder="Öğrenci veya koç ara..."
+            placeholder="Öğrenci adı, okul veya numara ara..."
             value={filters.search}
-            onChange={(e) => setFilter('search', e.target.value)}
-            className="w-full pl-10 pr-4 py-2.5 rounded-xl border border-neutral-200 bg-white text-xs sm:text-sm text-neutral-900 placeholder:text-neutral-400 focus:outline-none focus:ring-2 focus:ring-primary-500 transition-colors shadow-soft-xs"
+            onChange={(e) => setFilters((prev) => ({ ...prev, search: e.target.value }))}
+            className="w-full pl-10 pr-4 py-2.5 rounded-xl border border-neutral-200 bg-neutral-50/60 text-xs sm:text-sm text-neutral-900 placeholder:text-neutral-400 focus:outline-none focus:ring-2 focus:ring-primary-500/20 focus:border-primary-500 transition-all font-medium"
           />
         </div>
-        <button
-          type="button"
-          onClick={() => setFiltersOpen(!filtersOpen)}
-          className={cn(
-            'flex items-center gap-2 px-4 py-2.5 rounded-xl border text-xs sm:text-sm font-medium transition-colors shadow-soft-xs',
-            filtersOpen || activeFilterCount > 0
-              ? 'bg-primary-50 border-primary-300 text-primary-700 font-semibold'
-              : 'bg-white border-neutral-200 text-neutral-700 hover:bg-neutral-50'
-          )}
-        >
-          <Filter className="h-4 w-4" />
-          <span>Filtrele</span>
-          {activeFilterCount > 0 && (
-            <span className="w-4 h-4 rounded-full bg-primary-600 text-white text-[10px] flex items-center justify-center font-bold">
-              {activeFilterCount}
-            </span>
-          )}
-        </button>
-        {activeFilterCount > 0 && (
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={clearFilters}
-            className="text-xs text-neutral-400 hover:text-neutral-600"
+
+        <div className="flex items-center gap-2.5 w-full md:w-auto overflow-x-auto">
+          <select
+            value={filters.grade}
+            onChange={(e) => setFilters((prev) => ({ ...prev, grade: e.target.value }))}
+            className="flex-1 md:flex-none px-3.5 py-2.5 rounded-xl border border-neutral-200 bg-neutral-50/60 text-xs sm:text-sm font-medium text-neutral-700 focus:outline-none focus:ring-2 focus:ring-primary-500/20 focus:border-primary-500 transition-all cursor-pointer whitespace-nowrap"
           >
-            Filtreleri Temizle
-          </Button>
+            <option value="">Tüm Kademeler</option>
+            <option value="9">9. Sınıf</option>
+            <option value="10">10. Sınıf</option>
+            <option value="11">11. Sınıf</option>
+            <option value="12">12. Sınıf</option>
+          </select>
+
+          <select
+            value={filters.status}
+            onChange={(e) => setFilters((prev) => ({ ...prev, status: e.target.value }))}
+            className="flex-1 md:flex-none px-3.5 py-2.5 rounded-xl border border-neutral-200 bg-neutral-50/60 text-xs sm:text-sm font-medium text-neutral-700 focus:outline-none focus:ring-2 focus:ring-primary-500/20 focus:border-primary-500 transition-all cursor-pointer whitespace-nowrap"
+          >
+            <option value="">Tüm Durumlar</option>
+            <option value="Active">Aktif Kayıt</option>
+            <option value="Inactive">Pasif</option>
+          </select>
+        </div>
+      </div>
+
+      {/* 3. Students Directory List Table */}
+      <div className="bg-white rounded-2xl border border-neutral-200/80 shadow-soft-xs overflow-hidden">
+        {filteredStudents.length === 0 ? (
+          <div className="py-16 text-center text-neutral-400 p-4">
+            <GraduationCap className="h-10 w-10 mx-auto text-neutral-300 mb-2" />
+            <p className="text-sm font-semibold text-neutral-700">Öğrenci bulunamadı.</p>
+            <p className="text-xs text-neutral-400 mt-1">
+              Filtrelerinizi sıfırlayabilir veya kuruma yeni öğrenci kaydedebilirsiniz.
+            </p>
+          </div>
+        ) : (
+          <div className="divide-y divide-neutral-100">
+            {filteredStudents.map((student) => (
+              <div
+                key={student.id}
+                onClick={() => setSelectedStudent(student)}
+                className="p-4 sm:px-5 flex items-center justify-between gap-4 hover:bg-[#F8F7F3]/70 transition-colors cursor-pointer group select-none"
+              >
+                <div className="flex items-center gap-3.5 min-w-0">
+                  <div className="w-10 h-10 rounded-2xl bg-[#14233E] text-white text-xs font-bold flex items-center justify-center shrink-0 shadow-soft-xs group-hover:scale-105 transition-transform">
+                    {student.initials}
+                  </div>
+
+                  <div className="min-w-0 flex-1">
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <span className="text-sm font-bold text-navy-950 group-hover:text-primary-600 transition-colors">
+                        {student.name}
+                      </span>
+                      {student.studentNumber && (
+                        <span className="text-xs font-mono font-medium text-neutral-500 bg-neutral-100 px-2 py-0.5 rounded-md">
+                          #{student.studentNumber}
+                        </span>
+                      )}
+                      <span className="inline-flex items-center gap-1 text-[11px] font-bold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded-full border border-emerald-200">
+                        <CheckCircle2 className="h-3 w-3" />
+                        {student.status === 'Active' ? 'Aktif' : student.status}
+                      </span>
+                    </div>
+
+                    <div className="flex items-center gap-3 text-xs text-neutral-500 mt-1 flex-wrap">
+                      <span className="font-semibold text-neutral-700">{student.grade}</span>
+                      <span>·</span>
+                      <span>{student.schoolName || 'Kurum İçi'}</span>
+                      {student.createdAt && (
+                        <>
+                          <span className="hidden md:inline">·</span>
+                          <span className="hidden md:inline text-neutral-400">
+                            Kayıt: {new Date(student.createdAt).toLocaleDateString('tr-TR')}
+                          </span>
+                        </>
+                      )}
+                    </div>
+                  </div>
+                </div>
+
+                <div className="flex items-center gap-3 shrink-0">
+                  <span className="text-xs font-semibold text-primary-700 hidden sm:inline-block">
+                    Detay Gör
+                  </span>
+                  <ChevronRight className="h-4 w-4 text-neutral-400 group-hover:text-primary-600 group-hover:translate-x-0.5 transition-all" />
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+
+        {/* 4. Pagination */}
+        {totalPages > 1 && (
+          <div className="p-3.5 border-t border-neutral-100 bg-neutral-50/60 flex items-center justify-between text-xs text-neutral-600">
+            <span>
+              Sayfa <strong>{page}</strong> / <strong>{totalPages}</strong> ({totalCount} toplam öğrenci)
+            </span>
+            <div className="flex items-center gap-1.5">
+              <Button
+                variant="secondary"
+                size="sm"
+                onClick={() => setPage((p) => Math.max(1, p - 1))}
+                disabled={page <= 1}
+                className="h-8 px-2.5 text-xs rounded-lg"
+              >
+                <ChevronLeft className="h-3.5 w-3.5 mr-1" /> Önceki
+              </Button>
+              <Button
+                variant="secondary"
+                size="sm"
+                onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
+                disabled={page >= totalPages}
+                className="h-8 px-2.5 text-xs rounded-lg"
+              >
+                Sonraki <ChevronRight className="h-3.5 w-3.5 ml-1" />
+              </Button>
+            </div>
+          </div>
         )}
       </div>
 
-      {/* Filter Drawer */}
-      {filtersOpen && (
-        <div className="bg-surface-alt rounded-2xl border border-neutral-200 p-4 space-y-3 animate-fade-in shadow-soft-xs">
-          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3">
-            <div>
-              <label className="text-[11px] font-semibold text-neutral-600 uppercase tracking-wider block mb-1">
-                Sınıf Kademesi
-              </label>
-              <select
-                value={filters.grade}
-                onChange={(e) => setFilter('grade', e.target.value)}
-                className="w-full px-3 py-1.5 rounded-lg border border-neutral-200 bg-white text-xs text-neutral-700 focus:outline-none focus:ring-2 focus:ring-primary-500"
-              >
-                <option value="">Tümü</option>
-                <option value="9. Sınıf">9. Sınıf</option>
-                <option value="10. Sınıf">10. Sınıf</option>
-                <option value="11. Sınıf">11. Sınıf</option>
-                <option value="12. Sınıf">12. Sınıf</option>
-              </select>
-            </div>
-            <div>
-              <label className="text-[11px] font-semibold text-neutral-600 uppercase tracking-wider block mb-1">
-                Durum
-              </label>
-              <select
-                value={filters.status}
-                onChange={(e) => setFilter('status', e.target.value)}
-                className="w-full px-3 py-1.5 rounded-lg border border-neutral-200 bg-white text-xs text-neutral-700 focus:outline-none focus:ring-2 focus:ring-primary-500"
-              >
-                <option value="">Tümü</option>
-                <option value="takipte">Takipte</option>
-                <option value="dikkat">Dikkat</option>
-                <option value="kritik">Kritik</option>
-              </select>
-            </div>
-            <div>
-              <label className="text-[11px] font-semibold text-neutral-600 uppercase tracking-wider block mb-1">
-                Atanmış Koç
-              </label>
-              <select
-                value={filters.coach}
-                onChange={(e) => setFilter('coach', e.target.value)}
-                className="w-full px-3 py-1.5 rounded-lg border border-neutral-200 bg-white text-xs text-neutral-700 focus:outline-none focus:ring-2 focus:ring-primary-500"
-              >
-                <option value="">Tüm Koçlar</option>
-                {coaches.map((c) => (
-                  <option key={c} value={c}>
-                    {c}
-                  </option>
-                ))}
-              </select>
-            </div>
-            <div>
-              <label className="text-[11px] font-semibold text-neutral-600 uppercase tracking-wider block mb-1">
-                Şube
-              </label>
-              <select
-                value={filters.branch}
-                onChange={(e) => setFilter('branch', e.target.value)}
-                className="w-full px-3 py-1.5 rounded-lg border border-neutral-200 bg-white text-xs text-neutral-700 focus:outline-none focus:ring-2 focus:ring-primary-500"
-              >
-                <option value="">Tüm Şubeler</option>
-                {branches.map((b) => (
-                  <option key={b} value={b}>
-                    {b} Şubesi
-                  </option>
-                ))}
-              </select>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Table */}
-      <div className="bg-white rounded-2xl border border-neutral-200 overflow-hidden shadow-soft-xs">
-        <div className="overflow-x-auto">
-          <table className="w-full text-left border-collapse text-xs sm:text-sm">
-            <thead>
-              <tr className="border-b border-neutral-100 bg-neutral-50/50 text-[11px] font-bold text-neutral-500 uppercase tracking-wider">
-                <th className="py-3 px-4">Öğrenci</th>
-                <th className="py-3 px-4">Kademe & Alan</th>
-                <th className="py-3 px-4">Durum</th>
-                <th className="py-3 px-4">Plan Uyumu</th>
-                <th className="py-3 px-4">Son Aktivite</th>
-                <th className="py-3 px-4 text-right">İşlem</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-neutral-100">
-              {filtered.length === 0 ? (
-                <tr>
-                  <td colSpan={6} className="py-8 text-center text-neutral-400">
-                    Kayıtlı öğrenci bulunamadı.
-                  </td>
-                </tr>
-              ) : (
-                filtered.map((student) => {
-                  const status = STATUS_CONFIG[student.status] || STATUS_CONFIG.takipte;
-                  return (
-                    <tr
-                      key={student.id}
-                      onClick={() => setSelectedStudent(student)}
-                      className="hover:bg-neutral-50/80 transition-colors cursor-pointer group"
-                    >
-                      <td className="py-3.5 px-4">
-                        <div className="flex items-center gap-3">
-                          <div className="w-8 h-8 rounded-full bg-navy-100 text-navy-800 text-xs font-bold flex items-center justify-center flex-shrink-0">
-                            {student.initials}
-                          </div>
-                          <div>
-                            <p className="font-semibold text-neutral-900 group-hover:text-primary-700 transition-colors">
-                              {student.name}
-                            </p>
-                            <p className="text-[11px] text-neutral-400">
-                              {student.coach ? `Koç: ${student.coach}` : 'Koç atanmamış'}
-                            </p>
-                          </div>
-                        </div>
-                      </td>
-                      <td className="py-3.5 px-4 text-neutral-600">
-                        {student.grade} · {student.field}
-                      </td>
-                      <td className="py-3.5 px-4">
-                        <span
-                          className={cn(
-                            'inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-semibold border',
-                            status.badge
-                          )}
-                        >
-                          {status.icon}
-                          {status.label}
-                        </span>
-                      </td>
-                      <td className="py-3.5 px-4">
-                        <span className={cn('font-mono', ADHERENCE_COLOR(student.planAdherence))}>
-                          %{student.planAdherence}
-                        </span>
-                      </td>
-                      <td className="py-3.5 px-4 text-neutral-500">{student.lastActivity}</td>
-                      <td className="py-3.5 px-4 text-right">
-                        <ChevronRight className="h-4 w-4 text-neutral-300 inline group-hover:text-primary-600 transition-colors" />
-                      </td>
-                    </tr>
-                  );
-                })
-              )}
-            </tbody>
-          </table>
-        </div>
-      </div>
-
-      {/* Student Detail Modal */}
-      {selectedStudent && (
-        <StudentModal
-          student={selectedStudent}
-          onClose={() => setSelectedStudent(null)}
-          onStudentUpdated={fetchStudents}
-        />
-      )}
-
-      {/* Add New Student Modal */}
+      {/* New Student Registration Modal */}
       <Modal
         isOpen={isAddModalOpen}
-        onClose={() => {
-          setIsAddModalOpen(false);
-          setCreateError(null);
-        }}
-        title="Yeni Öğrenci Ekle"
+        onClose={() => setIsAddModalOpen(false)}
+        title="Yeni Öğrenci Kaydı"
       >
         <form onSubmit={handleCreateStudent} className="space-y-4">
           <div className="grid grid-cols-2 gap-3">
@@ -531,32 +418,15 @@ export const StudentDirectoryView: React.FC<StudentDirectoryViewProps> = ({
             />
           </div>
 
-          <Input
-            label="E-posta"
-            type="email"
-            value={newEmail}
-            onChange={(e) => setNewEmail(e.target.value)}
-            placeholder="ogrenci@okul.com"
-            required
-          />
-
-          <Input
-            label="Başlangıç Şifresi"
-            type="password"
-            value={newPassword}
-            onChange={(e) => setNewPassword(e.target.value)}
-            required
-          />
-
           <div className="grid grid-cols-2 gap-3">
             <div>
-              <label className="text-xs font-medium text-neutral-700 block mb-1">
-                Sınıf Kademesi
+              <label className="text-xs font-semibold text-neutral-700 block mb-1">
+                Sınıf Düzeyi
               </label>
               <select
                 value={newGradeLevel}
                 onChange={(e) => setNewGradeLevel(e.target.value)}
-                className="w-full px-3 py-2 text-sm rounded-xl border border-neutral-200 bg-white text-neutral-800 focus:outline-none focus:ring-2 focus:ring-primary-500"
+                className="w-full px-3 py-2 text-xs sm:text-sm rounded-xl border border-neutral-200 bg-white text-neutral-800 focus:outline-none focus:ring-2 focus:ring-primary-500 font-medium"
               >
                 <option value="9">9. Sınıf</option>
                 <option value="10">10. Sınıf</option>
@@ -564,35 +434,49 @@ export const StudentDirectoryView: React.FC<StudentDirectoryViewProps> = ({
                 <option value="12">12. Sınıf</option>
               </select>
             </div>
-            <div>
-              <label className="text-xs font-medium text-neutral-700 block mb-1">
-                Hedef Sınav
-              </label>
-              <select
-                value={newTargetExam}
-                onChange={(e) => setNewTargetExam(e.target.value)}
-                className="w-full px-3 py-2 text-sm rounded-xl border border-neutral-200 bg-white text-neutral-800 focus:outline-none focus:ring-2 focus:ring-primary-500"
-              >
-                <option value="YKS">YKS (TYT/AYT)</option>
-                <option value="LGS">LGS</option>
-                <option value="TYT">TYT</option>
-                <option value="AYT">AYT</option>
-              </select>
-            </div>
+            <Input
+              label="Okul Numarası"
+              value={newStudentNumber}
+              onChange={(e) => setNewStudentNumber(e.target.value)}
+              placeholder="Örn: 1205"
+            />
+          </div>
+
+          <Input
+            label="Mevcut Okulu"
+            value={newSchoolName}
+            onChange={(e) => setNewSchoolName(e.target.value)}
+            placeholder="Örn: Atatürk Anadolu Lisesi"
+          />
+
+          <div className="grid grid-cols-2 gap-3">
+            <Input
+              label="E-Posta (İsteğe bağlı)"
+              type="email"
+              value={newEmail}
+              onChange={(e) => setNewEmail(e.target.value)}
+              placeholder="ogrenci@okul.com"
+            />
+            <Input
+              label="Başlangıç Şifresi"
+              type="password"
+              value={newPassword}
+              onChange={(e) => setNewPassword(e.target.value)}
+              placeholder="Ogrenci@123!"
+            />
           </div>
 
           {createError && (
-            <p className="text-xs text-danger font-medium">{createError}</p>
+            <p className="text-xs text-rose-700 bg-rose-50 border border-rose-200 p-2.5 rounded-xl font-medium">
+              {createError}
+            </p>
           )}
 
-          <div className="flex justify-end gap-2 pt-2">
+          <div className="flex justify-end gap-2 pt-2 border-t border-neutral-100">
             <Button
               type="button"
               variant="secondary"
-              onClick={() => {
-                setIsAddModalOpen(false);
-                setCreateError(null);
-              }}
+              onClick={() => setIsAddModalOpen(false)}
             >
               İptal
             </Button>
@@ -600,12 +484,24 @@ export const StudentDirectoryView: React.FC<StudentDirectoryViewProps> = ({
               type="submit"
               variant="primary"
               disabled={isCreating}
+              className="bg-[#315FE8] hover:bg-blue-700 font-semibold"
             >
               {isCreating ? 'Kaydediliyor...' : 'Kaydet'}
             </Button>
           </div>
         </form>
       </Modal>
+
+      {/* Student Detail Modal */}
+      {selectedStudent && (
+        <StudentModal
+          student={selectedStudent}
+          onClose={() => setSelectedStudent(null)}
+          onStudentUpdated={fetchStudents}
+        />
+      )}
     </div>
   );
 };
+
+export default StudentDirectoryView;
