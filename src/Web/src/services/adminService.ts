@@ -221,7 +221,7 @@ export const adminService = {
   },
 
   assignCoach: (studentId: string, coachId: string): Promise<void> => {
-    return apiClient.post<void>('/api/v1/coaching/assignments', { studentId, coachId });
+    return apiClient.post<void>('/api/v1/coaching/assign', { studentId, coachId });
   },
 
   // Classrooms

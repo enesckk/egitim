@@ -1,14 +1,14 @@
+import { CoachAssignedStudentDto } from '@/services/adminService';
+
 export interface AdminCoachDirectoryItem {
   id: string;
   name: string;
-  title: string;
+  firstName: string;
+  lastName: string;
   initials: string;
+  institutionId: string;
   assignedStudentCount: number;
-  portfolioCapacity: number;
-  averageAdherencePercentage: number;
-  averageWeeklyStudyHours: number;
-  attentionStudentCount: number;
-  branch: string;
+  assignedStudents: CoachAssignedStudentDto[];
   status: 'active' | 'inactive';
 }
 
