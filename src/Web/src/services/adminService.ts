@@ -208,6 +208,22 @@ export const adminService = {
     return apiClient.get<PaginatedResult<TeacherListDto>>('/api/v1/teachers', { params });
   },
 
+  getTeacher: (id: string): Promise<{ id: string; userId: string; firstName: string; lastName: string; title?: string | null }> => {
+    return apiClient.get(`/api/v1/teachers/${id}`);
+  },
+
+  getTeacherSubjects: (teacherId: string): Promise<Array<{ id: string; teacherId: string; subjectId: string }>> => {
+    return apiClient.get(`/api/v1/teachers/${teacherId}/subjects`);
+  },
+
+  assignTeacherSubject: (teacherId: string, subjectId: string): Promise<{ id: string; teacherId: string; subjectId: string }> => {
+    return apiClient.post(`/api/v1/teachers/${teacherId}/subjects/${subjectId}`, {});
+  },
+
+  removeTeacherSubject: (teacherId: string, subjectId: string): Promise<void> => {
+    return apiClient.delete(`/api/v1/teachers/${teacherId}/subjects/${subjectId}`);
+  },
+
   // Coaches
   createCoach: (cmd: CreateCoachRequest): Promise<CoachSummaryDto> => {
     return apiClient.post<CoachSummaryDto>('/api/v1/coaching/coaches', cmd);
