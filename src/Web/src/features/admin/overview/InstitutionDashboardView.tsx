@@ -1,22 +1,15 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { AlertCircle, RefreshCw } from 'lucide-react';
-import { cn } from '@/lib/utils';
+import { AlertCircle, RefreshCw, Building2 } from 'lucide-react';
 import { Button } from '@/components/ui/Button';
 import { Alert } from '@/components/ui/Alert';
 import { Skeleton } from '@/components/ui/Skeleton';
-import { InstitutionOverviewViewModel, Timeframe } from './types';
+import { InstitutionOverviewViewModel } from './types';
 import { KpiGrid } from './components/KpiGrid';
 import { AcademicTrendChart } from './components/AcademicTrendChart';
 import { AttentionSummaryCard } from './components/AttentionSummaryCard';
 import { CoachPortfolioCard } from './components/CoachPortfolioCard';
 import { adminService } from '@/services/adminService';
-
-const TIMEFRAME_LABELS: Record<Timeframe, string> = {
-  '1m': 'Son 4 Deneme',
-  '3m': 'Son 3 Ay',
-  '6m': 'Son 6 Ay',
-};
 
 export interface InstitutionDashboardViewProps {
   initialData?: InstitutionOverviewViewModel;
@@ -35,7 +28,6 @@ export const InstitutionDashboardView: React.FC<InstitutionDashboardViewProps> =
   const [data, setData] = useState<InstitutionOverviewViewModel | undefined>(initialData);
   const [isLoading, setIsLoading] = useState<boolean>(propIsLoading || (!initialData && !propErrorMessage));
   const [errorMessage, setErrorMessage] = useState<string | undefined>(propErrorMessage);
-  const [timeframe, setTimeframe] = useState<Timeframe>('1m');
 
   const fetchOverview = useCallback(async () => {
     if (initialData) return;
@@ -74,14 +66,17 @@ export const InstitutionDashboardView: React.FC<InstitutionDashboardViewProps> =
   const activeLoading = propIsLoading || isLoading;
   const activeError = propErrorMessage || errorMessage;
 
-  const chartData = activeData?.trendData ? (activeData.trendData[timeframe] || activeData.trendData['1m'] || []) : [];
+  // Real trend points from server response
+  const chartData = activeData?.trendData
+    ? (activeData.trendData['1m'] || activeData.trendData['3m'] || activeData.trendData['6m'] || [])
+    : [];
 
   // Loading State
   if (activeLoading) {
     return (
-      <div className="max-w-6xl mx-auto space-y-4 select-none" data-testid="admin-dashboard-loading">
-        <Skeleton className="h-10 w-48 rounded-xl" />
-        <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+      <div className="max-w-6xl mx-auto space-y-4 select-none p-4" data-testid="admin-dashboard-loading">
+        <Skeleton className="h-12 w-1/3 rounded-2xl" />
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
           <Skeleton className="h-28 w-full rounded-2xl" />
           <Skeleton className="h-28 w-full rounded-2xl" />
           <Skeleton className="h-28 w-full rounded-2xl" />
@@ -98,7 +93,7 @@ export const InstitutionDashboardView: React.FC<InstitutionDashboardViewProps> =
   // Error State or Empty
   if (activeError || !activeData) {
     return (
-      <div className="max-w-6xl mx-auto py-10 space-y-4 select-none" data-testid="admin-dashboard-error">
+      <div className="max-w-6xl mx-auto py-10 space-y-4 select-none p-4" data-testid="admin-dashboard-error">
         <Alert
           variant="danger"
           icon={<AlertCircle className="h-5 w-5" />}
@@ -120,49 +115,47 @@ export const InstitutionDashboardView: React.FC<InstitutionDashboardViewProps> =
     );
   }
 
-  return (
-    <div className="max-w-6xl mx-auto select-none space-y-4 sm:space-y-6" data-testid="admin-dashboard-view">
-      {/* 1. Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
-        <div>
-          <h1 className="font-serif text-2xl sm:text-3xl text-neutral-900 leading-tight">
-            Kurumsal Genel Bakış
-          </h1>
-          <p className="text-xs sm:text-sm text-neutral-400 mt-0.5">
-            {activeData.institutionName} · {activeData.branchCount} Şube
-          </p>
-        </div>
+  // Normalize KPI subtitles to avoid misleading "şubede" text for classroom counts
+  const correctedKpis = (activeData.kpis || []).map((kpi) => {
+    if (kpi.iconType === 'users' && kpi.sub.includes('şubede')) {
+      const classCount = activeData.branchCount;
+      return {
+        ...kpi,
+        sub: classCount > 0 ? `${classCount} aktif sınıfta` : 'Kayıtlı öğrenciler',
+      };
+    }
+    return kpi;
+  });
 
-        {/* Timeframe Selector */}
-        <div className="flex items-center gap-1 bg-neutral-100 p-1 rounded-xl self-start sm:self-auto border border-neutral-200">
-          {(['1m', '3m', '6m'] as Timeframe[]).map((tf) => (
-            <button
-              key={tf}
-              type="button"
-              onClick={() => setTimeframe(tf)}
-              className={cn(
-                'px-3 py-1.5 text-xs font-semibold rounded-lg transition-colors',
-                timeframe === tf
-                  ? 'bg-white text-navy-900 shadow-soft-xs'
-                  : 'text-neutral-500 hover:text-neutral-800'
-              )}
-            >
-              {TIMEFRAME_LABELS[tf]}
-            </button>
-          ))}
+  return (
+    <div className="max-w-6xl mx-auto select-none space-y-4 sm:space-y-6 p-4" data-testid="admin-dashboard-view">
+      {/* 1. Header Banner */}
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-neutral-200/70 pb-4">
+        <div>
+          <div className="flex items-center gap-2.5">
+            <h1 className="font-serif text-2xl sm:text-3xl font-bold text-navy-950 tracking-tight leading-tight">
+              Kurumsal Genel Bakış
+            </h1>
+            <span className="text-xs font-bold text-navy-800 bg-neutral-100 border border-neutral-200 px-2.5 py-0.5 rounded-full">
+              Yönetici Paneli
+            </span>
+          </div>
+          <p className="text-xs sm:text-sm text-neutral-500 mt-1 flex items-center gap-1.5">
+            <Building2 className="h-3.5 w-3.5 text-neutral-400" />
+            <span className="font-semibold text-neutral-700">{activeData.institutionName}</span>
+            <span>·</span>
+            <span>{activeData.branchCount} Aktif Sınıf</span>
+          </p>
         </div>
       </div>
 
-      {/* 2. Top KPI Grid */}
-      <KpiGrid kpis={activeData.kpis} />
+      {/* 2. Top KPI Grid with Real Corrected Semantics */}
+      <KpiGrid kpis={correctedKpis} />
 
-      {/* 3. Middle Section: TYT Trend Chart + Attention Summary */}
+      {/* 3. Middle Section: Real TYT Trend Chart + Attention Summary */}
       <div className="grid grid-cols-1 xl:grid-cols-3 gap-4">
         <div className="xl:col-span-2">
-          <AcademicTrendChart
-            data={chartData}
-            timeframeLabel={TIMEFRAME_LABELS[timeframe]}
-          />
+          <AcademicTrendChart data={chartData} />
         </div>
         <div>
           <AttentionSummaryCard stats={activeData.attentionStats} />
@@ -172,9 +165,10 @@ export const InstitutionDashboardView: React.FC<InstitutionDashboardViewProps> =
       {/* 4. Bottom Section: Coach Portfolio */}
       <CoachPortfolioCard
         coaches={activeData.coaches}
-        timeframeLabel={TIMEFRAME_LABELS[timeframe]}
         onSelectCoach={(coachId) => navigate(`/admin/coaches?coachId=${coachId}`)}
       />
     </div>
   );
 };
+
+export default InstitutionDashboardView;
