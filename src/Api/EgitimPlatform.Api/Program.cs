@@ -14,6 +14,8 @@ using EgitimPlatform.Modules.Content.Extensions;
 using EgitimPlatform.Modules.Reporting.Extensions;
 using EgitimPlatform.Modules.Notebook.Extensions;
 using EgitimPlatform.Modules.AI.Extensions;
+using EgitimPlatform.Api.Health;
+using Microsoft.AspNetCore.Diagnostics.HealthChecks;
 using Microsoft.AspNetCore.HttpOverrides;
 using Microsoft.AspNetCore.RateLimiting;
 using Microsoft.EntityFrameworkCore;
@@ -240,6 +242,10 @@ try
         options.RejectionStatusCode = StatusCodes.Status429TooManyRequests;
     });
 
+    // Health Checks: liveness & database readiness probes
+    builder.Services.AddHealthChecks()
+        .AddCheck<DatabaseHealthCheck>("database", tags: new[] { "ready" });
+
     // Register Demo Showcase Seeder
     builder.Services.Configure<EgitimPlatform.Api.Seeding.DemoSeedSettings>(builder.Configuration.GetSection(EgitimPlatform.Api.Seeding.DemoSeedSettings.SectionName));
     builder.Services.AddScoped<EgitimPlatform.Api.Seeding.DemoDataSeeder>();
@@ -354,6 +360,24 @@ try
     app.UseAuthorization();
     app.UseOutputCache();
     app.UseRateLimiter();
+
+    // Health check endpoints:
+    // /health/live: Application liveness probe (no external dependencies, returns 200 OK as long as process is up)
+    app.MapHealthChecks("/health/live", new HealthCheckOptions
+    {
+        Predicate = _ => false,
+        ResponseWriter = HealthCheckEndpointExtensions.WriteSanitizedHealthResponse
+    }).AllowAnonymous();
+
+    // /health/ready & /health: Readiness probes with lightweight bounded MSSQL connectivity check
+    var readinessOptions = new HealthCheckOptions
+    {
+        Predicate = check => check.Tags.Contains("ready"),
+        ResponseWriter = HealthCheckEndpointExtensions.WriteSanitizedHealthResponse
+    };
+    app.MapHealthChecks("/health/ready", readinessOptions).AllowAnonymous();
+    app.MapHealthChecks("/health", readinessOptions).AllowAnonymous();
+
     app.MapControllers();
 
     Log.Information("Application starting in {Environment}...", app.Environment.EnvironmentName);
