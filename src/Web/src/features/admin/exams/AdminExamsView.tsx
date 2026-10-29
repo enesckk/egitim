@@ -14,6 +14,8 @@ import {
   RefreshCw,
   AlertCircle,
   HelpCircle,
+  Trash2,
+  BookOpen,
 } from 'lucide-react';
 import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
@@ -221,43 +223,47 @@ export const AdminExamsView: React.FC<AdminExamsViewProps> = ({
     switch (status) {
       case ExamStatus.Published:
         return (
-          <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-semibold bg-emerald-50 text-emerald-700 border border-emerald-200">
-            <CheckCircle2 className="w-3.5 h-3.5" /> Yayında
+          <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold bg-emerald-50 text-emerald-700 border border-emerald-200/80 dark:bg-emerald-950/40 dark:text-emerald-300 dark:border-emerald-800">
+            <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400" /> Yayında
           </span>
         );
       case ExamStatus.Closed:
         return (
-          <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-semibold bg-slate-100 text-slate-700 border border-slate-200">
-            <Archive className="w-3.5 h-3.5" /> Kapandı
+          <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold bg-slate-100 text-slate-700 border border-slate-200 dark:bg-slate-800/60 dark:text-slate-300 dark:border-slate-700">
+            <Archive className="w-3.5 h-3.5 text-slate-500" /> Kapandı
           </span>
         );
       case ExamStatus.Draft:
       default:
         return (
-          <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-semibold bg-amber-50 text-amber-700 border border-amber-200">
-            <Clock className="w-3.5 h-3.5" /> Taslak
+          <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold bg-amber-50 text-amber-700 border border-amber-200/80 dark:bg-amber-950/40 dark:text-amber-300 dark:border-amber-800">
+            <Clock className="w-3.5 h-3.5 text-amber-600 dark:text-amber-400" /> Taslak
           </span>
         );
     }
   };
 
   return (
-    <div className="space-y-6" data-testid="admin-exams-page">
+    <div className="space-y-6 max-w-7xl mx-auto" data-testid="admin-exams-page">
       {/* Header */}
-      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 border-b border-navy-100 pb-5">
+      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 border-b border-navy-100/80 dark:border-navy-800/80 pb-5">
         <div>
-          <h1 className="text-2xl font-bold text-navy-950 flex items-center gap-2">
-            <FileText className="h-6 w-6 text-primary" />
-            Deneme Sınavları
-          </h1>
-          <p className="text-sm text-navy-600 mt-1">
-            Kurumsal deneme sınavlarını oluşturun, soru dizilimlerini yönetin ve manuel/Excel sonuç girişlerini yapın.
+          <div className="flex items-center gap-2">
+            <div className="p-2 rounded-xl bg-blue-50 text-[#315FE8] dark:bg-blue-950/40 dark:text-blue-400">
+              <FileText className="h-6 w-6" />
+            </div>
+            <h1 className="text-2xl font-bold text-[#14233E] dark:text-white">
+              Deneme Sınavları
+            </h1>
+          </div>
+          <p className="text-sm text-navy-600 dark:text-navy-300 mt-1 pl-1">
+            Kurumsal deneme sınavlarını oluşturun, soru dizilimlerini yönetin ve manuel/Excel sonuç girişlerini gerçekleştirin.
           </p>
         </div>
         <Button
           onClick={handleOpenCreateModal}
           data-testid="create-exam-btn"
-          className="flex items-center gap-2 bg-primary text-white hover:bg-primary-hover shrink-0"
+          className="flex items-center gap-2 bg-[#315FE8] hover:bg-blue-700 text-white font-medium shadow-sm transition-all shrink-0 rounded-xl px-4 py-2.5"
         >
           <Plus className="h-4 w-4" />
           Yeni Sınav Oluştur
@@ -277,25 +283,25 @@ export const AdminExamsView: React.FC<AdminExamsViewProps> = ({
         </Alert>
       )}
 
-      {/* Filters */}
-      <div className="flex flex-col sm:flex-row gap-3 items-center justify-between bg-white p-4 rounded-xl border border-navy-100 shadow-sm">
-        <div className="relative w-full sm:w-80">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-navy-400" />
+      {/* Filters Toolbar */}
+      <div className="bg-[#F8F7F3] dark:bg-navy-900/60 p-4 rounded-2xl border border-navy-200/70 dark:border-navy-800 shadow-xs flex flex-col lg:flex-row gap-3 items-stretch lg:items-center justify-between">
+        <div className="relative flex-1 max-w-md">
+          <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 h-4 w-4 text-navy-400" />
           <Input
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
             placeholder="Sınav adı veya kodu ile ara..."
-            className="pl-9 bg-navy-50/50 border-navy-200"
+            className="pl-10 bg-white dark:bg-navy-950 border-navy-200/80 dark:border-navy-700 text-sm rounded-xl focus:ring-2 focus:ring-[#315FE8]/20 focus:border-[#315FE8]"
             data-testid="exam-search-input"
           />
         </div>
 
-        <div className="flex flex-wrap items-center gap-3 w-full sm:w-auto">
+        <div className="flex flex-wrap items-center gap-2.5">
           <select
             value={selectedExamType}
             onChange={(e) => setSelectedExamType(e.target.value)}
             aria-label="Sınav Türü Filtresi"
-            className="h-10 px-3 rounded-lg border border-navy-200 bg-white text-sm text-navy-800 focus:outline-none focus:ring-2 focus:ring-primary/20"
+            className="h-10 px-3.5 rounded-xl border border-navy-200/80 dark:border-navy-700 bg-white dark:bg-navy-950 text-xs sm:text-sm text-[#14233E] dark:text-white focus:outline-none focus:ring-2 focus:ring-[#315FE8]/20"
             data-testid="exam-type-filter"
           >
             <option value="all">Tüm Sınav Türleri</option>
@@ -310,7 +316,7 @@ export const AdminExamsView: React.FC<AdminExamsViewProps> = ({
             value={selectedStatus}
             onChange={(e) => setSelectedStatus(e.target.value)}
             aria-label="Durum Filtresi"
-            className="h-10 px-3 rounded-lg border border-navy-200 bg-white text-sm text-navy-800 focus:outline-none focus:ring-2 focus:ring-primary/20"
+            className="h-10 px-3.5 rounded-xl border border-navy-200/80 dark:border-navy-700 bg-white dark:bg-navy-950 text-xs sm:text-sm text-[#14233E] dark:text-white focus:outline-none focus:ring-2 focus:ring-[#315FE8]/20"
             data-testid="exam-status-filter"
           >
             <option value="all">Tüm Durumlar</option>
@@ -318,6 +324,20 @@ export const AdminExamsView: React.FC<AdminExamsViewProps> = ({
             <option value="published">Yayında</option>
             <option value="closed">Kapandı</option>
           </select>
+
+          {(searchTerm || selectedExamType !== 'all' || selectedStatus !== 'all') && (
+            <button
+              type="button"
+              onClick={() => {
+                setSearchTerm('');
+                setSelectedExamType('all');
+                setSelectedStatus('all');
+              }}
+              className="text-xs font-semibold text-[#315FE8] hover:underline px-2 py-1"
+            >
+              Temizle
+            </button>
+          )}
         </div>
       </div>
 
@@ -325,14 +345,14 @@ export const AdminExamsView: React.FC<AdminExamsViewProps> = ({
       {isLoading ? (
         <div className="space-y-3">
           {[1, 2, 3, 4].map((i) => (
-            <div key={i} className="p-5 bg-white rounded-xl border border-navy-100 animate-pulse flex items-center justify-between">
+            <div key={i} className="p-5 bg-[#F8F7F3] dark:bg-navy-900 rounded-2xl border border-navy-200/60 dark:border-navy-800 animate-pulse flex items-center justify-between">
               <div className="space-y-2">
-                <Skeleton className="h-5 w-48 bg-navy-100" />
-                <Skeleton className="h-4 w-32 bg-navy-50" />
+                <Skeleton className="h-5 w-48 bg-navy-200/60" />
+                <Skeleton className="h-4 w-32 bg-navy-100" />
               </div>
               <div className="flex gap-2">
-                <Skeleton className="h-9 w-28 bg-navy-100 rounded-lg" />
-                <Skeleton className="h-9 w-28 bg-navy-100 rounded-lg" />
+                <Skeleton className="h-9 w-28 bg-navy-200/60 rounded-xl" />
+                <Skeleton className="h-9 w-28 bg-navy-200/60 rounded-xl" />
               </div>
             </div>
           ))}
@@ -341,14 +361,14 @@ export const AdminExamsView: React.FC<AdminExamsViewProps> = ({
         /* Empty State */
         <div
           data-testid="admin-exams-empty"
-          className="bg-white rounded-xl border border-navy-100 p-12 text-center flex flex-col items-center justify-center space-y-4"
+          className="bg-[#F8F7F3] dark:bg-navy-900/40 rounded-2xl border border-navy-200/70 dark:border-navy-800 p-12 text-center flex flex-col items-center justify-center space-y-4 shadow-xs"
         >
-          <div className="h-14 w-14 rounded-2xl bg-navy-50 flex items-center justify-center text-navy-400">
+          <div className="h-14 w-14 rounded-2xl bg-blue-50 dark:bg-blue-950/50 flex items-center justify-center text-[#315FE8]">
             <ClipboardList className="h-7 w-7" />
           </div>
           <div className="max-w-md">
-            <h3 className="text-lg font-bold text-navy-900">Henüz Deneme Sınavı Bulunmuyor</h3>
-            <p className="text-sm text-navy-500 mt-1">
+            <h3 className="text-lg font-bold text-[#14233E] dark:text-white">Henüz Deneme Sınavı Bulunmuyor</h3>
+            <p className="text-sm text-navy-600 dark:text-navy-300 mt-1">
               {searchTerm || selectedExamType !== 'all' || selectedStatus !== 'all'
                 ? 'Arama kriterlerinize uygun deneme sınavı bulunamadı. Filtreleri temizleyebilirsiniz.'
                 : 'Kurumunuz için ilk deneme sınavını oluşturarak soru bankasından soru dizilimine veya sonuç girişine başlayın.'}
@@ -362,91 +382,165 @@ export const AdminExamsView: React.FC<AdminExamsViewProps> = ({
                 setSelectedExamType('all');
                 setSelectedStatus('all');
               }}
+              className="rounded-xl"
             >
               Filtreleri Sıfırla
             </Button>
           ) : (
-            <Button onClick={handleOpenCreateModal} className="flex items-center gap-2">
+            <Button
+              onClick={handleOpenCreateModal}
+              className="flex items-center gap-2 bg-[#315FE8] hover:bg-blue-700 text-white rounded-xl"
+            >
               <Plus className="h-4 w-4" />
               Yeni Sınav Oluştur
             </Button>
           )}
         </div>
       ) : (
-        /* Exam List */
-        <div className="bg-white rounded-xl border border-navy-100 overflow-hidden shadow-sm">
-          <div className="overflow-x-auto">
-            <table className="w-full text-left border-collapse">
-              <thead>
-                <tr className="bg-navy-50/70 border-b border-navy-100 text-xs font-semibold text-navy-600 uppercase tracking-wider">
-                  <th className="py-3.5 px-4">Sınav Bilgisi</th>
-                  <th className="py-3.5 px-4">Tür & Bölümler</th>
-                  <th className="py-3.5 px-4">Tarih</th>
-                  <th className="py-3.5 px-4">Durum</th>
-                  <th className="py-3.5 px-4 text-right">İşlemler</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-navy-100 text-sm">
-                {filteredExams.map((exam) => (
-                  <tr
-                    key={exam.id}
-                    data-testid={`exam-row-${exam.id}`}
-                    className="hover:bg-navy-50/40 transition-colors"
+        /* Dual Presentation: Responsive Cards (< 1024px) and Desktop Table (>= 1024px) */
+        <div className="space-y-4">
+          {/* Responsive Cards View (< 1024px, covers mobile 390px and tablet 768px) */}
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:hidden gap-3.5">
+            {filteredExams.map((exam) => (
+              <div
+                key={exam.id}
+                data-testid={`exam-card-${exam.id}`}
+                className="bg-[#F8F7F3] dark:bg-navy-900/60 p-4.5 rounded-2xl border border-navy-200/70 dark:border-navy-800 shadow-xs flex flex-col justify-between gap-3.5"
+              >
+                <div className="space-y-2">
+                  <div className="flex items-start justify-between gap-2">
+                    <div className="min-w-0 flex-1">
+                      <h3 className="font-bold text-sm sm:text-base text-[#14233E] dark:text-white truncate">
+                        {exam.title}
+                      </h3>
+                      <div className="text-xs font-mono text-navy-500 dark:text-navy-400 mt-0.5">
+                        {exam.code}
+                      </div>
+                    </div>
+                    <div className="shrink-0">{getStatusBadge(exam.status)}</div>
+                  </div>
+
+                  <div className="flex flex-wrap items-center gap-2 text-xs pt-1 border-t border-navy-200/50 dark:border-navy-800">
+                    <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-white dark:bg-navy-950 text-[#14233E] dark:text-white font-medium border border-navy-200/60 dark:border-navy-800">
+                      <Layers className="h-3 w-3 text-[#315FE8]" />
+                      {exam.examTypeName || 'Belirtilmedi'}
+                    </span>
+                    <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-white dark:bg-navy-950 text-navy-600 dark:text-navy-300 border border-navy-200/60 dark:border-navy-800">
+                      <BookOpen className="h-3 w-3 text-navy-400" />
+                      {exam.sectionCount > 0 ? `${exam.sectionCount} Ders` : 'Bölüm Yok'}
+                    </span>
+                    <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-white dark:bg-navy-950 text-navy-600 dark:text-navy-300 border border-navy-200/60 dark:border-navy-800">
+                      <Calendar className="h-3 w-3 text-navy-400" />
+                      {new Date(exam.examDate).toLocaleDateString('tr-TR', {
+                        day: 'numeric',
+                        month: 'short',
+                        year: 'numeric',
+                      })}
+                    </span>
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-2 gap-2 pt-2 border-t border-navy-200/40 dark:border-navy-800/80">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    data-testid={`navigate-questions-m-${exam.id}`}
+                    onClick={() => navigate(`/admin/exams/${exam.id}/questions`)}
+                    className="w-full flex items-center justify-center gap-1.5 text-xs rounded-xl border-navy-200/80 text-[#14233E] hover:bg-white"
                   >
-                    <td className="py-4 px-4">
-                      <div className="font-semibold text-navy-950">{exam.title}</div>
-                      <div className="text-xs font-mono text-navy-500 mt-0.5">{exam.code}</div>
-                    </td>
-                    <td className="py-4 px-4">
-                      <div className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md bg-navy-50 text-navy-800 font-medium text-xs">
-                        <Layers className="h-3.5 w-3.5 text-navy-500" />
-                        {exam.examTypeName || 'Genel Sınav'}
-                      </div>
-                      <div className="text-xs text-navy-500 mt-1">
-                        {exam.sectionCount > 0 ? `${exam.sectionCount} Bölüm / Ders` : 'Bölüm Yok'}
-                      </div>
-                    </td>
-                    <td className="py-4 px-4 text-navy-600">
-                      <div className="flex items-center gap-1.5 text-xs">
-                        <Calendar className="h-3.5 w-3.5 text-navy-400" />
-                        {new Date(exam.examDate).toLocaleDateString('tr-TR', {
-                          year: 'numeric',
-                          month: 'short',
-                          day: 'numeric',
-                        })}
-                      </div>
-                    </td>
-                    <td className="py-4 px-4">
-                      {getStatusBadge(exam.status)}
-                    </td>
-                    <td className="py-4 px-4 text-right">
-                      <div className="flex items-center justify-end gap-2">
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          data-testid={`navigate-questions-${exam.id}`}
-                          onClick={() => navigate(`/admin/exams/${exam.id}/questions`)}
-                          className="flex items-center gap-1 text-xs border-navy-200 text-navy-700 hover:bg-navy-50"
-                        >
-                          <HelpCircle className="h-3.5 w-3.5 text-navy-500" />
-                          Soru Dizilimi
-                        </Button>
-                        <Button
-                          size="sm"
-                          data-testid={`navigate-results-${exam.id}`}
-                          onClick={() => navigate(`/admin/exams/${exam.id}/results/entry`)}
-                          className="flex items-center gap-1 text-xs bg-navy-900 text-white hover:bg-navy-800"
-                        >
-                          <ClipboardList className="h-3.5 w-3.5" />
-                          Sonuç Girişi
-                          <ArrowRight className="h-3 w-3 ml-0.5" />
-                        </Button>
-                      </div>
-                    </td>
+                    <HelpCircle className="h-3.5 w-3.5 text-navy-500" />
+                    Soru Dizilimi
+                  </Button>
+                  <Button
+                    size="sm"
+                    data-testid={`navigate-results-m-${exam.id}`}
+                    onClick={() => navigate(`/admin/exams/${exam.id}/results/entry`)}
+                    className="w-full flex items-center justify-center gap-1.5 text-xs rounded-xl bg-[#14233E] hover:bg-navy-800 text-white shadow-xs"
+                  >
+                    <ClipboardList className="h-3.5 w-3.5" />
+                    Sonuç Girişi
+                    <ArrowRight className="h-3 w-3 ml-0.5" />
+                  </Button>
+                </div>
+              </div>
+            ))}
+          </div>
+
+          {/* Desktop Table (>= 1024px) */}
+          <div className="hidden lg:block bg-white dark:bg-navy-900 rounded-2xl border border-navy-200/70 dark:border-navy-800 overflow-hidden shadow-xs">
+            <div className="overflow-x-auto">
+              <table className="w-full text-left border-collapse">
+                <thead>
+                  <tr className="bg-[#F8F7F3] dark:bg-navy-950/70 border-b border-navy-200/70 dark:border-navy-800 text-xs font-semibold text-navy-600 dark:text-navy-300 uppercase tracking-wider">
+                    <th className="py-4 px-5">Sınav Bilgisi</th>
+                    <th className="py-4 px-4">Tür & Bölümler</th>
+                    <th className="py-4 px-4">Tarih</th>
+                    <th className="py-4 px-4">Durum</th>
+                    <th className="py-4 px-5 text-right">İşlemler</th>
                   </tr>
-                ))}
-              </tbody>
-            </table>
+                </thead>
+                <tbody className="divide-y divide-navy-100 dark:divide-navy-800/80 text-sm">
+                  {filteredExams.map((exam) => (
+                    <tr
+                      key={exam.id}
+                      data-testid={`exam-row-${exam.id}`}
+                      className="hover:bg-[#F8F7F3]/60 dark:hover:bg-navy-800/40 transition-colors"
+                    >
+                      <td className="py-4 px-5">
+                        <div className="font-bold text-[#14233E] dark:text-white">{exam.title}</div>
+                        <div className="text-xs font-mono text-navy-500 dark:text-navy-400 mt-0.5">{exam.code}</div>
+                      </td>
+                      <td className="py-4 px-4">
+                        <div className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-blue-50 dark:bg-blue-950/40 text-[#14233E] dark:text-blue-300 font-semibold text-xs border border-blue-100 dark:border-blue-900">
+                          <Layers className="h-3.5 w-3.5 text-[#315FE8]" />
+                          {exam.examTypeName || 'Belirtilmedi'}
+                        </div>
+                        <div className="text-xs text-navy-500 dark:text-navy-400 mt-1 pl-0.5">
+                          {exam.sectionCount > 0 ? `${exam.sectionCount} Ders / Bölüm` : 'Bölüm Yok'}
+                        </div>
+                      </td>
+                      <td className="py-4 px-4 text-navy-700 dark:text-navy-300">
+                        <div className="flex items-center gap-1.5 text-xs font-medium">
+                          <Calendar className="h-3.5 w-3.5 text-navy-400" />
+                          {new Date(exam.examDate).toLocaleDateString('tr-TR', {
+                            year: 'numeric',
+                            month: 'short',
+                            day: 'numeric',
+                          })}
+                        </div>
+                      </td>
+                      <td className="py-4 px-4">
+                        {getStatusBadge(exam.status)}
+                      </td>
+                      <td className="py-4 px-5 text-right">
+                        <div className="flex items-center justify-end gap-2">
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            data-testid={`navigate-questions-${exam.id}`}
+                            onClick={() => navigate(`/admin/exams/${exam.id}/questions`)}
+                            className="flex items-center gap-1 text-xs border-navy-200/80 text-[#14233E] hover:bg-[#F8F7F3] rounded-xl"
+                          >
+                            <HelpCircle className="h-3.5 w-3.5 text-navy-500" />
+                            Soru Dizilimi
+                          </Button>
+                          <Button
+                            size="sm"
+                            data-testid={`navigate-results-${exam.id}`}
+                            onClick={() => navigate(`/admin/exams/${exam.id}/results/entry`)}
+                            className="flex items-center gap-1 text-xs bg-[#14233E] hover:bg-navy-800 text-white rounded-xl shadow-xs"
+                          >
+                            <ClipboardList className="h-3.5 w-3.5" />
+                            Sonuç Girişi
+                            <ArrowRight className="h-3 w-3 ml-0.5" />
+                          </Button>
+                        </div>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
           </div>
         </div>
       )}
@@ -467,26 +561,28 @@ export const AdminExamsView: React.FC<AdminExamsViewProps> = ({
 
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div>
-              <label className="block text-xs font-semibold text-navy-700 mb-1">
-                Sınav Başlığı *
+              <label className="block text-xs font-semibold text-[#14233E] dark:text-white mb-1.5">
+                Sınav Başlığı <span className="text-red-500">*</span>
               </label>
               <Input
                 value={newTitle}
                 onChange={(e) => setNewTitle(e.target.value)}
                 placeholder="Örn: 2026 TYT Genel Deneme - 1"
                 required
+                className="rounded-xl border-navy-200/80 focus:border-[#315FE8]"
                 data-testid="input-exam-title"
               />
             </div>
             <div>
-              <label className="block text-xs font-semibold text-navy-700 mb-1">
-                Sınav Kodu *
+              <label className="block text-xs font-semibold text-[#14233E] dark:text-white mb-1.5">
+                Sınav Kodu <span className="text-red-500">*</span>
               </label>
               <Input
                 value={newCode}
                 onChange={(e) => setNewCode(e.target.value)}
                 placeholder="Örn: TYT-2026-01"
                 required
+                className="rounded-xl border-navy-200/80 focus:border-[#315FE8]"
                 data-testid="input-exam-code"
               />
             </div>
@@ -494,15 +590,15 @@ export const AdminExamsView: React.FC<AdminExamsViewProps> = ({
 
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
             <div>
-              <label className="block text-xs font-semibold text-navy-700 mb-1">
-                Sınav Türü *
+              <label className="block text-xs font-semibold text-[#14233E] dark:text-white mb-1.5">
+                Sınav Türü <span className="text-red-500">*</span>
               </label>
               <select
                 value={newExamTypeId}
                 onChange={(e) => setNewExamTypeId(e.target.value)}
                 required
                 aria-label="Sınav Türü Seçiniz"
-                className="w-full h-10 px-3 rounded-lg border border-navy-200 bg-white text-sm text-navy-800 focus:outline-none focus:ring-2 focus:ring-primary/20"
+                className="w-full h-10 px-3 rounded-xl border border-navy-200/80 dark:border-navy-700 bg-white dark:bg-navy-950 text-sm text-[#14233E] dark:text-white focus:outline-none focus:ring-2 focus:ring-[#315FE8]/20 focus:border-[#315FE8]"
                 data-testid="select-exam-type"
               >
                 <option value="">Seçiniz</option>
@@ -514,19 +610,20 @@ export const AdminExamsView: React.FC<AdminExamsViewProps> = ({
               </select>
             </div>
             <div>
-              <label className="block text-xs font-semibold text-navy-700 mb-1">
-                Sınav Tarihi *
+              <label className="block text-xs font-semibold text-[#14233E] dark:text-white mb-1.5">
+                Sınav Tarihi <span className="text-red-500">*</span>
               </label>
               <Input
                 type="date"
                 value={newExamDate}
                 onChange={(e) => setNewExamDate(e.target.value)}
                 required
+                className="rounded-xl border-navy-200/80 focus:border-[#315FE8]"
                 data-testid="input-exam-date"
               />
             </div>
             <div>
-              <label className="block text-xs font-semibold text-navy-700 mb-1">
+              <label className="block text-xs font-semibold text-[#14233E] dark:text-white mb-1.5">
                 Yanlış Cezası (Örn: 0.25)
               </label>
               <Input
@@ -536,15 +633,16 @@ export const AdminExamsView: React.FC<AdminExamsViewProps> = ({
                 max="1"
                 value={newWrongPenalty}
                 onChange={(e) => setNewWrongPenalty(parseFloat(e.target.value) || 0)}
+                className="rounded-xl border-navy-200/80 focus:border-[#315FE8]"
                 data-testid="input-exam-penalty"
               />
             </div>
           </div>
 
-          {/* Section Setup */}
-          <div className="pt-2 border-t border-navy-100">
+          {/* Responsive Section Setup */}
+          <div className="pt-3 border-t border-navy-100 dark:border-navy-800">
             <div className="flex items-center justify-between mb-2">
-              <span className="text-xs font-bold text-navy-900 uppercase tracking-wider">
+              <span className="text-xs font-bold text-[#14233E] dark:text-white uppercase tracking-wider">
                 Ders / Bölüm Yapısı ({newSections.length})
               </span>
               <Button
@@ -552,58 +650,68 @@ export const AdminExamsView: React.FC<AdminExamsViewProps> = ({
                 variant="outline"
                 size="sm"
                 onClick={handleAddSection}
-                className="text-xs flex items-center gap-1"
+                className="text-xs flex items-center gap-1 rounded-xl border-navy-200/80"
                 data-testid="btn-add-section"
               >
-                <Plus className="h-3 w-3" /> Bölüm Ekle
+                <Plus className="h-3 w-3 text-[#315FE8]" /> Bölüm Ekle
               </Button>
             </div>
 
             {newSections.length === 0 ? (
-              <p className="text-xs text-navy-500 italic py-2">
+              <p className="text-xs text-navy-500 italic py-3 text-center bg-[#F8F7F3] rounded-xl border border-dashed border-navy-200">
                 Sınavda yer alacak en az bir ders bölümü eklemelisiniz.
               </p>
             ) : (
-              <div className="space-y-2 max-h-48 overflow-y-auto pr-1">
+              <div className="space-y-2.5 max-h-60 overflow-y-auto pr-1">
                 {newSections.map((sec, idx) => (
                   <div
                     key={idx}
-                    className="flex items-center gap-2 bg-navy-50/60 p-2 rounded-lg border border-navy-100 text-xs"
+                    className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2 bg-[#F8F7F3] dark:bg-navy-900/60 p-2.5 rounded-xl border border-navy-200/70 dark:border-navy-800 text-xs"
                   >
-                    <span className="font-semibold text-navy-500 w-5">{idx + 1}.</span>
-                    <select
-                      value={sec.subjectId}
-                      onChange={(e) => handleSectionChange(idx, 'subjectId', e.target.value)}
-                      aria-label="Ders Seçiniz"
-                      className="flex-1 h-8 px-2 rounded border border-navy-200 bg-white text-navy-800 text-xs"
-                    >
-                      {subjects.map((sub) => (
-                        <option key={sub.id} value={sub.id}>
-                          {sub.name}
-                        </option>
-                      ))}
-                    </select>
-                    <div className="flex items-center gap-1">
-                      <span className="text-navy-500">Soru:</span>
-                      <input
-                        type="number"
-                        min="1"
-                        max="200"
-                        value={sec.questionCount}
-                        onChange={(e) =>
-                          handleSectionChange(idx, 'questionCount', parseInt(e.target.value, 10) || 1)
-                        }
-                        className="w-16 h-8 px-2 rounded border border-navy-200 bg-white text-center text-xs"
-                      />
+                    <div className="flex items-center gap-2 flex-1">
+                      <span className="font-bold text-navy-400 w-5 shrink-0 text-center">
+                        {idx + 1}.
+                      </span>
+                      <select
+                        value={sec.subjectId}
+                        onChange={(e) => handleSectionChange(idx, 'subjectId', e.target.value)}
+                        aria-label="Ders Seçiniz"
+                        className="flex-1 h-9 px-2.5 rounded-lg border border-navy-200/80 bg-white dark:bg-navy-950 text-[#14233E] dark:text-white text-xs focus:ring-1 focus:ring-[#315FE8]"
+                      >
+                        {subjects.map((sub) => (
+                          <option key={sub.id} value={sub.id}>
+                            {sub.name}
+                          </option>
+                        ))}
+                      </select>
                     </div>
-                    <button
-                      type="button"
-                      onClick={() => handleRemoveSection(idx)}
-                      className="text-red-500 hover:text-red-700 px-1 font-bold text-sm"
-                      title="Bölümü Kaldır"
-                    >
-                      &times;
-                    </button>
+
+                    <div className="flex items-center justify-between sm:justify-end gap-2 pl-7 sm:pl-0">
+                      <div className="flex items-center gap-1.5">
+                        <span className="text-navy-600 dark:text-navy-300 font-medium">Soru:</span>
+                        <input
+                          type="number"
+                          min="1"
+                          max="200"
+                          value={sec.questionCount}
+                          onChange={(e) =>
+                            handleSectionChange(idx, 'questionCount', parseInt(e.target.value, 10) || 1)
+                          }
+                          aria-label="Soru Sayısı"
+                          className="w-16 h-9 px-2 rounded-lg border border-navy-200/80 bg-white dark:bg-navy-950 text-center font-bold text-xs"
+                        />
+                      </div>
+
+                      <button
+                        type="button"
+                        onClick={() => handleRemoveSection(idx)}
+                        className="p-1.5 rounded-lg text-red-500 hover:text-red-700 hover:bg-red-50 dark:hover:bg-red-950/40 transition-colors shrink-0"
+                        title="Bölümü Kaldır"
+                        aria-label="Bölümü Kaldır"
+                      >
+                        <Trash2 className="h-4 w-4" />
+                      </button>
+                    </div>
                   </div>
                 ))}
               </div>
@@ -611,12 +719,13 @@ export const AdminExamsView: React.FC<AdminExamsViewProps> = ({
           </div>
 
           {/* Modal Actions */}
-          <div className="flex justify-end gap-2 pt-4 border-t border-navy-100">
+          <div className="flex justify-end gap-2.5 pt-4 border-t border-navy-100 dark:border-navy-800">
             <Button
               type="button"
               variant="outline"
               onClick={() => setIsCreateModalOpen(false)}
               disabled={isSubmitting}
+              className="rounded-xl border-navy-200/80"
             >
               İptal
             </Button>
@@ -624,7 +733,7 @@ export const AdminExamsView: React.FC<AdminExamsViewProps> = ({
               type="submit"
               disabled={isSubmitting}
               data-testid="submit-create-exam"
-              className="bg-primary text-white hover:bg-primary-hover"
+              className="bg-[#315FE8] hover:bg-blue-700 text-white rounded-xl shadow-xs"
             >
               {isSubmitting ? 'Oluşturuluyor...' : 'Sınavı Oluştur'}
             </Button>
