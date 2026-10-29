@@ -101,7 +101,7 @@ export const ExamResultEntryView: React.FC<ExamResultEntryViewProps> = ({ portal
     if (portalRole === 'coach') {
       navigate('/coach/today');
     } else {
-      navigate('/admin/overview');
+      navigate('/admin/exams');
     }
   };
 
