@@ -252,13 +252,20 @@ export const QuestionFormModal: React.FC<QuestionFormModalProps> = ({
       onClose={onClose}
       title={isEditing ? 'Soruyu Düzenle' : 'Yeni Soru Oluştur'}
       subtitle="Soru bankasına eklemek için gerekli bilgileri doldurunuz."
+      headerVariant="dark"
       maxWidth="xl"
       footer={
         <div className="flex items-center justify-end gap-2">
-          <Button variant="outline" size="sm" onClick={onClose} disabled={isSubmitting}>
+          <Button variant="outline" size="sm" onClick={onClose} disabled={isSubmitting} className="rounded-xl border-navy-200">
             İptal
           </Button>
-          <Button variant="primary" size="sm" onClick={handleSubmit} isLoading={isSubmitting}>
+          <Button
+            variant="primary"
+            size="sm"
+            onClick={handleSubmit}
+            isLoading={isSubmitting}
+            className="bg-[#315FE8] hover:bg-blue-700 text-white rounded-xl shadow-soft-xs"
+          >
             {isEditing ? 'Değişiklikleri Kaydet' : 'Soruyu Kaydet'}
           </Button>
         </div>
@@ -268,7 +275,7 @@ export const QuestionFormModal: React.FC<QuestionFormModalProps> = ({
         {error && <Alert variant="danger">{error}</Alert>}
 
         {/* 1. Academic Taxonomy Section */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 p-4 rounded-xl bg-neutral-50 border border-neutral-200">
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 p-4 rounded-2xl bg-[#F8F7F3] border border-navy-200/80">
           <FormField label="Ders *" required>
             <Select
               value={subjectId}

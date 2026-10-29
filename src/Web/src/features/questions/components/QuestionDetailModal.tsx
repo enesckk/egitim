@@ -33,11 +33,23 @@ export const QuestionDetailModal: React.FC<QuestionDetailModalProps> = ({
   const getDifficultyBadge = (difficulty: DifficultyLevel) => {
     switch (difficulty) {
       case DifficultyLevel.Easy:
-        return <Badge variant="success">Kolay</Badge>;
+        return (
+          <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-semibold bg-emerald-50 text-emerald-700 border border-emerald-200">
+            Kolay
+          </span>
+        );
       case DifficultyLevel.Medium:
-        return <Badge variant="warning">Orta</Badge>;
+        return (
+          <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-semibold bg-amber-50 text-amber-700 border border-amber-200">
+            Orta
+          </span>
+        );
       case DifficultyLevel.Hard:
-        return <Badge variant="danger">Zor</Badge>;
+        return (
+          <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-semibold bg-rose-50 text-rose-700 border border-rose-200">
+            Zor
+          </span>
+        );
       default:
         return <Badge variant="secondary">Bilinmiyor</Badge>;
     }
@@ -46,11 +58,23 @@ export const QuestionDetailModal: React.FC<QuestionDetailModalProps> = ({
   const getStatusBadge = (status: QuestionStatus) => {
     switch (status) {
       case QuestionStatus.Draft:
-        return <Badge variant="warning">Taslak</Badge>;
+        return (
+          <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-semibold bg-amber-50 text-amber-700 border border-amber-200">
+            Taslak
+          </span>
+        );
       case QuestionStatus.Published:
-        return <Badge variant="success">Yayımlandı</Badge>;
+        return (
+          <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-semibold bg-emerald-50 text-emerald-700 border border-emerald-200">
+            Yayımlandı
+          </span>
+        );
       case QuestionStatus.Archived:
-        return <Badge variant="secondary">Arşivlendi</Badge>;
+        return (
+          <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-semibold bg-slate-100 text-slate-700 border border-slate-200">
+            Arşivlendi
+          </span>
+        );
       default:
         return null;
     }
@@ -74,6 +98,7 @@ export const QuestionDetailModal: React.FC<QuestionDetailModalProps> = ({
       onClose={onClose}
       title="Soru Detayı"
       subtitle={`Soru ID: ${question.id.substring(0, 8)}...`}
+      headerVariant="dark"
       maxWidth="lg"
       footer={
         <div className="flex items-center justify-between w-full">
@@ -82,7 +107,7 @@ export const QuestionDetailModal: React.FC<QuestionDetailModalProps> = ({
               <Button
                 variant="outline"
                 size="sm"
-                className="text-amber-700 border-amber-300 hover:bg-amber-50"
+                className="text-amber-700 border-amber-300 hover:bg-amber-50 rounded-xl"
                 onClick={() => onArchive(question)}
               >
                 Soru Arşivle
@@ -90,7 +115,7 @@ export const QuestionDetailModal: React.FC<QuestionDetailModalProps> = ({
             )}
           </div>
           <div className="flex items-center gap-2">
-            <Button variant="outline" size="sm" onClick={onClose}>
+            <Button variant="outline" size="sm" onClick={onClose} className="rounded-xl border-navy-200">
               Kapat
             </Button>
             {onEdit && (
@@ -98,6 +123,7 @@ export const QuestionDetailModal: React.FC<QuestionDetailModalProps> = ({
                 variant="primary"
                 size="sm"
                 disabled={!canEdit}
+                className="bg-[#315FE8] hover:bg-blue-700 text-white rounded-xl"
                 onClick={() => onEdit(question)}
               >
                 Düzenle
@@ -110,44 +136,52 @@ export const QuestionDetailModal: React.FC<QuestionDetailModalProps> = ({
       <div className="space-y-6">
         {/* Immutability Banner */}
         {!canEdit && cannotEditReason && (
-          <div className="flex items-center gap-2.5 p-3 rounded-lg bg-amber-50 border border-amber-200 text-amber-800 text-xs">
+          <div className="flex items-center gap-2.5 p-3 rounded-xl bg-amber-50 border border-amber-200 text-amber-850 text-xs">
             <Lock className="h-4 w-4 shrink-0 text-amber-600" />
-            <span>{cannotEditReason}</span>
+            <span className="font-medium text-amber-900">{cannotEditReason}</span>
           </div>
         )}
 
         {/* Metadata Badges & Tags */}
         <div className="flex flex-wrap items-center gap-2">
           {question.institutionId === null ? (
-            <Badge variant="info" className="flex items-center gap-1">
+            <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-semibold bg-sky-50 text-sky-700 border border-sky-200">
               <Globe className="h-3 w-3" /> Global Soru
-            </Badge>
+            </span>
           ) : (
-            <Badge variant="secondary" className="flex items-center gap-1">
+            <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-semibold bg-blue-50 text-[#315FE8] border border-blue-200">
               <Building2 className="h-3 w-3" /> Kurum Sorusu
-            </Badge>
+            </span>
           )}
 
           {getStatusBadge(question.status)}
           {getDifficultyBadge(question.difficulty)}
 
-          <Badge variant="secondary">
+          <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-[#F8F7F3] text-navy-800 border border-navy-200/80">
             {getSourceLabel(question.sourceType, question.sourceYear)}
-          </Badge>
+          </span>
 
-          {subjectName && <Badge variant="secondary">Ders: {subjectName}</Badge>}
-          {topicName && <Badge variant="secondary">Konu: {topicName}</Badge>}
+          {subjectName && (
+            <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-[#F8F7F3] text-navy-800 border border-navy-200/80">
+              Ders: {subjectName}
+            </span>
+          )}
+          {topicName && (
+            <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-[#F8F7F3] text-navy-800 border border-navy-200/80">
+              Konu: {topicName}
+            </span>
+          )}
         </div>
 
         {/* Question Styles */}
         {question.styles && question.styles.length > 0 && (
-          <div className="flex flex-wrap items-center gap-1.5 p-2.5 rounded-lg bg-purple-50/50 border border-purple-100">
-            <span className="text-xs font-semibold text-purple-900 mr-1">Soru Tarzları:</span>
+          <div className="flex flex-wrap items-center gap-1.5 p-3 rounded-xl bg-[#F8F7F3] border border-navy-200/80">
+            <span className="text-xs font-bold text-[#14233E] mr-1">Soru Tarzları:</span>
             {question.styles.map((s) => (
               <span
                 key={s.id}
                 title={s.description || s.name}
-                className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-purple-100 text-purple-800"
+                className="inline-flex items-center px-2.5 py-0.5 rounded-md text-xs font-semibold bg-white text-navy-800 border border-navy-200/80 shadow-2xs"
               >
                 {s.name}
               </span>
@@ -156,11 +190,11 @@ export const QuestionDetailModal: React.FC<QuestionDetailModalProps> = ({
         )}
 
         {/* Question Content */}
-        <div className="p-4 rounded-xl bg-neutral-50 border border-neutral-200">
-          <h4 className="text-xs font-semibold text-neutral-400 uppercase tracking-wider mb-2">
+        <div className="p-4 sm:p-5 rounded-2xl bg-[#F8F7F3] border border-navy-200/80">
+          <h4 className="text-[11px] font-bold text-navy-500 uppercase tracking-wider mb-2">
             Soru Metni
           </h4>
-          <div className="text-sm font-medium text-neutral-900 leading-relaxed whitespace-pre-wrap">
+          <div className="text-sm font-semibold text-[#14233E] leading-relaxed whitespace-pre-wrap">
             {question.content}
           </div>
           {question.mediaUrl && (
@@ -168,7 +202,7 @@ export const QuestionDetailModal: React.FC<QuestionDetailModalProps> = ({
               <img
                 src={question.mediaUrl}
                 alt="Soru görseli"
-                className="max-h-60 rounded-lg border border-neutral-200 object-contain"
+                className="max-h-60 rounded-xl border border-navy-200/80 object-contain bg-white p-2"
               />
             </div>
           )}
@@ -176,8 +210,8 @@ export const QuestionDetailModal: React.FC<QuestionDetailModalProps> = ({
 
         {/* Options */}
         <div className="space-y-3">
-          <h4 className="text-xs font-semibold text-neutral-400 uppercase tracking-wider flex items-center gap-1.5">
-            <HelpCircle className="h-3.5 w-3.5" /> Seçenekler (A–E)
+          <h4 className="text-[11px] font-bold text-navy-500 uppercase tracking-wider flex items-center gap-1.5">
+            <HelpCircle className="h-3.5 w-3.5 text-[#315FE8]" /> Seçenekler (A–E)
           </h4>
 
           <div className="space-y-2">
@@ -187,25 +221,25 @@ export const QuestionDetailModal: React.FC<QuestionDetailModalProps> = ({
               .map((option) => (
                 <div
                   key={option.id}
-                  className={`flex items-start gap-3 p-3 rounded-lg border text-sm transition-colors ${
+                  className={`flex items-start gap-3 p-3.5 rounded-xl border text-sm transition-colors ${
                     option.isCorrect
-                      ? 'bg-emerald-50/70 border-emerald-300 text-emerald-950 font-medium'
-                      : 'bg-white border-neutral-200 text-neutral-800'
+                      ? 'bg-emerald-50/80 border-emerald-300 text-emerald-950 font-medium'
+                      : 'bg-white border-navy-200/80 text-navy-900'
                   }`}
                 >
                   <span
-                    className={`inline-flex items-center justify-center h-6 w-6 rounded-md font-bold text-xs shrink-0 ${
+                    className={`inline-flex items-center justify-center h-6 w-6 rounded-lg font-bold text-xs shrink-0 shadow-2xs ${
                       option.isCorrect
                         ? 'bg-emerald-600 text-white'
-                        : 'bg-neutral-100 text-neutral-600'
+                        : 'bg-[#F8F7F3] text-navy-700 border border-navy-200/80'
                     }`}
                   >
                     {option.optionLabel}
                   </span>
-                  <div className="flex-1 pt-0.5 whitespace-pre-wrap">{option.content}</div>
+                  <div className="flex-1 pt-0.5 whitespace-pre-wrap text-xs sm:text-sm font-medium">{option.content}</div>
                   {option.isCorrect && (
-                    <span className="flex items-center gap-1 text-xs font-semibold text-emerald-700 bg-emerald-100 px-2 py-0.5 rounded-full shrink-0">
-                      <CheckCircle2 className="h-3.5 w-3.5" /> Doğru Cevap
+                    <span className="flex items-center gap-1 text-xs font-bold text-emerald-700 bg-emerald-100/80 px-2.5 py-0.5 rounded-full shrink-0">
+                      <CheckCircle2 className="h-3.5 w-3.5 text-emerald-600" /> Doğru Cevap
                     </span>
                   )}
                 </div>

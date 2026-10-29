@@ -4,7 +4,6 @@ import {
   Button,
   Input,
   Select,
-  Badge,
   Modal,
   Alert,
   LoadingState,
@@ -47,6 +46,11 @@ import {
   ChevronDown,
   ChevronUp,
   FileSpreadsheet,
+  CheckCircle2,
+  Clock,
+  Archive as ArchiveIcon,
+  AlertCircle,
+  RefreshCw,
 } from 'lucide-react';
 
 interface QuestionBankViewProps {
@@ -330,11 +334,23 @@ export const QuestionBankView: React.FC<QuestionBankViewProps> = ({ role }) => {
   const getDifficultyBadge = (d: DifficultyLevel) => {
     switch (d) {
       case DifficultyLevel.Easy:
-        return <Badge variant="success">Kolay</Badge>;
+        return (
+          <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-semibold bg-emerald-50 text-emerald-700 border border-emerald-200">
+            Kolay
+          </span>
+        );
       case DifficultyLevel.Medium:
-        return <Badge variant="warning">Orta</Badge>;
+        return (
+          <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-semibold bg-amber-50 text-amber-700 border border-amber-200">
+            Orta
+          </span>
+        );
       case DifficultyLevel.Hard:
-        return <Badge variant="danger">Zor</Badge>;
+        return (
+          <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-semibold bg-rose-50 text-rose-700 border border-rose-200">
+            Zor
+          </span>
+        );
       default:
         return null;
     }
@@ -343,17 +359,32 @@ export const QuestionBankView: React.FC<QuestionBankViewProps> = ({ role }) => {
   const getStatusBadge = (s: QuestionStatus) => {
     switch (s) {
       case QuestionStatus.Draft:
-        return <Badge variant="warning">Taslak</Badge>;
+        return (
+          <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-semibold bg-amber-50 text-amber-700 border border-amber-200">
+            <Clock className="h-3 w-3 text-amber-600" /> Taslak
+          </span>
+        );
       case QuestionStatus.Published:
-        return <Badge variant="success">Yayımlandı</Badge>;
+        return (
+          <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-semibold bg-emerald-50 text-emerald-700 border border-emerald-200">
+            <CheckCircle2 className="h-3 w-3 text-emerald-600" /> Yayımlandı
+          </span>
+        );
       case QuestionStatus.Archived:
-        return <Badge variant="secondary">Arşivlendi</Badge>;
+        return (
+          <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-semibold bg-slate-100 text-slate-700 border border-slate-200">
+            <ArchiveIcon className="h-3 w-3 text-slate-500" /> Arşivlendi
+          </span>
+        );
       default:
         return null;
     }
   };
 
   const totalPages = Math.max(1, Math.ceil(totalCount / pageSize));
+  const currentCountOnPage = questions.length;
+  const startItemIndex = totalCount === 0 ? 0 : (page - 1) * pageSize + 1;
+  const endItemIndex = Math.min(page * pageSize, totalCount);
 
   // Authoritative subjects for teacher display
   const teacherSubjectsDisplay = useMemo(() => {
@@ -363,38 +394,58 @@ export const QuestionBankView: React.FC<QuestionBankViewProps> = ({ role }) => {
     return 'Matematik';
   }, [teacherProfile]);
 
+  const hasActiveFilters = Boolean(
+    selectedSubjectId ||
+    selectedTopicId ||
+    difficulty !== 'all' ||
+    status !== 'all' ||
+    sourceType !== 'all' ||
+    sourceYear ||
+    debouncedSearch ||
+    poolType !== 'all'
+  );
+
   return (
-    <div className="w-full max-w-6xl mx-auto select-none space-y-5 sm:space-y-6 pb-12" data-testid="question-bank-view">
-      {/* 1. Header with Real Scope & Statistics */}
+    <div
+      className="w-full max-w-7xl mx-auto select-none space-y-5 sm:space-y-6 pb-12"
+      data-testid={role === 'admin' ? 'admin-questions-page' : 'teacher-questions-page'}
+    >
+      {/* Hidden marker for testid compatibility */}
+      <span className="sr-only" data-testid="question-bank-view">Soru Bankası</span>
+
+      {/* 1. Header with Ivory/Navy/Blue Design System */}
       {role === 'teacher' ? (
-        <div className="bg-white rounded-2xl border border-neutral-200/80 p-5 sm:p-6 shadow-soft-sm">
+        <div className="bg-[#F8F7F3] rounded-2xl border border-navy-200/80 p-5 sm:p-6 shadow-soft-xs">
           <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-5">
             <div className="space-y-2 max-w-2xl">
               <div className="flex items-center gap-2.5 flex-wrap">
-                <h1 className="font-serif text-2xl sm:text-3xl font-bold text-neutral-900 tracking-tight">
+                <div className="p-2 rounded-xl bg-blue-50 text-[#315FE8]">
+                  <BookOpen className="h-6 w-6" />
+                </div>
+                <h1 className="font-serif text-2xl sm:text-3xl font-bold text-[#14233E] tracking-tight">
                   Soru Bankası & Deneme Montajı
                 </h1>
-                <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold bg-primary-50 text-primary-700 border border-primary-200">
+                <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold bg-blue-50 text-[#315FE8] border border-blue-200">
                   <BookOpen className="h-3.5 w-3.5" />
                   {teacherSubjectsDisplay}
                 </span>
               </div>
-              <p className="text-xs sm:text-sm text-neutral-500 leading-relaxed">
-                Kurumsal ve genel soru havuzundan branşınıza uygun soruları filtreleyin, yeni sorular ekleyin ve sınav montajı yapın
+              <p className="text-xs sm:text-sm text-navy-600 leading-relaxed pl-1">
+                Kurumsal ve genel soru havuzundan branşınıza uygun soruları filtreleyin, yeni sorular ekleyin ve sınav montajı yapın.
               </p>
             </div>
 
-            <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3 border-t lg:border-t-0 lg:border-l border-neutral-200/80 pt-4 lg:pt-0 lg:pl-6">
-              <div className="bg-[#F8F7F3] p-3 rounded-xl border border-neutral-200/80 min-w-[120px]">
-                <span className="text-[10px] uppercase font-bold text-neutral-500 tracking-wider block">
+            <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3 border-t lg:border-t-0 lg:border-l border-navy-200/80 pt-4 lg:pt-0 lg:pl-6">
+              <div className="bg-white p-3 rounded-xl border border-navy-200/80 min-w-[130px] shadow-2xs">
+                <span className="text-[10px] uppercase font-bold text-navy-500 tracking-wider block">
                   Havuz Sorusu
                 </span>
                 <div className="flex items-center gap-1.5 mt-0.5">
-                  <Layers className="h-4 w-4 text-primary-600 flex-shrink-0" />
-                  <span className="font-mono text-lg font-bold text-neutral-900">
+                  <Layers className="h-4 w-4 text-[#315FE8] flex-shrink-0" />
+                  <span className="font-mono text-lg font-bold text-[#14233E]" data-testid="pool-question-count">
                     {totalCount}
                   </span>
-                  <span className="text-xs text-neutral-500">Soru</span>
+                  <span className="text-xs text-navy-500">Soru</span>
                 </div>
               </div>
 
@@ -404,9 +455,10 @@ export const QuestionBankView: React.FC<QuestionBankViewProps> = ({ role }) => {
                     variant="secondary"
                     size="sm"
                     onClick={() => setIsAssemblyModalOpen(true)}
-                    leftIcon={<FileSpreadsheet className="h-4 w-4 text-primary-600" />}
-                    className="h-11 px-3 text-xs font-semibold bg-[#F8F7F3] border-neutral-200 hover:bg-primary-50 hover:text-primary-700"
+                    leftIcon={<FileSpreadsheet className="h-4 w-4 text-[#315FE8]" />}
+                    className="h-11 px-3 text-xs font-semibold bg-white border-navy-200/80 hover:bg-blue-50 hover:text-[#315FE8] text-[#14233E] rounded-xl shadow-2xs"
                     id="btn-exam-assembly"
+                    data-testid="btn-exam-assembly"
                   >
                     Sınav Montajı
                   </Button>
@@ -420,8 +472,9 @@ export const QuestionBankView: React.FC<QuestionBankViewProps> = ({ role }) => {
                     setIsFormOpen(true);
                   }}
                   leftIcon={<Plus className="h-4 w-4" />}
-                  className="h-11 px-4 text-xs font-semibold shadow-soft-sm"
+                  className="h-11 px-4 text-xs font-semibold bg-[#315FE8] hover:bg-blue-700 text-white rounded-xl shadow-soft-xs"
                   id="btn-create-question"
+                  data-testid="btn-create-question"
                 >
                   Yeni Soru Ekle
                 </Button>
@@ -431,14 +484,21 @@ export const QuestionBankView: React.FC<QuestionBankViewProps> = ({ role }) => {
         </div>
       ) : (
         /* Admin Default Header */
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-navy-200/70 pb-5">
           <div>
-            <h1 className="text-2xl font-bold text-neutral-900 tracking-tight flex items-center gap-2">
-              <BookOpen className="h-6 w-6 text-primary-600" />
-              Soru Bankası
-            </h1>
-            <p className="text-xs text-neutral-500 mt-1">
-              Kurumsal ve global soru havuzunu yönetin.
+            <div className="flex items-center gap-2.5 flex-wrap">
+              <div className="p-2 rounded-xl bg-blue-50 text-[#315FE8]">
+                <BookOpen className="h-6 w-6" />
+              </div>
+              <h1 className="font-serif text-2xl sm:text-3xl font-bold text-[#14233E] tracking-tight">
+                Soru Bankası
+              </h1>
+              <span className="text-xs font-bold text-[#315FE8] bg-blue-50 px-2.5 py-0.5 rounded-full border border-blue-100">
+                {totalCount} Havuz Sorusu
+              </span>
+            </div>
+            <p className="text-xs sm:text-sm text-navy-600 mt-1 pl-1">
+              Kurumsal ve global soru havuzunu yönetin, zorluk ve kazanım etiketlerini denetleyin.
             </p>
           </div>
 
@@ -449,43 +509,56 @@ export const QuestionBankView: React.FC<QuestionBankViewProps> = ({ role }) => {
               setEditingQuestion(null);
               setIsFormOpen(true);
             }}
-            className="flex items-center gap-1.5 self-start sm:self-auto"
+            data-testid="create-question-btn"
+            className="flex items-center gap-2 bg-[#315FE8] hover:bg-blue-700 text-white font-medium rounded-xl shadow-soft-xs px-4 py-2.5 self-start sm:self-auto shrink-0"
           >
             <Plus className="h-4 w-4" />
-            <span>Yeni Soru Oluştur</span>
+            <span>Yeni Soru Ekle</span>
           </Button>
         </div>
       )}
 
-      {error && <Alert variant="danger">{error}</Alert>}
+      {error && (
+        <Alert variant="danger" className="flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <AlertCircle className="h-4 w-4" />
+            <span>{error}</span>
+          </div>
+          <Button variant="outline" size="sm" onClick={fetchQuestions} className="flex items-center gap-1">
+            <RefreshCw className="h-3 w-3" /> Tekrar Dene
+          </Button>
+        </Alert>
+      )}
 
-      {/* 2. Simplified Filters Bar */}
-      <div className="bg-white p-4 sm:p-5 rounded-2xl border border-neutral-200/80 shadow-soft-sm space-y-3.5">
+      {/* 2. Filters Toolbar */}
+      <div className="bg-[#F8F7F3] p-4 sm:p-5 rounded-2xl border border-navy-200/80 shadow-soft-xs space-y-3.5">
         <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-3">
           {/* Search Box */}
           <div className="relative flex-1 min-w-0">
-            <Search className="absolute left-3.5 top-3 h-4 w-4 text-neutral-400" />
+            <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 h-4 w-4 text-navy-400 pointer-events-none" />
             <Input
               placeholder="Soru metninde veya kazanımda ara..."
               value={searchText}
               onChange={(e) => setSearchText(e.target.value)}
-              className="pl-10 text-xs bg-[#F8F7F3] border-neutral-200 w-full"
+              className="pl-10 text-xs sm:text-sm bg-white border-navy-200/80 rounded-xl w-full text-[#14233E] placeholder:text-navy-400 focus:ring-2 focus:ring-[#315FE8]/20 focus:border-[#315FE8]"
+              data-testid="question-search-input"
             />
           </div>
 
           <div className="flex items-center justify-between sm:justify-start gap-2 flex-wrap">
             {/* Pool Filter Chips */}
-            <div className="inline-flex rounded-xl bg-[#F8F7F3] p-1 border border-neutral-200/80 flex-wrap">
+            <div className="inline-flex rounded-xl bg-white p-1 border border-navy-200/80 flex-wrap shadow-2xs">
               <button
                 type="button"
                 onClick={() => {
                   setPoolType('all');
                   setPage(1);
                 }}
-                className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-all ${
+                data-testid="pool-tab-all"
+                className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all ${
                   poolType === 'all'
-                    ? 'bg-white text-neutral-900 shadow-2xs font-semibold'
-                    : 'text-neutral-600 hover:text-neutral-900'
+                    ? 'bg-[#14233E] text-white shadow-2xs'
+                    : 'text-navy-600 hover:text-[#14233E]'
                 }`}
               >
                 Tüm Havuzlar
@@ -496,10 +569,11 @@ export const QuestionBankView: React.FC<QuestionBankViewProps> = ({ role }) => {
                   setPoolType('institution');
                   setPage(1);
                 }}
-                className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-all ${
+                data-testid="pool-tab-institution"
+                className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all ${
                   poolType === 'institution'
-                    ? 'bg-white text-neutral-900 shadow-2xs font-semibold'
-                    : 'text-neutral-600 hover:text-neutral-900'
+                    ? 'bg-[#14233E] text-white shadow-2xs'
+                    : 'text-navy-600 hover:text-[#14233E]'
                 }`}
               >
                 Kurum Havuzu
@@ -510,10 +584,11 @@ export const QuestionBankView: React.FC<QuestionBankViewProps> = ({ role }) => {
                   setPoolType('global');
                   setPage(1);
                 }}
-                className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-all ${
+                data-testid="pool-tab-global"
+                className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all ${
                   poolType === 'global'
-                    ? 'bg-white text-neutral-900 shadow-2xs font-semibold'
-                    : 'text-neutral-600 hover:text-neutral-900'
+                    ? 'bg-[#14233E] text-white shadow-2xs'
+                    : 'text-navy-600 hover:text-[#14233E]'
                 }`}
               >
                 Genel Havuz
@@ -526,23 +601,25 @@ export const QuestionBankView: React.FC<QuestionBankViewProps> = ({ role }) => {
                 variant="outline"
                 size="sm"
                 onClick={() => setShowAdvancedFilters(!showAdvancedFilters)}
-                className="text-xs text-neutral-700 bg-white border-neutral-200 hover:bg-neutral-50"
+                data-testid="toggle-filters-btn"
+                className="text-xs text-[#14233E] bg-white border-navy-200/80 hover:bg-neutral-50 rounded-xl"
               >
-                <Filter className="h-3.5 w-3.5 mr-1 text-primary-600" />
-                <span>Filtreler</span>
+                <Filter className="h-3.5 w-3.5 mr-1 text-[#315FE8]" />
+                <span>Detaylı Filtreler</span>
                 {showAdvancedFilters ? (
-                  <ChevronUp className="h-3.5 w-3.5 ml-1 text-neutral-400" />
+                  <ChevronUp className="h-3.5 w-3.5 ml-1 text-navy-400" />
                 ) : (
-                  <ChevronDown className="h-3.5 w-3.5 ml-1 text-neutral-400" />
+                  <ChevronDown className="h-3.5 w-3.5 ml-1 text-navy-400" />
                 )}
               </Button>
 
-              {(selectedSubjectId || selectedTopicId || difficulty !== 'all' || status !== 'all' || debouncedSearch) && (
+              {hasActiveFilters && (
                 <Button
                   variant="ghost"
                   size="sm"
                   onClick={handleResetFilters}
-                  className="text-xs text-neutral-500 hover:text-neutral-800"
+                  data-testid="reset-filters-btn"
+                  className="text-xs text-navy-500 hover:text-[#14233E]"
                 >
                   <RotateCcw className="h-3.5 w-3.5 mr-1" /> Temizle
                 </Button>
@@ -553,17 +630,21 @@ export const QuestionBankView: React.FC<QuestionBankViewProps> = ({ role }) => {
 
         {/* Collapsible Advanced Filters */}
         {showAdvancedFilters && (
-          <div className="pt-3 border-t border-neutral-100 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 animate-fadeIn">
+          <div
+            className="pt-3 border-t border-navy-200/60 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 animate-fadeIn"
+            data-testid="advanced-filters-panel"
+          >
             {/* Subject Selector */}
             <div>
-              <label className="text-[11px] font-semibold text-neutral-600 block mb-1">Ders / Branş</label>
+              <label className="text-[11px] font-bold text-navy-700 block mb-1">Ders / Branş</label>
               <Select
                 value={selectedSubjectId}
                 onChange={(e) => {
                   setSelectedSubjectId(e.target.value);
                   setPage(1);
                 }}
-                className="text-xs bg-[#F8F7F3] border-neutral-200"
+                className="text-xs bg-white border-navy-200/80 rounded-xl text-[#14233E]"
+                data-testid="filter-subject-select"
               >
                 <option value="">Tüm Dersler</option>
                 {subjects.map((s) => (
@@ -576,7 +657,7 @@ export const QuestionBankView: React.FC<QuestionBankViewProps> = ({ role }) => {
 
             {/* Topic Selector */}
             <div>
-              <label className="text-[11px] font-semibold text-neutral-600 block mb-1">Konu</label>
+              <label className="text-[11px] font-bold text-navy-700 block mb-1">Konu</label>
               <Select
                 value={selectedTopicId}
                 onChange={(e) => {
@@ -584,7 +665,8 @@ export const QuestionBankView: React.FC<QuestionBankViewProps> = ({ role }) => {
                   setPage(1);
                 }}
                 disabled={!selectedSubjectId}
-                className="text-xs bg-[#F8F7F3] border-neutral-200"
+                className="text-xs bg-white border-navy-200/80 rounded-xl text-[#14233E]"
+                data-testid="filter-topic-select"
               >
                 <option value="">Tüm Konular</option>
                 {topics.map((t) => (
@@ -597,14 +679,15 @@ export const QuestionBankView: React.FC<QuestionBankViewProps> = ({ role }) => {
 
             {/* Difficulty Selector */}
             <div>
-              <label className="text-[11px] font-semibold text-neutral-600 block mb-1">Zorluk Seviyesi</label>
+              <label className="text-[11px] font-bold text-navy-700 block mb-1">Zorluk Seviyesi</label>
               <Select
                 value={difficulty}
                 onChange={(e) => {
                   setDifficulty(e.target.value);
                   setPage(1);
                 }}
-                className="text-xs bg-[#F8F7F3] border-neutral-200"
+                className="text-xs bg-white border-navy-200/80 rounded-xl text-[#14233E]"
+                data-testid="filter-difficulty-select"
               >
                 <option value="all">Tüm Zorluklar</option>
                 <option value={DifficultyLevel.Easy}>Kolay</option>
@@ -615,14 +698,15 @@ export const QuestionBankView: React.FC<QuestionBankViewProps> = ({ role }) => {
 
             {/* Status Selector */}
             <div>
-              <label className="text-[11px] font-semibold text-neutral-600 block mb-1">Durum</label>
+              <label className="text-[11px] font-bold text-navy-700 block mb-1">Yayın Durumu</label>
               <Select
                 value={status}
                 onChange={(e) => {
                   setStatus(e.target.value);
                   setPage(1);
                 }}
-                className="text-xs bg-[#F8F7F3] border-neutral-200"
+                className="text-xs bg-white border-navy-200/80 rounded-xl text-[#14233E]"
+                data-testid="filter-status-select"
               >
                 <option value="all">Tüm Durumlar</option>
                 <option value={QuestionStatus.Draft}>Taslak</option>
@@ -639,12 +723,12 @@ export const QuestionBankView: React.FC<QuestionBankViewProps> = ({ role }) => {
         <LoadingState message="Sorular yükleniyor..." />
       ) : questions.length === 0 ? (
         <EmptyState
-          icon={<BookOpen className="h-8 w-8 text-neutral-400" />}
-          title={debouncedSearch || selectedSubjectId ? 'Filtrelere uygun soru bulunamadı' : 'Henüz soru bulunmuyor'}
+          icon={<BookOpen className="h-8 w-8 text-navy-400" />}
+          title={hasActiveFilters ? 'Filtrelere uygun soru bulunamadı' : 'Henüz soru bulunmuyor'}
           description={
-            debouncedSearch || selectedSubjectId
+            hasActiveFilters
               ? 'Arama terimlerinizi veya filtrelerinizi değiştirerek tekrar deneyiniz.'
-              : 'Yeni soru oluştur butonunu kullanarak ilk sorunuzu ekleyebilirsiniz.'
+              : 'Yeni soru ekle butonunu kullanarak kurum havuzuna ilk sorunuzu kaydedebilirsiniz.'
           }
           action={
             <Button
@@ -654,25 +738,28 @@ export const QuestionBankView: React.FC<QuestionBankViewProps> = ({ role }) => {
                 setEditingQuestion(null);
                 setIsFormOpen(true);
               }}
+              className="bg-white border-navy-200/80 text-[#14233E] hover:bg-neutral-50 rounded-xl"
             >
-              <Plus className="h-4 w-4 mr-1" /> Soru Ekle
+              <Plus className="h-4 w-4 mr-1 text-[#315FE8]" /> Soru Ekle
             </Button>
           }
         />
       ) : (
         <div className="space-y-4">
-          {/* Results Summary */}
-          <div className="flex items-center justify-between text-xs text-neutral-500 px-1">
-            <span>
-              Toplam <strong className="text-neutral-800">{totalCount}</strong> soru listeleniyor.
+          {/* Results Summary with honest distinction */}
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between text-xs text-navy-600 px-1 gap-1">
+            <span data-testid="pagination-count-label">
+              Toplam <strong className="text-[#14233E] font-bold">{totalCount}</strong> sorudan{' '}
+              <strong className="text-[#14233E] font-semibold">{startItemIndex}–{endItemIndex}</strong> arası listeleniyor
+              {' '}(bu sayfada {currentCountOnPage} soru).
             </span>
-            <span>
+            <span className="font-medium text-navy-500">
               Sayfa {page} / {totalPages}
             </span>
           </div>
 
-          {/* Question List Cards */}
-          <div className="space-y-3.5">
+          {/* Question List Cards - Responsive below 1024px & Clean compact layout at 1024px+ */}
+          <div className="space-y-3.5" data-testid="question-list-container">
             {questions.map((q) => {
               const canEdit = canEditQuestion(q);
               const reason = getCannotEditReason(q);
@@ -680,17 +767,18 @@ export const QuestionBankView: React.FC<QuestionBankViewProps> = ({ role }) => {
               return (
                 <div
                   key={q.id}
-                  className="bg-white rounded-2xl border border-neutral-200/80 p-4 sm:p-5 shadow-soft-sm hover:border-primary-300 transition-colors flex flex-col md:flex-row md:items-center justify-between gap-4"
+                  data-testid={`question-card-${q.id}`}
+                  className="bg-white rounded-2xl border border-navy-200/80 p-4 sm:p-5 shadow-soft-xs hover:border-[#315FE8]/40 transition-colors flex flex-col lg:flex-row lg:items-center justify-between gap-4"
                 >
                   <div className="space-y-2 flex-1 min-w-0">
-                    {/* Metadata Header */}
+                    {/* Metadata Badges Header */}
                     <div className="flex flex-wrap items-center gap-2 text-xs">
                       {q.institutionId === null ? (
                         <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-semibold bg-sky-50 text-sky-700 border border-sky-200">
                           <Globe className="h-3 w-3" /> Genel Havuz
                         </span>
                       ) : (
-                        <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-semibold bg-primary-50 text-primary-700 border border-primary-200">
+                        <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-semibold bg-blue-50 text-[#315FE8] border border-blue-200">
                           <Building2 className="h-3 w-3" /> Kurumsal
                         </span>
                       )}
@@ -698,23 +786,23 @@ export const QuestionBankView: React.FC<QuestionBankViewProps> = ({ role }) => {
                       {getStatusBadge(q.status)}
                       {getDifficultyBadge(q.difficulty)}
 
-                      <span className="text-neutral-500 font-medium">
+                      <span className="text-navy-600 font-medium">
                         {subjectNames[q.subjectId] || 'Ders'} • {topicNames[q.topicId] || 'Konu'}
                       </span>
                     </div>
 
                     {/* Question Content Preview */}
-                    <p className="text-sm font-medium text-neutral-900 line-clamp-2 leading-relaxed">
+                    <p className="text-sm font-semibold text-[#14233E] line-clamp-2 leading-relaxed">
                       {q.content}
                     </p>
 
-                    {/* Style Badges */}
+                    {/* Question Style Tags */}
                     {q.styles && q.styles.length > 0 && (
                       <div className="flex flex-wrap items-center gap-1.5 pt-0.5">
                         {q.styles.map((s) => (
                           <span
                             key={s.id}
-                            className="inline-flex items-center px-2 py-0.5 rounded text-[11px] font-medium bg-[#F8F7F3] text-neutral-700 border border-neutral-200"
+                            className="inline-flex items-center px-2 py-0.5 rounded-md text-[11px] font-medium bg-[#F8F7F3] text-navy-800 border border-navy-200/80"
                           >
                             {s.name}
                           </span>
@@ -722,27 +810,28 @@ export const QuestionBankView: React.FC<QuestionBankViewProps> = ({ role }) => {
                       </div>
                     )}
 
-                    {/* Sub-info */}
-                    <div className="flex flex-wrap items-center gap-4 text-[11px] text-neutral-400 font-mono">
+                    {/* Sub-info metadata */}
+                    <div className="flex flex-wrap items-center gap-4 text-[11px] text-navy-400 font-mono">
                       <span>{q.optionCount} Şık</span>
                       <span>Kayıt: {new Date(q.createdAt).toLocaleDateString('tr-TR')}</span>
                       {!canEdit && reason && (
-                        <span className="flex items-center gap-1 text-amber-700 bg-amber-50 px-2 py-0.5 rounded text-[11px] font-sans">
-                          <Lock className="h-3 w-3" /> {reason}
+                        <span className="flex items-center gap-1 text-amber-800 bg-amber-50 px-2 py-0.5 rounded-md text-[11px] font-sans border border-amber-200/80">
+                          <Lock className="h-3 w-3 text-amber-600" /> {reason}
                         </span>
                       )}
                     </div>
                   </div>
 
                   {/* Actions */}
-                  <div className="flex items-center gap-2 shrink-0 border-t md:border-t-0 pt-3 md:pt-0 border-neutral-100">
+                  <div className="flex items-center gap-2 shrink-0 border-t lg:border-t-0 pt-3 lg:pt-0 border-navy-100 flex-wrap">
                     <Button
                       variant="ghost"
                       size="sm"
                       onClick={() => handleOpenDetail(q.id)}
-                      className="text-neutral-600 hover:text-neutral-900 text-xs"
+                      data-testid={`question-detail-btn-${q.id}`}
+                      className="text-navy-700 hover:text-[#14233E] hover:bg-navy-50 text-xs rounded-xl"
                     >
-                      <Eye className="h-3.5 w-3.5 mr-1 text-primary-600" /> İncele
+                      <Eye className="h-3.5 w-3.5 mr-1 text-[#315FE8]" /> İncele
                     </Button>
 
                     <Button
@@ -750,9 +839,10 @@ export const QuestionBankView: React.FC<QuestionBankViewProps> = ({ role }) => {
                       size="sm"
                       disabled={!canEdit}
                       onClick={() => handleOpenEdit(q.id)}
-                      className="text-xs"
+                      data-testid={`question-edit-btn-${q.id}`}
+                      className="text-xs bg-white border-navy-200/80 hover:bg-neutral-50 text-[#14233E] rounded-xl"
                     >
-                      <Edit2 className="h-3.5 w-3.5 mr-1" /> Düzenle
+                      <Edit2 className="h-3.5 w-3.5 mr-1 text-navy-600" /> Düzenle
                     </Button>
 
                     {q.status !== QuestionStatus.Archived && (
@@ -761,7 +851,8 @@ export const QuestionBankView: React.FC<QuestionBankViewProps> = ({ role }) => {
                         size="sm"
                         disabled={q.institutionId === null && !isSuperAdmin}
                         onClick={() => setArchivingQuestion(q)}
-                        className="text-amber-700 hover:bg-amber-50 hover:text-amber-800 text-xs"
+                        data-testid={`question-archive-btn-${q.id}`}
+                        className="text-amber-700 hover:bg-amber-50 hover:text-amber-800 text-xs rounded-xl"
                       >
                         <Archive className="h-3.5 w-3.5 mr-1" /> Arşivle
                       </Button>
@@ -774,18 +865,22 @@ export const QuestionBankView: React.FC<QuestionBankViewProps> = ({ role }) => {
 
           {/* 4. Pagination Controls */}
           {totalPages > 1 && (
-            <div className="bg-white rounded-2xl border border-neutral-200/80 p-4 shadow-soft-sm flex items-center justify-between">
+            <div
+              className="bg-[#F8F7F3] rounded-2xl border border-navy-200/80 p-3.5 sm:p-4 shadow-soft-xs flex items-center justify-between"
+              data-testid="question-pagination-controls"
+            >
               <Button
                 variant="outline"
                 size="sm"
                 disabled={page <= 1}
                 onClick={() => setPage((p) => Math.max(1, p - 1))}
-                className="text-xs"
+                data-testid="pagination-prev-btn"
+                className="text-xs bg-white border-navy-200/80 text-[#14233E] hover:bg-neutral-50 rounded-xl"
               >
                 <ChevronLeft className="h-4 w-4 mr-1" /> Önceki
               </Button>
 
-              <span className="text-xs font-semibold text-neutral-700">
+              <span className="text-xs font-semibold text-[#14233E]">
                 Sayfa {page} / {totalPages}
               </span>
 
@@ -794,7 +889,8 @@ export const QuestionBankView: React.FC<QuestionBankViewProps> = ({ role }) => {
                 size="sm"
                 disabled={page >= totalPages}
                 onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
-                className="text-xs"
+                data-testid="pagination-next-btn"
+                className="text-xs bg-white border-navy-200/80 text-[#14233E] hover:bg-neutral-50 rounded-xl"
               >
                 Sonraki <ChevronRight className="h-4 w-4 ml-1" />
               </Button>
@@ -813,7 +909,12 @@ export const QuestionBankView: React.FC<QuestionBankViewProps> = ({ role }) => {
           headerVariant="dark"
           footer={
             <div className="flex justify-end gap-2 w-full">
-              <Button variant="secondary" size="sm" onClick={() => setIsAssemblyModalOpen(false)}>
+              <Button
+                variant="secondary"
+                size="sm"
+                onClick={() => setIsAssemblyModalOpen(false)}
+                className="rounded-xl"
+              >
                 Kapat
               </Button>
             </div>
@@ -821,7 +922,7 @@ export const QuestionBankView: React.FC<QuestionBankViewProps> = ({ role }) => {
         >
           <div className="space-y-3 py-2">
             {availableExams.length === 0 ? (
-              <p className="text-xs text-neutral-500 text-center py-4">
+              <p className="text-xs text-navy-500 text-center py-4">
                 Montaj yapılabilecek kayıtlı sınav bulunmuyor.
               </p>
             ) : (
@@ -829,11 +930,11 @@ export const QuestionBankView: React.FC<QuestionBankViewProps> = ({ role }) => {
                 {availableExams.map((exam) => (
                   <div
                     key={exam.id}
-                    className="p-3 bg-[#F8F7F3] rounded-xl border border-neutral-200/80 flex items-center justify-between gap-3 hover:border-primary-300 transition-colors"
+                    className="p-3 bg-[#F8F7F3] rounded-xl border border-navy-200/80 flex items-center justify-between gap-3 hover:border-[#315FE8]/40 transition-colors"
                   >
                     <div>
-                      <h4 className="text-xs font-bold text-neutral-900">{exam.title}</h4>
-                      <p className="text-[11px] text-neutral-500 font-mono">
+                      <h4 className="text-xs font-bold text-[#14233E]">{exam.title}</h4>
+                      <p className="text-[11px] text-navy-500 font-mono">
                         {exam.examTypeName || 'Sınav'} • {new Date(exam.examDate).toLocaleDateString('tr-TR')}
                       </p>
                     </div>
@@ -845,7 +946,7 @@ export const QuestionBankView: React.FC<QuestionBankViewProps> = ({ role }) => {
                         setIsAssemblyModalOpen(false);
                         navigate(`/exams/${exam.id}/questions`);
                       }}
-                      className="text-xs shrink-0"
+                      className="text-xs shrink-0 bg-[#315FE8] hover:bg-blue-700 text-white rounded-xl"
                     >
                       Soruları Yönet
                     </Button>
@@ -907,13 +1008,14 @@ export const QuestionBankView: React.FC<QuestionBankViewProps> = ({ role }) => {
               size="sm"
               onClick={() => setArchivingQuestion(null)}
               disabled={isArchiving}
+              className="rounded-xl border-navy-200"
             >
               Vazgeç
             </Button>
             <Button
               variant="primary"
               size="sm"
-              className="bg-amber-600 hover:bg-amber-700 text-white"
+              className="bg-amber-600 hover:bg-amber-700 text-white rounded-xl"
               onClick={handleConfirmArchive}
               isLoading={isArchiving}
             >
@@ -922,12 +1024,12 @@ export const QuestionBankView: React.FC<QuestionBankViewProps> = ({ role }) => {
           </div>
         }
       >
-        <div className="space-y-3 py-2 text-xs text-neutral-700">
-          <p className="font-medium text-neutral-900">
+        <div className="space-y-3 py-2 text-xs text-navy-700">
+          <p className="font-medium text-[#14233E]">
             Soru arşivlenecektir. Geçmiş sınav ve sonuç kayıtları etkilenmeyecektir.
           </p>
           {archivingQuestion && (
-            <div className="p-3 bg-[#F8F7F3] rounded-xl text-xs text-neutral-600 border border-neutral-200 line-clamp-3">
+            <div className="p-3 bg-[#F8F7F3] rounded-xl text-xs text-navy-600 border border-navy-200/80 line-clamp-3">
               "{archivingQuestion.content}"
             </div>
           )}
