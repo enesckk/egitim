@@ -40,6 +40,12 @@ export const resolveApiBaseUrl = ({
     return 'http://localhost:5000';
   }
 
+  // Same-origin relative paths (e.g., "/" or "/api" for reverse proxy architectures)
+  if (trimmed === '/' || trimmed.startsWith('/')) {
+    const normalizedRelative = trimmed.replace(/\/+$/, '');
+    return normalizedRelative === '' ? '' : normalizedRelative;
+  }
+
   let parsed: URL;
   try {
     parsed = new URL(trimmed);

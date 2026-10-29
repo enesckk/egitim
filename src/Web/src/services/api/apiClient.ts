@@ -42,7 +42,26 @@ class ApiClient {
 
   private buildUrl(path: string, params?: Record<string, string | number | boolean | undefined | null>): string {
     const cleanPath = path.startsWith('/') ? path : `/${path}`;
-    const url = new URL(`${this.baseUrl}${cleanPath}`);
+    
+    // Support same-origin reverse proxy paths (e.g. baseUrl is "" or starts with "/")
+    let fullPath: string;
+    if (!this.baseUrl || this.baseUrl === '') {
+      fullPath = cleanPath;
+    } else if (this.baseUrl.startsWith('/')) {
+      const normalizedBase = this.baseUrl.replace(/\/+$/, '');
+      fullPath = `${normalizedBase}${cleanPath}`;
+    } else {
+      fullPath = `${this.baseUrl.replace(/\/+$/, '')}${cleanPath}`;
+    }
+
+    // In browser environments with relative fullPath, use window.location.origin as base
+    const baseOrigin = (typeof window !== 'undefined' && window.location?.origin)
+      ? window.location.origin
+      : 'http://localhost';
+
+    const url = fullPath.startsWith('http://') || fullPath.startsWith('https://')
+      ? new URL(fullPath)
+      : new URL(fullPath, baseOrigin);
 
     if (params) {
       Object.entries(params).forEach(([key, value]) => {
@@ -50,6 +69,11 @@ class ApiClient {
           url.searchParams.append(key, String(value));
         }
       });
+    }
+
+    // If original baseUrl was relative, return pathname + search
+    if (!this.baseUrl || this.baseUrl.startsWith('/')) {
+      return `${url.pathname}${url.search}`;
     }
 
     return url.toString();

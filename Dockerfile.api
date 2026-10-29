@@ -1,0 +1,60 @@
+# syntax=docker/dockerfile:1
+# Multi-stage Dockerfile for EgitimPlatform.Api (.NET 10)
+
+# Stage 1: Build & Publish
+FROM mcr.microsoft.com/dotnet/sdk:10.0-preview AS build
+WORKDIR /src
+
+# Copy global props and solution
+COPY Directory.Build.props global.json ./
+COPY EgitimPlatform.sln ./
+
+# Copy all project definition files preserving vertical slice hierarchy
+COPY src/BuildingBlocks/EgitimPlatform.BuildingBlocks/*.csproj src/BuildingBlocks/EgitimPlatform.BuildingBlocks/
+COPY src/Infrastructure/EgitimPlatform.Infrastructure/*.csproj src/Infrastructure/EgitimPlatform.Infrastructure/
+COPY src/Api/EgitimPlatform.Api/*.csproj src/Api/EgitimPlatform.Api/
+
+COPY src/Modules/AI/EgitimPlatform.Modules.AI/*.csproj src/Modules/AI/EgitimPlatform.Modules.AI/
+COPY src/Modules/Academic/EgitimPlatform.Modules.Academic/*.csproj src/Modules/Academic/EgitimPlatform.Modules.Academic/
+COPY src/Modules/Coaching/EgitimPlatform.Modules.Coaching/*.csproj src/Modules/Coaching/EgitimPlatform.Modules.Coaching/
+COPY src/Modules/Communication/EgitimPlatform.Modules.Communication/*.csproj src/Modules/Communication/EgitimPlatform.Modules.Communication/
+COPY src/Modules/Content/EgitimPlatform.Modules.Content/*.csproj src/Modules/Content/EgitimPlatform.Modules.Content/
+COPY src/Modules/Exams/EgitimPlatform.Modules.Exams/*.csproj src/Modules/Exams/EgitimPlatform.Modules.Exams/
+COPY src/Modules/Identity/EgitimPlatform.Modules.Identity/*.csproj src/Modules/Identity/EgitimPlatform.Modules.Identity/
+COPY src/Modules/Institutions/EgitimPlatform.Modules.Institutions/*.csproj src/Modules/Institutions/EgitimPlatform.Modules.Institutions/
+COPY src/Modules/Learning/EgitimPlatform.Modules.Learning/*.csproj src/Modules/Learning/EgitimPlatform.Modules.Learning/
+COPY src/Modules/Notebook/EgitimPlatform.Modules.Notebook/*.csproj src/Modules/Notebook/EgitimPlatform.Modules.Notebook/
+COPY src/Modules/Planning/EgitimPlatform.Modules.Planning/*.csproj src/Modules/Planning/EgitimPlatform.Modules.Planning/
+COPY src/Modules/Questions/EgitimPlatform.Modules.Questions/*.csproj src/Modules/Questions/EgitimPlatform.Modules.Questions/
+COPY src/Modules/Reporting/EgitimPlatform.Modules.Reporting/*.csproj src/Modules/Reporting/EgitimPlatform.Modules.Reporting/
+COPY src/Modules/Students/EgitimPlatform.Modules.Students/*.csproj src/Modules/Students/EgitimPlatform.Modules.Students/
+COPY src/Modules/Teachers/EgitimPlatform.Modules.Teachers/*.csproj src/Modules/Teachers/EgitimPlatform.Modules.Teachers/
+
+# Restore dependencies with layer caching
+RUN dotnet restore src/Api/EgitimPlatform.Api/EgitimPlatform.Api.csproj
+
+# Copy all source files
+COPY src/ src/
+
+# Build and publish release binaries
+WORKDIR /src/src/Api/EgitimPlatform.Api
+RUN dotnet publish -c Release -o /app/publish /p:UseAppHost=false
+
+# Stage 2: Runtime
+FROM mcr.microsoft.com/dotnet/aspnet:10.0-preview AS runtime
+WORKDIR /app
+
+# Run as non-root user (app user is pre-configured in .NET container images)
+USER $APP_UID
+
+# Copy published output
+COPY --from=build --chown=$APP_UID:$APP_UID /app/publish .
+
+# Default configuration
+ENV ASPNETCORE_URLS=http://+:5005 \
+    ASPNETCORE_ENVIRONMENT=Production \
+    DOTNET_RUNNING_IN_CONTAINER=true
+
+EXPOSE 5005
+
+ENTRYPOINT ["dotnet", "EgitimPlatform.Api.dll"]

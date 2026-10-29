@@ -1,0 +1,33 @@
+# Git & Version Control
+.git/
+.gitignore
+
+# Environment & Secret files
+.env
+.env.*
+!.env.example
+*.local
+
+# IDE & Editor files
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# Build & Runtime Artifacts
+bin/
+obj/
+publish/
+dist/
+node_modules/
+
+# Test results & coverage
+TestResults/
+test-results/
+coverage/
+playwright-report/
+blob-report/
+
+# OS specific files
+.DS_Store
+Thumbs.db
