@@ -100,7 +100,7 @@ public class InstitutionalReportHandler : IInstitutionalReportHandler
                     c.Name,
                     COUNT(DISTINCT cs.StudentId) AS StudentCount,
                     COUNT(DISTINCT ct.TeacherId) AS TeacherCount,
-                    ISNULL(AVG(p.UtilizationRate), 0) AS AvgAdherence,
+                    ISNULL(AVG(p.UtilizationRate * 100), 0) AS AvgAdherence,
                     ISNULL(AVG(a.TotalNet), 0) AS AvgNet
                 FROM Classrooms c
                 LEFT JOIN ClassroomStudents cs ON cs.ClassroomId = c.Id AND cs.InstitutionId = @instId AND cs.IsDeleted = 0
@@ -143,9 +143,9 @@ public class InstitutionalReportHandler : IInstitutionalReportHandler
         {
             cmd.CommandText = @"
                 SELECT 
-                    COUNT(CASE WHEN UtilizationRate >= 80 THEN 1 END) AS HighCount,
-                    COUNT(CASE WHEN UtilizationRate >= 50 AND UtilizationRate < 80 THEN 1 END) AS MidCount,
-                    COUNT(CASE WHEN UtilizationRate < 50 THEN 1 END) AS LowCount,
+                    COUNT(CASE WHEN UtilizationRate >= 0.80 THEN 1 END) AS HighCount,
+                    COUNT(CASE WHEN UtilizationRate >= 0.50 AND UtilizationRate < 0.80 THEN 1 END) AS MidCount,
+                    COUNT(CASE WHEN UtilizationRate < 0.50 THEN 1 END) AS LowCount,
                     COUNT(*) AS TotalCount
                 FROM StudyPlans
                 WHERE InstitutionId = @instId AND Status = 1 AND IsDeleted = 0";
