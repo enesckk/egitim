@@ -10,7 +10,9 @@ obj/
 node_modules/
 dist/
 .env
-.env.local
+.env.*
+!.env.example
+!.env.production.example
 .DS_Store
 *.tsbuildinfo
 test-results/

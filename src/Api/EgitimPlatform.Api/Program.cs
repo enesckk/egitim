@@ -28,6 +28,12 @@ Log.Logger = new LoggerConfiguration()
 
 try
 {
+    if (args.Length > 0 && (args.Contains("--check-health") || args.Contains("--check-health-live")))
+    {
+        var exitCode = await HealthCheckEndpointExtensions.RunCliHealthProbeAsync(args);
+        Environment.Exit(exitCode);
+    }
+
     var builder = WebApplication.CreateBuilder(args);
 
     // Serilog
@@ -147,35 +153,39 @@ try
             // Prevents unbounded header chain traversal.
             options.ForwardLimit = reverseProxySection.GetValue<int>("ForwardLimit", 1);
 
-            // Configure trusted proxies from configuration
+            // Configure trusted proxies and networks from configuration
             var knownProxies = reverseProxySection.GetSection("KnownProxies").Get<string[]>();
+            var knownNetworks = reverseProxySection.GetSection("KnownNetworks").Get<string[]>();
 
-            if (knownProxies is { Length: > 0 })
+            if (knownProxies is { Length: > 0 } || knownNetworks is { Length: > 0 })
             {
                 options.KnownProxies.Clear();
-                foreach (var proxyIp in knownProxies)
+                options.KnownIPNetworks.Clear();
+
+                if (knownProxies is { Length: > 0 })
                 {
-                    if (System.Net.IPAddress.TryParse(proxyIp, out var address))
-                        options.KnownProxies.Add(address);
+                    foreach (var proxyIp in knownProxies)
+                    {
+                        if (System.Net.IPAddress.TryParse(proxyIp, out var address))
+                            options.KnownProxies.Add(address);
+                    }
+                }
+
+                if (knownNetworks is { Length: > 0 })
+                {
+                    foreach (var cidr in knownNetworks)
+                    {
+                        if (System.Net.IPNetwork.TryParse(cidr, out var network))
+                        {
+                            options.KnownIPNetworks.Add(network);
+                        }
+                    }
                 }
             }
-
-            // P1-02: Configure trusted proxies from configuration.
-            // KnownProxies uses IPAddress — simple and sufficient for most deployments.
-            if (knownProxies is { Length: > 0 })
+            else
             {
-                options.KnownProxies.Clear();
-                foreach (var proxyIp in knownProxies)
-                {
-                    if (System.Net.IPAddress.TryParse(proxyIp, out var address))
-                        options.KnownProxies.Add(address);
-                }
-            }
-
-            // P1-02: If proxy is enabled but no trusted proxies configured,
-            // fail safely — only trust localhost loopback (development scenario).
-            if (knownProxies is null || knownProxies.Length == 0)
-            {
+                // P1-02: If proxy is enabled but no trusted proxies or networks configured,
+                // fail safely — only trust localhost loopback (development scenario).
                 options.KnownProxies.Clear();
                 options.KnownProxies.Add(System.Net.IPAddress.Loopback);
                 options.KnownProxies.Add(System.Net.IPAddress.IPv6Loopback);
@@ -266,6 +276,7 @@ try
 
         // Step 1: Apply pending migrations
         await dbContext.Database.MigrateAsync();
+        await EgitimPlatform.Modules.Questions.Constants.QuestionStyleDefaults.SeedInitialStylesAsync(dbContext);
         Log.Information("Database migrations applied.");
 
         // Step 2: Seed required system roles

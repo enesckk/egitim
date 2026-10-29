@@ -1,0 +1,30 @@
+# ==============================================================================
+# Egitim Platformu — Production HTTPS Gateway (Caddy)
+# Terminates TLS, enforces security headers, routes /api and /health to API,
+# and proxies all other requests to the SPA frontend container (with SPA fallback).
+# ==============================================================================
+
+{$SITE_ADDRESS:localhost, 127.0.0.1} {
+	# Security headers (set/overwrite to prevent duplicates)
+	header {
+		Strict-Transport-Security "max-age=31536000; includeSubDomains"
+		X-Content-Type-Options "nosniff"
+		X-Frame-Options "SAMEORIGIN"
+		Referrer-Policy "strict-origin-when-cross-origin"
+		Permissions-Policy "accelerometer=(), camera=(), geolocation=(), gyroscope=(), magnetometer=(), microphone=(), payment=(), usb=()"
+		-Server
+	}
+
+	# Same-origin API and health check routing
+	@backend {
+		path /api/* /health /health/*
+	}
+	handle @backend {
+		reverse_proxy api:5005
+	}
+
+	# Frontend static assets & SPA fallback (handled by unprivileged Nginx in web:8080)
+	handle {
+		reverse_proxy web:8080
+	}
+}

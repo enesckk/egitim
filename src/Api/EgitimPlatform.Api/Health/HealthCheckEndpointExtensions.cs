@@ -1,3 +1,4 @@
+using System.Net.Http;
 using System.Text.Json;
 using Microsoft.AspNetCore.Diagnostics.HealthChecks;
 using Microsoft.Extensions.Diagnostics.HealthChecks;
@@ -22,5 +23,20 @@ public static class HealthCheckEndpointExtensions
         };
 
         return context.Response.Body.WriteAsync(bytes, 0, bytes.Length);
+    }
+
+    public static async Task<int> RunCliHealthProbeAsync(string[] args)
+    {
+        var path = args.Contains("--check-health-live") ? "/health/live" : "/health/ready";
+        using var client = new HttpClient { Timeout = TimeSpan.FromSeconds(4) };
+        try
+        {
+            using var response = await client.GetAsync($"http://127.0.0.1:5005{path}");
+            return response.IsSuccessStatusCode ? 0 : 1;
+        }
+        catch
+        {
+            return 1;
+        }
     }
 }

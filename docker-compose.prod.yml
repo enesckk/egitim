@@ -1,0 +1,153 @@
+# ==============================================================================
+# Egitim Platformu — Production Docker Compose Stack
+# Architecture: Single-Institution Deployment with HTTPS Gateway (Caddy),
+#               Frontend SPA (Nginx Unprivileged), Backend API (.NET 10),
+#               One-Shot Migration Runner, and Persistent MSSQL 2022.
+#
+# Usage:
+#   1. Copy .env.production.example to .env.production and set real secrets.
+#   2. Validate configuration:
+#      docker compose -f docker-compose.prod.yml --env-file .env.production config
+#   3. Start stack (runs migrations via 'migrate' before starting 'api'):
+#      docker compose -f docker-compose.prod.yml --env-file .env.production up -d --build
+# ==============================================================================
+
+services:
+  mssql:
+    image: mcr.microsoft.com/mssql/server:2022-latest
+    restart: unless-stopped
+    environment:
+      ACCEPT_EULA: "Y"
+      MSSQL_SA_PASSWORD: ${MSSQL_SA_PASSWORD:?MSSQL_SA_PASSWORD is required}
+      MSSQL_PID: ${MSSQL_PID:-Developer}
+    expose:
+      - "1433"
+    volumes:
+      - mssql_data:/var/opt/mssql
+    networks:
+      - egitim_internal
+    healthcheck:
+      test: ["CMD-SHELL", "/opt/mssql-tools18/bin/sqlcmd -S localhost -U sa -P \"$$MSSQL_SA_PASSWORD\" -C -Q \"SELECT 1\" -b -o /dev/null"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 20s
+
+  migrate:
+    image: egitim-platform-api:latest
+    build:
+      context: .
+      dockerfile: Dockerfile.api
+    restart: "no"
+    command: ["--initialize-platform"]
+    depends_on:
+      mssql:
+        condition: service_healthy
+    environment:
+      ASPNETCORE_ENVIRONMENT: Production
+      ConnectionStrings__DefaultConnection: "Server=mssql,1433;Database=${MSSQL_DATABASE:-EgitimPlatform};User Id=sa;Password=${MSSQL_SA_PASSWORD:?MSSQL_SA_PASSWORD is required};TrustServerCertificate=True;Encrypt=True;"
+      JwtSettings__SigningKey: ${JWT_SIGNING_KEY:?JWT_SIGNING_KEY is required (min 32 characters)}
+      JwtSettings__Issuer: ${JWT_ISSUER:-EgitimPlatform}
+      JwtSettings__Audience: ${JWT_AUDIENCE:-EgitimPlatform}
+      Bootstrap__Enabled: ${BOOTSTRAP_ENABLED:-false}
+      Bootstrap__SuperAdminEmail: ${BOOTSTRAP_SUPERADMIN_EMAIL:-}
+      Bootstrap__SuperAdminPassword: ${BOOTSTRAP_SUPERADMIN_PASSWORD:-}
+      DemoSeed__Enabled: "false"
+    networks:
+      - egitim_internal
+
+  api:
+    image: egitim-platform-api:latest
+    build:
+      context: .
+      dockerfile: Dockerfile.api
+    restart: unless-stopped
+    depends_on:
+      mssql:
+        condition: service_healthy
+      migrate:
+        condition: service_completed_successfully
+    expose:
+      - "5005"
+    environment:
+      ASPNETCORE_ENVIRONMENT: Production
+      ASPNETCORE_URLS: http://+:5005
+      ConnectionStrings__DefaultConnection: "Server=mssql,1433;Database=${MSSQL_DATABASE:-EgitimPlatform};User Id=sa;Password=${MSSQL_SA_PASSWORD:?MSSQL_SA_PASSWORD is required};TrustServerCertificate=True;Encrypt=True;"
+      JwtSettings__SigningKey: ${JWT_SIGNING_KEY:?JWT_SIGNING_KEY is required (min 32 characters)}
+      JwtSettings__Issuer: ${JWT_ISSUER:-EgitimPlatform}
+      JwtSettings__Audience: ${JWT_AUDIENCE:-EgitimPlatform}
+      JwtSettings__AccessTokenExpirationMinutes: ${JWT_ACCESS_TOKEN_MINUTES:-15}
+      JwtSettings__RefreshTokenExpirationDays: ${JWT_REFRESH_TOKEN_DAYS:-7}
+      CorsSettings__AllowedOrigins__0: ${CORS_ALLOWED_ORIGIN:?CORS_ALLOWED_ORIGIN is required (e.g. https://localhost)}
+      ReverseProxy__Enabled: "true"
+      ReverseProxy__ForwardLimit: "1"
+      ReverseProxy__KnownNetworks__0: "10.0.0.0/8"
+      ReverseProxy__KnownNetworks__1: "172.16.0.0/12"
+      ReverseProxy__KnownNetworks__2: "192.168.0.0/16"
+      RateLimiting__LoginLimit: ${RATE_LIMIT_LOGIN:-10}
+      RateLimiting__RefreshLimit: ${RATE_LIMIT_REFRESH:-30}
+      RateLimiting__UploadLimit: ${RATE_LIMIT_UPLOAD:-20}
+      Bootstrap__Enabled: "false"
+      DemoSeed__Enabled: "false"
+    healthcheck:
+      test: ["CMD", "dotnet", "EgitimPlatform.Api.dll", "--check-health"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 15s
+    networks:
+      - egitim_internal
+
+  web:
+    image: egitim-platform-web:latest
+    build:
+      context: ./src/Web
+      dockerfile: ../../Dockerfile.web
+      args:
+        VITE_API_BASE_URL: ${VITE_API_BASE_URL:-}
+    restart: unless-stopped
+    expose:
+      - "8080"
+    healthcheck:
+      test: ["CMD-SHELL", "wget --quiet --tries=1 --spider http://127.0.0.1:8080/health || exit 1"]
+      interval: 15s
+      timeout: 3s
+      retries: 3
+      start_period: 5s
+    networks:
+      - egitim_internal
+
+  gateway:
+    image: caddy:2-alpine
+    restart: unless-stopped
+    depends_on:
+      api:
+        condition: service_healthy
+      web:
+        condition: service_healthy
+    ports:
+      - "${GATEWAY_HTTP_PORT:-80}:80"
+      - "${GATEWAY_HTTPS_PORT:-443}:443"
+    environment:
+      SITE_ADDRESS: ${SITE_ADDRESS:-localhost, 127.0.0.1}
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+      - caddy_config:/config
+    healthcheck:
+      test: ["CMD-SHELL", "wget --no-check-certificate --quiet --tries=1 --spider https://127.0.0.1/health/live || exit 1"]
+      interval: 15s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+    networks:
+      - egitim_internal
+
+volumes:
+  mssql_data:
+  caddy_data:
+  caddy_config:
+
+networks:
+  egitim_internal:
+    driver: bridge
