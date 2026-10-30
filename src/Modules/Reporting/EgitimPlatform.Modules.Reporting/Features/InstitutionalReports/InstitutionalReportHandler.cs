@@ -76,11 +76,14 @@ public class InstitutionalReportHandler : IInstitutionalReportHandler
         if (conn.State != System.Data.ConnectionState.Open)
             await conn.OpenAsync(ct);
 
-        // 1. Institution Name
+        var hasClassroomFilter = filter.ClassroomId.HasValue && filter.ClassroomId.Value != Guid.Empty;
+        var hasExamFilter = filter.ExamId.HasValue && filter.ExamId.Value != Guid.Empty;
+
+        // 1. Institution Name & Distinct Student Count (grain: distinct non-deleted Students in institution/classroom)
         string institutionName = "Kurum Raporu";
         using (var cmd = conn.CreateCommand())
         {
-            cmd.CommandText = "SELECT TOP 1 Name FROM Institutions WHERE Id = @instId";
+            cmd.CommandText = "SELECT TOP 1 Name FROM Institutions WHERE Id = @instId AND IsDeleted = 0";
             var p = cmd.CreateParameter();
             p.ParameterName = "@instId";
             p.Value = instId;
@@ -90,31 +93,131 @@ public class InstitutionalReportHandler : IInstitutionalReportHandler
             if (scalar is string s) institutionName = s;
         }
 
-        // 2. Classrooms & Branches
-        var branches = new List<BranchReportItemDto>();
+        int totalStudents = 0;
         using (var cmd = conn.CreateCommand())
         {
-            cmd.CommandText = @"
-                SELECT 
-                    c.Id,
-                    c.Name,
-                    COUNT(DISTINCT cs.StudentId) AS StudentCount,
-                    COUNT(DISTINCT ct.TeacherId) AS TeacherCount,
-                    ISNULL(AVG(p.UtilizationRate * 100), 0) AS AvgAdherence,
-                    ISNULL(AVG(a.TotalNet), 0) AS AvgNet
-                FROM Classrooms c
-                LEFT JOIN ClassroomStudents cs ON cs.ClassroomId = c.Id AND cs.InstitutionId = @instId AND cs.IsDeleted = 0
-                LEFT JOIN ClassroomTeachers ct ON ct.ClassroomId = c.Id AND ct.InstitutionId = @instId AND ct.IsDeleted = 0
-                LEFT JOIN StudyPlans p ON p.StudentId = cs.StudentId AND p.InstitutionId = @instId AND p.Status = 1 AND p.IsDeleted = 0
-                LEFT JOIN StudentExamAttempts a ON a.StudentId = cs.StudentId AND a.InstitutionId = @instId AND a.IsDeleted = 0
-                WHERE c.InstitutionId = @instId AND c.IsDeleted = 0
-                GROUP BY c.Id, c.Name
-                ORDER BY c.Name";
+            var sql = new StringBuilder(@"
+                SELECT COUNT(st.Id)
+                FROM Students st
+                WHERE st.InstitutionId = @instId AND st.IsDeleted = 0");
 
             var p = cmd.CreateParameter();
             p.ParameterName = "@instId";
             p.Value = instId;
             cmd.Parameters.Add(p);
+
+            if (hasClassroomFilter)
+            {
+                sql.Append(@"
+                    AND EXISTS (
+                        SELECT 1
+                        FROM ClassroomStudents cs
+                        WHERE cs.StudentId = st.Id
+                          AND cs.ClassroomId = @classroomId
+                          AND cs.InstitutionId = @instId
+                          AND cs.IsDeleted = 0
+                    )");
+                var pc = cmd.CreateParameter();
+                pc.ParameterName = "@classroomId";
+                pc.Value = filter.ClassroomId!.Value;
+                cmd.Parameters.Add(pc);
+            }
+
+            cmd.CommandText = sql.ToString();
+            var scalar = await cmd.ExecuteScalarAsync(ct);
+            if (scalar != null && scalar != DBNull.Value)
+                totalStudents = Convert.ToInt32(scalar);
+        }
+
+        // 2. Classrooms & Branches (grain: 1 row per Classroom; independent subqueries prevent StudyPlans x StudentExamAttempts x ClassroomTeachers fan-out)
+        var branches = new List<BranchReportItemDto>();
+        using (var cmd = conn.CreateCommand())
+        {
+            var attemptFilterClause = new StringBuilder();
+            var p = cmd.CreateParameter();
+            p.ParameterName = "@instId";
+            p.Value = instId;
+            cmd.Parameters.Add(p);
+
+            if (hasExamFilter)
+            {
+                attemptFilterClause.Append(" AND a.ExamId = @examId");
+                var pe = cmd.CreateParameter();
+                pe.ParameterName = "@examId";
+                pe.Value = filter.ExamId!.Value;
+                cmd.Parameters.Add(pe);
+            }
+
+            if (filter.StartDate.HasValue)
+            {
+                attemptFilterClause.Append(" AND a.CreatedAt >= @startDate");
+                var ps = cmd.CreateParameter();
+                ps.ParameterName = "@startDate";
+                ps.Value = filter.StartDate.Value;
+                cmd.Parameters.Add(ps);
+            }
+
+            if (filter.EndDate.HasValue)
+            {
+                attemptFilterClause.Append(" AND a.CreatedAt <= @endDate");
+                var pe = cmd.CreateParameter();
+                pe.ParameterName = "@endDate";
+                pe.Value = filter.EndDate.Value;
+                cmd.Parameters.Add(pe);
+            }
+
+            cmd.CommandText = $@"
+                SELECT 
+                    c.Id,
+                    c.Name,
+                    (
+                        SELECT COUNT(DISTINCT cs.StudentId)
+                        FROM ClassroomStudents cs
+                        JOIN Students st ON st.Id = cs.StudentId AND st.InstitutionId = @instId AND st.IsDeleted = 0
+                        WHERE cs.ClassroomId = c.Id AND cs.InstitutionId = @instId AND cs.IsDeleted = 0
+                    ) AS StudentCount,
+                    (
+                        SELECT COUNT(DISTINCT ct.TeacherId)
+                        FROM ClassroomTeachers ct
+                        JOIN Teachers t ON t.Id = ct.TeacherId AND t.InstitutionId = @instId AND t.IsDeleted = 0
+                        WHERE ct.ClassroomId = c.Id AND ct.InstitutionId = @instId AND ct.IsDeleted = 0
+                    ) AS TeacherCount,
+                    ISNULL((
+                        SELECT AVG(p.UtilizationRate * 100.0)
+                        FROM StudyPlans p
+                        JOIN Students st ON st.Id = p.StudentId AND st.InstitutionId = @instId AND st.IsDeleted = 0
+                        WHERE p.InstitutionId = @instId
+                          AND p.Status = 1
+                          AND p.IsDeleted = 0
+                          AND EXISTS (
+                              SELECT 1
+                              FROM ClassroomStudents cs
+                              WHERE cs.ClassroomId = c.Id
+                                AND cs.StudentId = p.StudentId
+                                AND cs.InstitutionId = @instId
+                                AND cs.IsDeleted = 0
+                          )
+                    ), 0) AS AvgAdherence,
+                    ISNULL((
+                        SELECT AVG(a.TotalNet)
+                        FROM StudentExamAttempts a
+                        JOIN Exams e ON e.Id = a.ExamId AND e.InstitutionId = @instId AND e.IsDeleted = 0
+                        JOIN Students st ON st.Id = a.StudentId AND st.InstitutionId = @instId AND st.IsDeleted = 0
+                        WHERE a.InstitutionId = @instId
+                          AND a.IsDeleted = 0
+                          {attemptFilterClause}
+                          AND EXISTS (
+                              SELECT 1
+                              FROM ClassroomStudents cs
+                              WHERE cs.ClassroomId = c.Id
+                                AND cs.StudentId = a.StudentId
+                                AND cs.InstitutionId = @instId
+                                AND cs.IsDeleted = 0
+                          )
+                    ), 0) AS AvgNet
+                FROM Classrooms c
+                WHERE c.InstitutionId = @instId AND c.IsDeleted = 0
+                ORDER BY c.Name";
 
             using var reader = await cmd.ExecuteReaderAsync(ct);
             while (await reader.ReadAsync(ct))
@@ -137,23 +240,45 @@ public class InstitutionalReportHandler : IInstitutionalReportHandler
             }
         }
 
-        // 3. Adherence Distribution across all active study plans in institution
+        // 3. Adherence Distribution & Overall Average Adherence (grain: active StudyPlans of non-deleted Students, without multi-classroom duplication)
         var adherenceDist = new List<AdherenceDistributionDto>();
+        decimal overallAvgAdh = 0m;
         using (var cmd = conn.CreateCommand())
         {
-            cmd.CommandText = @"
+            var sql = new StringBuilder(@"
                 SELECT 
-                    COUNT(CASE WHEN UtilizationRate >= 0.80 THEN 1 END) AS HighCount,
-                    COUNT(CASE WHEN UtilizationRate >= 0.50 AND UtilizationRate < 0.80 THEN 1 END) AS MidCount,
-                    COUNT(CASE WHEN UtilizationRate < 0.50 THEN 1 END) AS LowCount,
-                    COUNT(*) AS TotalCount
-                FROM StudyPlans
-                WHERE InstitutionId = @instId AND Status = 1 AND IsDeleted = 0";
+                    COUNT(CASE WHEN p.UtilizationRate >= 0.80 THEN 1 END) AS HighCount,
+                    COUNT(CASE WHEN p.UtilizationRate >= 0.50 AND p.UtilizationRate < 0.80 THEN 1 END) AS MidCount,
+                    COUNT(CASE WHEN p.UtilizationRate < 0.50 THEN 1 END) AS LowCount,
+                    COUNT(*) AS TotalCount,
+                    ISNULL(AVG(p.UtilizationRate * 100.0), 0) AS OverallAvgAdherence
+                FROM StudyPlans p
+                JOIN Students st ON st.Id = p.StudentId AND st.InstitutionId = @instId AND st.IsDeleted = 0
+                WHERE p.InstitutionId = @instId AND p.Status = 1 AND p.IsDeleted = 0");
 
             var p = cmd.CreateParameter();
             p.ParameterName = "@instId";
             p.Value = instId;
             cmd.Parameters.Add(p);
+
+            if (hasClassroomFilter)
+            {
+                sql.Append(@"
+                    AND EXISTS (
+                        SELECT 1
+                        FROM ClassroomStudents cs
+                        WHERE cs.StudentId = p.StudentId
+                          AND cs.ClassroomId = @classroomId
+                          AND cs.InstitutionId = @instId
+                          AND cs.IsDeleted = 0
+                    )");
+                var pc = cmd.CreateParameter();
+                pc.ParameterName = "@classroomId";
+                pc.Value = filter.ClassroomId!.Value;
+                cmd.Parameters.Add(pc);
+            }
+
+            cmd.CommandText = sql.ToString();
 
             using var reader = await cmd.ExecuteReaderAsync(ct);
             if (await reader.ReadAsync(ct))
@@ -162,6 +287,7 @@ public class InstitutionalReportHandler : IInstitutionalReportHandler
                 var mid = reader.GetInt32(1);
                 var low = reader.GetInt32(2);
                 var total = reader.GetInt32(3);
+                overallAvgAdh = Math.Round(Convert.ToDecimal(reader.GetValue(4)), 1);
 
                 decimal hPct = total > 0 ? Math.Round((decimal)high * 100 / total, 1) : 0;
                 decimal mPct = total > 0 ? Math.Round((decimal)mid * 100 / total, 1) : 0;
@@ -173,7 +299,7 @@ public class InstitutionalReportHandler : IInstitutionalReportHandler
             }
         }
 
-        // 4. Subject Averages with applied filters (Classroom, Exam, Dates)
+        // 4. Subject Averages with applied filters (grain: StudentExamSubjectResults, using EXISTS for classroom filter to prevent multi-classroom fan-out)
         var subjectAverages = new List<SubjectAverageDto>();
         using (var cmd = conn.CreateCommand())
         {
@@ -184,10 +310,11 @@ public class InstitutionalReportHandler : IInstitutionalReportHandler
                     AVG(CAST(sr.Correct AS decimal(10,2))) AS AvgCorrect,
                     AVG(CAST(sr.Wrong AS decimal(10,2))) AS AvgWrong
                 FROM StudentExamSubjectResults sr
-                JOIN StudentExamAttempts a ON a.Id = sr.StudentExamAttemptId AND a.IsDeleted = 0
+                JOIN StudentExamAttempts a ON a.Id = sr.StudentExamAttemptId AND a.InstitutionId = @instId AND a.IsDeleted = 0
+                JOIN Exams e ON e.Id = a.ExamId AND e.InstitutionId = @instId AND e.IsDeleted = 0
+                JOIN Students st ON st.Id = a.StudentId AND st.InstitutionId = @instId AND st.IsDeleted = 0
                 JOIN ExamSections es ON es.Id = sr.ExamSectionId AND es.IsDeleted = 0
                 JOIN AcademicSubjects sub ON sub.Id = es.SubjectId AND sub.IsDeleted = 0
-                LEFT JOIN ClassroomStudents cs ON cs.StudentId = a.StudentId AND cs.IsDeleted = 0
                 WHERE sr.InstitutionId = @instId AND sr.IsDeleted = 0");
 
             var p = cmd.CreateParameter();
@@ -195,21 +322,29 @@ public class InstitutionalReportHandler : IInstitutionalReportHandler
             p.Value = instId;
             cmd.Parameters.Add(p);
 
-            if (filter.ClassroomId.HasValue && filter.ClassroomId.Value != Guid.Empty)
+            if (hasClassroomFilter)
             {
-                sql.Append(" AND cs.ClassroomId = @classroomId");
+                sql.Append(@"
+                    AND EXISTS (
+                        SELECT 1
+                        FROM ClassroomStudents cs
+                        WHERE cs.StudentId = a.StudentId
+                          AND cs.ClassroomId = @classroomId
+                          AND cs.InstitutionId = @instId
+                          AND cs.IsDeleted = 0
+                    )");
                 var pc = cmd.CreateParameter();
                 pc.ParameterName = "@classroomId";
-                pc.Value = filter.ClassroomId.Value;
+                pc.Value = filter.ClassroomId!.Value;
                 cmd.Parameters.Add(pc);
             }
 
-            if (filter.ExamId.HasValue && filter.ExamId.Value != Guid.Empty)
+            if (hasExamFilter)
             {
                 sql.Append(" AND a.ExamId = @examId");
                 var pe = cmd.CreateParameter();
                 pe.ParameterName = "@examId";
-                pe.Value = filter.ExamId.Value;
+                pe.Value = filter.ExamId!.Value;
                 cmd.Parameters.Add(pe);
             }
 
@@ -231,7 +366,7 @@ public class InstitutionalReportHandler : IInstitutionalReportHandler
                 cmd.Parameters.Add(pe);
             }
 
-            sql.Append(" GROUP BY sub.Name ORDER BY sub.Name");
+            sql.Append(" GROUP BY sub.Id, sub.Name ORDER BY sub.Name");
             cmd.CommandText = sql.ToString();
 
             using var reader = await cmd.ExecuteReaderAsync(ct);
@@ -251,24 +386,37 @@ public class InstitutionalReportHandler : IInstitutionalReportHandler
             }
         }
 
-        // 5. Exam Performance Rows (for drill-down and export)
+        // 5. Exam Performance Rows (grain: strictly 1 row per StudentExamAttempt; OUTER APPLY resolves classroom display name without duplicating attempts)
         var examPerformances = new List<ExamPerformanceRowDto>();
+        var distinctExamIds = new HashSet<Guid>();
         using (var cmd = conn.CreateCommand())
         {
-            var sql = new StringBuilder(@"
+            var classroomSubqueryFilter = hasClassroomFilter ? "AND cs.ClassroomId = @classroomId" : string.Empty;
+            var sql = new StringBuilder($@"
                 SELECT 
                     a.Id,
+                    a.ExamId,
                     e.Title AS ExamTitle,
-                    ISNULL(c.Name, 'Genel') AS ClassroomName,
+                    ISNULL(cls.ClassroomName, 'Genel') AS ClassroomName,
                     (st.FirstName + ' ' + st.LastName) AS StudentName,
                     a.TotalNet,
                     ISNULL(a.ReportedScore, 0) AS Score,
                     a.CreatedAt
                 FROM StudentExamAttempts a
-                JOIN Exams e ON e.Id = a.ExamId AND e.IsDeleted = 0
-                JOIN Students st ON st.Id = a.StudentId AND st.IsDeleted = 0
-                LEFT JOIN ClassroomStudents cs ON cs.StudentId = st.Id AND cs.IsDeleted = 0
-                LEFT JOIN Classrooms c ON c.Id = cs.ClassroomId AND c.IsDeleted = 0
+                JOIN Exams e ON e.Id = a.ExamId AND e.InstitutionId = @instId AND e.IsDeleted = 0
+                JOIN Students st ON st.Id = a.StudentId AND st.InstitutionId = @instId AND st.IsDeleted = 0
+                OUTER APPLY (
+                    SELECT STRING_AGG(c.Name, ', ') WITHIN GROUP (ORDER BY c.Name) AS ClassroomName
+                    FROM (
+                        SELECT DISTINCT c.Name
+                        FROM ClassroomStudents cs
+                        JOIN Classrooms c ON c.Id = cs.ClassroomId AND c.InstitutionId = @instId AND c.IsDeleted = 0
+                        WHERE cs.StudentId = st.Id
+                          AND cs.InstitutionId = @instId
+                          AND cs.IsDeleted = 0
+                          {classroomSubqueryFilter}
+                    ) c
+                ) cls
                 WHERE a.InstitutionId = @instId AND a.IsDeleted = 0");
 
             var p = cmd.CreateParameter();
@@ -276,21 +424,29 @@ public class InstitutionalReportHandler : IInstitutionalReportHandler
             p.Value = instId;
             cmd.Parameters.Add(p);
 
-            if (filter.ClassroomId.HasValue && filter.ClassroomId.Value != Guid.Empty)
+            if (hasClassroomFilter)
             {
-                sql.Append(" AND cs.ClassroomId = @classroomId");
+                sql.Append(@"
+                    AND EXISTS (
+                        SELECT 1
+                        FROM ClassroomStudents cs
+                        WHERE cs.StudentId = st.Id
+                          AND cs.ClassroomId = @classroomId
+                          AND cs.InstitutionId = @instId
+                          AND cs.IsDeleted = 0
+                    )");
                 var pc = cmd.CreateParameter();
                 pc.ParameterName = "@classroomId";
-                pc.Value = filter.ClassroomId.Value;
+                pc.Value = filter.ClassroomId!.Value;
                 cmd.Parameters.Add(pc);
             }
 
-            if (filter.ExamId.HasValue && filter.ExamId.Value != Guid.Empty)
+            if (hasExamFilter)
             {
                 sql.Append(" AND a.ExamId = @examId");
                 var pe = cmd.CreateParameter();
                 pe.ParameterName = "@examId";
-                pe.Value = filter.ExamId.Value;
+                pe.Value = filter.ExamId!.Value;
                 cmd.Parameters.Add(pe);
             }
 
@@ -318,26 +474,23 @@ public class InstitutionalReportHandler : IInstitutionalReportHandler
             using var reader = await cmd.ExecuteReaderAsync(ct);
             while (await reader.ReadAsync(ct))
             {
+                distinctExamIds.Add(reader.GetGuid(1));
                 examPerformances.Add(new ExamPerformanceRowDto(
                     reader.GetGuid(0),
-                    reader.GetString(1),
                     reader.GetString(2),
                     reader.GetString(3),
-                    reader.GetDecimal(4),
+                    reader.GetString(4),
                     reader.GetDecimal(5),
-                    (DateTimeOffset)reader.GetValue(6)
+                    reader.GetDecimal(6),
+                    (DateTimeOffset)reader.GetValue(7)
                 ));
             }
         }
 
-        // Summary Calculations
-        int totalStudents = branches.Sum(b => b.StudentCount);
+        // Summary Calculations (each metric computed at its canonical grain without multi-classroom or multi-relation inflation)
         int totalAttempts = examPerformances.Count;
-        int totalExams = examPerformances.Select(p => p.ExamTitle).Distinct().Count();
+        int totalExams = distinctExamIds.Count;
         decimal overallAvgNet = totalAttempts > 0 ? Math.Round(examPerformances.Average(p => p.TotalNet), 2) : 0m;
-        decimal overallAvgAdh = branches.Any(b => b.AverageAdherence > 0)
-            ? Math.Round(branches.Where(b => b.AverageAdherence > 0).Average(b => b.AverageAdherence), 1)
-            : 0m;
 
         return new InstitutionalReportDto(
             institutionName,
