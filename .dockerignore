@@ -29,6 +29,10 @@ coverage/
 playwright-report/
 blob-report/
 
-# OS specific files
+# OS specific & backup files
 .DS_Store
 Thumbs.db
+backups/
+*.bak
+*.bak.sha256
+*.trn

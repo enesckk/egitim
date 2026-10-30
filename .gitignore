@@ -22,8 +22,12 @@ playwright-report/
 Library/
 *.pid
 
-# Storage and uploads
+# Storage, uploads, and database backups
 Storage/
 src/Api/EgitimPlatform.Api/Storage/
+backups/
+*.bak
+*.bak.sha256
+*.trn
 
 
