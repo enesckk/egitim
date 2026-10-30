@@ -34,12 +34,17 @@ test.describe('P2-01: API Base URL Validation Tests', () => {
     expect(() => validateAndNormalizeApiBaseUrl('https://api.example.com#fragment')).toThrow(/hash|fragment/i);
   });
 
-  test('Development fallback to localhost vs Production mandatory failure', () => {
+  test('Development fallback to localhost vs Production mandatory failure and same-origin "/" support', () => {
     // Dev: fallback
     expect(validateAndNormalizeApiBaseUrl('', false)).toBe('http://localhost:5000');
     expect(validateAndNormalizeApiBaseUrl(undefined, false)).toBe('http://localhost:5000');
 
-    // Prod: must throw
+    // Prod: same-origin "/" and "/api" relative paths succeed without error
+    expect(validateAndNormalizeApiBaseUrl('/', true)).toBe('');
+    expect(validateAndNormalizeApiBaseUrl('/api', true)).toBe('/api');
+    expect(validateAndNormalizeApiBaseUrl('/api/', true)).toBe('/api');
+
+    // Prod: empty or whitespace must throw (fail closed)
     expect(() => validateAndNormalizeApiBaseUrl('', true)).toThrow(/required in production/i);
     expect(() => validateAndNormalizeApiBaseUrl(undefined, true)).toThrow(/required in production/i);
     expect(() => validateAndNormalizeApiBaseUrl('   ', true)).toThrow(/required in production/i);

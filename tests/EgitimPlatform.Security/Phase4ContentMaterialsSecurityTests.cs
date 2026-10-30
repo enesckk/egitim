@@ -408,4 +408,43 @@ public class Phase4ContentMaterialsSecurityTests
 
         if (Directory.Exists(tempFolder)) Directory.Delete(tempFolder, true);
     }
+
+    [Fact]
+    public async Task Spoofed_Pdf_Magic_Bytes_Throws_InvalidOperationException()
+    {
+        var tempFolder = Path.Combine(Path.GetTempPath(), Guid.NewGuid().ToString("N"));
+        try
+        {
+            var storage = new LocalFileStorageService(tempFolder);
+            var spoofedPdf = CreateMockFormFile("spoofed.pdf", "application/pdf", Encoding.UTF8.GetBytes("MZ-not-a-pdf-payload"));
+
+            await Assert.ThrowsAsync<InvalidOperationException>(() => storage.SaveFileAsync(spoofedPdf, "subfolder"));
+        }
+        finally
+        {
+            if (Directory.Exists(tempFolder)) Directory.Delete(tempFolder, true);
+        }
+    }
+
+    [Fact]
+    public async Task Path_Traversal_In_GetFileAsync_Is_Sanitized_And_Cannot_Escape_BaseStorage()
+    {
+        var outerFolder = Path.Combine(Path.GetTempPath(), Guid.NewGuid().ToString("N"));
+        var baseStorage = Path.Combine(outerFolder, "Storage", "Materials");
+        Directory.CreateDirectory(outerFolder);
+        var secretOutsidePath = Path.Combine(outerFolder, "secret.pdf");
+        await File.WriteAllTextAsync(secretOutsidePath, "%PDF-1.4 secret outside base storage");
+
+        try
+        {
+            var storage = new LocalFileStorageService(baseStorage);
+
+            await Assert.ThrowsAsync<FileNotFoundException>(() =>
+                storage.GetFileAsync("../../secret.pdf", "secret.pdf", "application/pdf"));
+        }
+        finally
+        {
+            if (Directory.Exists(outerFolder)) Directory.Delete(outerFolder, true);
+        }
+    }
 }

@@ -70,6 +70,8 @@ services:
         condition: service_completed_successfully
     expose:
       - "5005"
+    volumes:
+      - api_storage:/app/Storage
     environment:
       ASPNETCORE_ENVIRONMENT: Production
       ASPNETCORE_URLS: http://+:5005
@@ -105,7 +107,7 @@ services:
       context: ./src/Web
       dockerfile: ../../Dockerfile.web
       args:
-        VITE_API_BASE_URL: ${VITE_API_BASE_URL:-}
+        VITE_API_BASE_URL: ${VITE_API_BASE_URL:-/}
     restart: unless-stopped
     expose:
       - "8080"
@@ -147,6 +149,7 @@ services:
 volumes:
   mssql_data:
   mssql_backups:
+  api_storage:
   caddy_data:
   caddy_config:
 

@@ -57,4 +57,26 @@ test.describe('P1-01: Mandatory Real Vite Production Bundle Environment Tests', 
     // Must statically inline the configured production API URL
     expect(mainBundleContent).toContain(customApiUrl);
   });
+
+  test('CASE C: Default same-origin VITE_API_BASE_URL="/" in production build resolves cleanly without localhost fallback', () => {
+    execSync('npx vite build', {
+      cwd: webRoot,
+      env: { ...process.env, VITE_API_BASE_URL: '/' },
+      stdio: 'pipe',
+    });
+
+    const distAssets = path.join(webRoot, 'dist', 'assets');
+    const jsFiles = fs.readdirSync(distAssets).filter((f) => f.endsWith('.js'));
+    let mainBundleContent = '';
+
+    for (const file of jsFiles) {
+      const content = fs.readFileSync(path.join(distAssets, file), 'utf8');
+      if (content.includes('resolveApiBaseUrl') || content.includes('apiBaseUrl') || content.includes('CRITICAL CONFIGURATION ERROR')) {
+        mainBundleContent += content;
+      }
+    }
+
+    expect(mainBundleContent.length).toBeGreaterThan(0);
+    expect(mainBundleContent).not.toMatch(/apiBaseUrl:\s*["']http:\/\/localhost:5000["']/);
+  });
 });
