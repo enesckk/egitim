@@ -1,4 +1,4 @@
-using EgitimPlatform.BuildingBlocks.Constants;
+using System.Data;
 using EgitimPlatform.BuildingBlocks.Exceptions;
 using EgitimPlatform.BuildingBlocks.Interfaces;
 using EgitimPlatform.Modules.Planning.Entities;
@@ -10,12 +10,6 @@ public class GetInstitutionOverviewHandler(
     IApplicationDbContext db,
     ICurrentUser user)
 {
-    private sealed record RawAttemptSubjectResult(
-        DateTimeOffset TakenAt,
-        string SubjectName,
-        decimal Net
-    );
-
     public async Task<InstitutionOverviewDto> HandleAsync(CancellationToken ct = default)
     {
         if (!user.IsAuthenticated || user.UserId is null)
@@ -29,11 +23,11 @@ public class GetInstitutionOverviewHandler(
         if (user.IsSuperAdmin && targetInstId == Guid.Empty)
         {
             // Fallback for superadmin without active institution header: query first active institution
-            if (db is Microsoft.EntityFrameworkCore.DbContext superDb)
+            if (db is DbContext superDb && superDb.Database.IsRelational())
             {
                 using var cmd = superDb.Database.GetDbConnection().CreateCommand();
-                cmd.CommandText = "SELECT TOP 1 Id FROM Institutions WHERE IsDeleted = 0";
-                if (cmd.Connection?.State != System.Data.ConnectionState.Open)
+                cmd.CommandText = "SELECT TOP (1) Id FROM Institutions WHERE IsDeleted = 0";
+                if (cmd.Connection?.State != ConnectionState.Open)
                     await cmd.Connection!.OpenAsync(ct);
                 var scalar = await cmd.ExecuteScalarAsync(ct);
                 if (scalar is Guid gid) targetInstId = gid;
@@ -49,52 +43,98 @@ public class GetInstitutionOverviewHandler(
         int activePlanCount = 0;
 
         var coachesList = new List<AdminCoachPortfolioDto>();
-        var trendAttempts = new List<RawAttemptSubjectResult>();
+        var trendPoints = new List<TytTrendPointDto>();
+        string[] trMonths = ["", "Oca", "Şub", "Mar", "Nis", "May", "Haz", "Tem", "Ağu", "Eyl", "Eki", "Kas", "Ara"];
 
-        if (db is Microsoft.EntityFrameworkCore.DbContext efDb && efDb.Database.IsRelational())
+        if (db is DbContext efDb && efDb.Database.IsRelational())
         {
             var conn = efDb.Database.GetDbConnection();
-            if (conn.State != System.Data.ConnectionState.Open)
+            if (conn.State != ConnectionState.Open)
                 await conn.OpenAsync(ct);
 
-            // 1. Institution Name & Branch (Classroom) Count
-            using (var cmd = conn.CreateCommand())
-            {
-                cmd.CommandText = $@"
-                    SELECT 
-                        (SELECT TOP 1 Name FROM Institutions WHERE Id = '{targetInstId}') AS InstName,
-                        (SELECT COUNT(*) FROM Classrooms WHERE InstitutionId = '{targetInstId}' AND IsDeleted = 0) AS BranchCount,
-                        (SELECT COUNT(*) FROM Students WHERE InstitutionId = '{targetInstId}' AND IsDeleted = 0) AS StudentCount,
-                        (SELECT COUNT(*) FROM Coaches WHERE InstitutionId = '{targetInstId}' AND IsDeleted = 0) AS CoachCount";
+            using var cmd = conn.CreateCommand();
+            cmd.CommandText = @"
+                SELECT 
+                    (SELECT TOP (1) Name FROM Institutions WHERE Id = @instId) AS InstName,
+                    (SELECT COUNT(*) FROM Classrooms WHERE InstitutionId = @instId AND IsDeleted = 0) AS BranchCount,
+                    (SELECT COUNT(*) FROM Students WHERE InstitutionId = @instId AND IsDeleted = 0) AS StudentCount,
+                    (SELECT COUNT(*) FROM Coaches WHERE InstitutionId = @instId AND IsDeleted = 0) AS CoachCount,
+                    COUNT(*) AS ActivePlanCount,
+                    ISNULL(AVG(CAST(UtilizationRate AS float)), 0) AS AvgUtilization,
+                    ISNULL(AVG(CAST(TotalPlannedMinutes AS float)), 0) AS AvgPlannedMinutes
+                FROM StudyPlans
+                WHERE InstitutionId = @instId AND Status = 1 AND IsDeleted = 0;
 
-                using var reader = await cmd.ExecuteReaderAsync(ct);
-                if (await reader.ReadAsync(ct))
+                SELECT 
+                    c.Id,
+                    c.FirstName,
+                    c.LastName,
+                    COUNT(DISTINCT ca.StudentId) AS StudentCount,
+                    ISNULL(AVG(p.UtilizationRate), 0) AS AvgAdherence,
+                    ISNULL(AVG(p.TotalPlannedMinutes), 0) AS AvgMinutes
+                FROM Coaches c
+                LEFT JOIN StudentCoachAssignments ca ON ca.CoachId = c.Id AND ca.InstitutionId = @instId AND ca.IsActive = 1
+                LEFT JOIN StudyPlans p ON p.StudentId = ca.StudentId AND p.InstitutionId = @instId AND p.Status = 1 AND p.IsDeleted = 0
+                WHERE c.InstitutionId = @instId AND c.IsDeleted = 0
+                GROUP BY c.Id, c.FirstName, c.LastName;
+
+                ;WITH SubjectBuckets AS (
+                    SELECT
+                        es.Id AS ExamSectionId,
+                        CASE
+                            WHEN sub.Name LIKE N'%Türkçe%' THEN 1
+                            WHEN sub.Name LIKE N'%Matematik%' THEN 2
+                            WHEN sub.Name LIKE N'%Fizik%' OR sub.Name LIKE N'%Kimya%' OR sub.Name LIKE N'%Biyoloji%' THEN 3
+                            WHEN sub.Name LIKE N'%Tarih%' OR sub.Name LIKE N'%Coğrafya%' OR sub.Name LIKE N'%Felsefe%' THEN 4
+                            ELSE 0
+                        END AS Bucket
+                    FROM ExamSections es
+                    INNER JOIN AcademicSubjects sub ON sub.Id = es.SubjectId AND sub.IsDeleted = 0
+                    WHERE es.InstitutionId = @instId AND es.IsDeleted = 0
+                )
+                SELECT TOP (12)
+                    YEAR(a.TakenAt) AS AttemptYear,
+                    MONTH(a.TakenAt) AS AttemptMonth,
+                    ISNULL(AVG(CASE WHEN sb.Bucket = 1 THEN CAST(sr.Net AS decimal(18,6)) END), 0) AS TurkceAvg,
+                    ISNULL(AVG(CASE WHEN sb.Bucket = 2 THEN CAST(sr.Net AS decimal(18,6)) END), 0) AS MatematikAvg,
+                    ISNULL(AVG(CASE WHEN sb.Bucket = 3 THEN CAST(sr.Net AS decimal(18,6)) END), 0) AS FenAvg,
+                    ISNULL(AVG(CASE WHEN sb.Bucket = 4 THEN CAST(sr.Net AS decimal(18,6)) END), 0) AS SosyalAvg
+                FROM StudentExamAttempts a
+                INNER JOIN StudentExamSubjectResults sr ON sr.StudentExamAttemptId = a.Id AND sr.IsDeleted = 0
+                INNER JOIN SubjectBuckets sb ON sb.ExamSectionId = sr.ExamSectionId AND sb.Bucket > 0
+                WHERE a.InstitutionId = @instId AND a.IsDeleted = 0 AND a.Status = 1
+                GROUP BY YEAR(a.TakenAt), MONTH(a.TakenAt)
+                ORDER BY AttemptYear DESC, AttemptMonth DESC;";
+
+            var instParam = cmd.CreateParameter();
+            instParam.ParameterName = "@instId";
+            instParam.DbType = DbType.Guid;
+            instParam.Value = targetInstId;
+            cmd.Parameters.Add(instParam);
+
+            using var reader = await cmd.ExecuteReaderAsync(ct);
+
+            // Resultset 1: Overview & Study Plan KPIs
+            if (await reader.ReadAsync(ct))
+            {
+                institutionName = reader.IsDBNull(0) ? "Kurum Genel Bakış" : reader.GetString(0);
+                branchCount = reader.IsDBNull(1) ? 0 : reader.GetInt32(1);
+                activeStudents = reader.IsDBNull(2) ? 0 : reader.GetInt32(2);
+                activeCoaches = reader.IsDBNull(3) ? 0 : reader.GetInt32(3);
+                activePlanCount = reader.IsDBNull(4) ? 0 : reader.GetInt32(4);
+
+                if (activePlanCount > 0)
                 {
-                    institutionName = reader.IsDBNull(0) ? "Kurum Genel Bakış" : reader.GetString(0);
-                    branchCount = reader.IsDBNull(1) ? 0 : reader.GetInt32(1);
-                    activeStudents = reader.IsDBNull(2) ? 0 : reader.GetInt32(2);
-                    activeCoaches = reader.IsDBNull(3) ? 0 : reader.GetInt32(3);
+                    var avgUtil = reader.IsDBNull(5) ? 0.0 : reader.GetDouble(5);
+                    var avgMins = reader.IsDBNull(6) ? 0.0 : reader.GetDouble(6);
+                    avgAdherence = Math.Round((decimal)avgUtil * 100m, 0);
+                    avgWeeklyStudyHours = Math.Round((decimal)avgMins / 60m, 1);
                 }
             }
 
-            // 2. Coach Portfolios with real adherence from StudyPlans
-            using (var cmd = conn.CreateCommand())
+            // Resultset 2: Coach portfolios
+            if (await reader.NextResultAsync(ct))
             {
-                cmd.CommandText = $@"
-                    SELECT 
-                        c.Id,
-                        c.FirstName,
-                        c.LastName,
-                        COUNT(DISTINCT ca.StudentId) AS StudentCount,
-                        ISNULL(AVG(p.UtilizationRate), 0) AS AvgAdherence,
-                        ISNULL(AVG(p.TotalPlannedMinutes), 0) AS AvgMinutes
-                    FROM Coaches c
-                    LEFT JOIN StudentCoachAssignments ca ON ca.CoachId = c.Id AND ca.IsActive = 1
-                    LEFT JOIN StudyPlans p ON p.StudentId = ca.StudentId AND p.Status = 1 AND p.IsDeleted = 0
-                    WHERE c.InstitutionId = '{targetInstId}' AND c.IsDeleted = 0
-                    GROUP BY c.Id, c.FirstName, c.LastName";
-
-                using var reader = await cmd.ExecuteReaderAsync(ct);
                 while (await reader.ReadAsync(ct))
                 {
                     var cId = reader.GetGuid(0);
@@ -123,71 +163,44 @@ public class GetInstitutionOverviewHandler(
                 }
             }
 
-            // 4. Trend Data from StudentExamSubjectResults
-            using (var cmd = conn.CreateCommand())
+            // Resultset 3: Monthly subject net averages (ordered DESC in SQL, reversed to ASC here)
+            if (await reader.NextResultAsync(ct))
             {
-                cmd.CommandText = $@"
-                    SELECT 
-                        a.TakenAt,
-                        sub.Name AS SubjectName,
-                        sr.Net
-                    FROM StudentExamAttempts a
-                    JOIN StudentExamSubjectResults sr ON sr.StudentExamAttemptId = a.Id AND sr.IsDeleted = 0
-                    JOIN ExamSections es ON sr.ExamSectionId = es.Id
-                    JOIN AcademicSubjects sub ON es.SubjectId = sub.Id
-                    WHERE a.InstitutionId = '{targetInstId}' AND a.IsDeleted = 0 AND a.Status = 1
-                    ORDER BY a.TakenAt ASC";
-
-                using var reader = await cmd.ExecuteReaderAsync(ct);
                 while (await reader.ReadAsync(ct))
                 {
-                    var takenAt = reader.GetFieldValue<DateTimeOffset>(0);
-                    var subName = reader.GetString(1);
-                    var net = reader.GetDecimal(2);
-                    trendAttempts.Add(new RawAttemptSubjectResult(takenAt, subName, net));
+                    int year = reader.GetInt32(0);
+                    int month = reader.GetInt32(1);
+                    decimal turkce = reader.GetDecimal(2);
+                    decimal matematik = reader.GetDecimal(3);
+                    decimal fen = reader.GetDecimal(4);
+                    decimal sosyal = reader.GetDecimal(5);
+
+                    var label = $"{trMonths[month]} '{year.ToString()[2..]}";
+                    trendPoints.Add(new TytTrendPointDto(
+                        label,
+                        Math.Round(turkce, 1),
+                        Math.Round(matematik, 1),
+                        Math.Round(sosyal, 1),
+                        Math.Round(fen, 1)
+                    ));
                 }
+                trendPoints.Reverse();
             }
         }
-
-        // 3. Overall Study Plan Metrics (Queryable across providers)
-        var activePlans = await db.Set<StudyPlan>().AsNoTracking()
-            .Where(p => p.InstitutionId == targetInstId && p.Status == StudyPlanStatus.Active && !p.IsDeleted)
-            .ToListAsync(ct);
-
-        activePlanCount = activePlans.Count;
-        if (activePlanCount > 0)
+        else
         {
-            avgAdherence = Math.Round((decimal)activePlans.Average(p => (double)p.UtilizationRate) * 100m, 0);
-            avgWeeklyStudyHours = Math.Round((decimal)activePlans.Average(p => (double)p.TotalPlannedMinutes) / 60m, 1);
-        }
+            // Non-relational fallback (e.g. InMemory test provider)
+            var activePlans = await db.Set<StudyPlan>().AsNoTracking()
+                .Where(p => p.InstitutionId == targetInstId && p.Status == StudyPlanStatus.Active && !p.IsDeleted)
+                .Select(p => new { p.UtilizationRate, p.TotalPlannedMinutes })
+                .ToListAsync(ct);
 
-        // Build Trend Points grouped by Month or Exam period
-        var trendPoints = new List<TytTrendPointDto>();
-        var monthlyGroups = trendAttempts
-            .GroupBy(t => new { Year = t.TakenAt.Year, Month = t.TakenAt.Month })
-            .OrderBy(g => g.Key.Year).ThenBy(g => g.Key.Month)
-            .ToList();
-
-        // Turkish month abbreviations
-        string[] trMonths = ["", "Oca", "Şub", "Mar", "Nis", "May", "Haz", "Tem", "Ağu", "Eyl", "Eki", "Kas", "Ara"];
-
-        foreach (var mg in monthlyGroups)
-        {
-            var label = $"{trMonths[mg.Key.Month]} '{mg.Key.Year.ToString().Substring(2)}";
-            var turkce = mg.Where(x => x.SubjectName.Contains("Türkçe")).Select(x => x.Net).DefaultIfEmpty(0m).Average();
-            var matematik = mg.Where(x => x.SubjectName.Contains("Matematik")).Select(x => x.Net).DefaultIfEmpty(0m).Average();
-            var fen = mg.Where(x => x.SubjectName.Contains("Fizik") || x.SubjectName.Contains("Kimya") || x.SubjectName.Contains("Biyoloji"))
-                       .Select(x => x.Net).DefaultIfEmpty(0m).Average();
-            var sosyal = mg.Where(x => x.SubjectName.Contains("Tarih") || x.SubjectName.Contains("Coğrafya") || x.SubjectName.Contains("Felsefe"))
-                          .Select(x => x.Net).DefaultIfEmpty(0m).Average();
-
-            trendPoints.Add(new TytTrendPointDto(
-                label,
-                Math.Round(turkce, 1),
-                Math.Round(matematik, 1),
-                Math.Round(sosyal, 1),
-                Math.Round(fen, 1)
-            ));
+            activePlanCount = activePlans.Count;
+            if (activePlanCount > 0)
+            {
+                avgAdherence = Math.Round((decimal)activePlans.Average(p => (double)p.UtilizationRate) * 100m, 0);
+                avgWeeklyStudyHours = Math.Round((decimal)activePlans.Average(p => (double)p.TotalPlannedMinutes) / 60m, 1);
+            }
         }
 
         // Build 1m, 3m, 6m slices
