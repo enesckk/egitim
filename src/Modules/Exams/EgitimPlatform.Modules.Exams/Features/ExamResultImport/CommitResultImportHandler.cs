@@ -36,17 +36,19 @@ public class CommitResultImportHandler(
             throw new ValidationException("Preview fileHash is required for commit confirmation.");
         }
 
-        // 1. Calculate File Hash and Compare
-        using var stream = file.OpenReadStream();
-        var fileBytes = new byte[file.Length];
-        int bytesRead = 0;
-        while (bytesRead < file.Length)
+        // 1. Validate file header & size limits, then calculate streaming SHA-256 hash and compare
+        new ImportFileValidator().ValidateFileHeader(file);
+
+        string actualHash;
+        await using (var stream = file.OpenReadStream())
         {
-            int read = await stream.ReadAsync(fileBytes.AsMemory(bytesRead, (int)file.Length - bytesRead), ct);
-            if (read == 0) break;
-            bytesRead += read;
+            if (stream.CanSeek)
+            {
+                stream.Position = 0;
+            }
+            var hashBytes = await SHA256.HashDataAsync(stream, ct);
+            actualHash = Convert.ToHexString(hashBytes);
         }
-        var actualHash = Convert.ToHexString(SHA256.HashData(fileBytes));
 
         if (!string.Equals(actualHash, fileHash.Trim(), StringComparison.OrdinalIgnoreCase))
         {

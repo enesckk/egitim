@@ -1,18 +1,31 @@
+using System.IdentityModel.Tokens.Jwt;
+using System.Net;
+using System.Net.Http.Headers;
+using System.Security.Claims;
+using System.Text;
+using System.Text.Json;
 using ClosedXML.Excel;
+using EgitimPlatform.BuildingBlocks.Constants;
 using EgitimPlatform.BuildingBlocks.Exceptions;
 using EgitimPlatform.BuildingBlocks.Interfaces;
 using EgitimPlatform.Infrastructure;
 using EgitimPlatform.Integration.Fixtures;
 using EgitimPlatform.Modules.Academic.Entities;
+using EgitimPlatform.Modules.Content.Features.ManageMaterials;
+using EgitimPlatform.Modules.Content.Services;
 using EgitimPlatform.Modules.Exams.Entities;
 using EgitimPlatform.Modules.Exams.Features.ExamResultImport;
 using EgitimPlatform.Modules.Exams.Services;
+using EgitimPlatform.Modules.Identity.Entities;
+using EgitimPlatform.Modules.Identity.Services;
 using EgitimPlatform.Modules.Institutions.Entities;
 using EgitimPlatform.Modules.Students.Entities;
 using EgitimPlatform.Modules.Students.Services;
+using EgitimPlatform.Modules.Teachers.Entities;
 using FluentValidation;
 using Microsoft.AspNetCore.Http;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.IdentityModel.Tokens;
 using NSubstitute;
 using Xunit;
 
@@ -471,5 +484,189 @@ public class Sprint5BIntegrationTests(IntegrationTestFactory factory)
         Assert.Equal(2, attempts.Count);
         Assert.Equal(1, attempts[0].AttemptNumber);
         Assert.Equal(2, attempts[1].AttemptNumber);
+    }
+
+    [Fact]
+    public async Task UploadHardening_MssqlEndToEnd_EnforcesMultipartLimits_And_PreservesMaterialUploadDownloadAndAuditJson()
+    {
+        using var db = Db();
+        var inst = new Institution { Name = "Inst Upload Hardening" };
+        db.Add(inst);
+        await db.SaveChangesAsync();
+
+        var teacherUserId = Guid.NewGuid();
+        var studentUserId = Guid.NewGuid();
+
+        var teacherAppUser = new ApplicationUser
+        {
+            Id = teacherUserId,
+            UserName = $"teacher.{teacherUserId:N}@test.local",
+            NormalizedUserName = $"TEACHER.{teacherUserId:N}@TEST.LOCAL",
+            Email = $"teacher.{teacherUserId:N}@test.local",
+            NormalizedEmail = $"TEACHER.{teacherUserId:N}@TEST.LOCAL",
+            InstitutionId = inst.Id,
+            FirstName = "Kemal",
+            LastName = "Hoca",
+            SecurityStamp = Guid.NewGuid().ToString("N")
+        };
+        var studentAppUser = new ApplicationUser
+        {
+            Id = studentUserId,
+            UserName = $"student.{studentUserId:N}@test.local",
+            NormalizedUserName = $"STUDENT.{studentUserId:N}@TEST.LOCAL",
+            Email = $"student.{studentUserId:N}@test.local",
+            NormalizedEmail = $"STUDENT.{studentUserId:N}@TEST.LOCAL",
+            InstitutionId = inst.Id,
+            FirstName = "Elif",
+            LastName = "Demir",
+            SecurityStamp = Guid.NewGuid().ToString("N")
+        };
+        db.AddRange(teacherAppUser, studentAppUser);
+        await db.SaveChangesAsync();
+
+        var teacher = new Teacher
+        {
+            Id = Guid.NewGuid(),
+            InstitutionId = inst.Id,
+            UserId = teacherUserId,
+            FirstName = "Kemal",
+            LastName = "Hoca"
+        };
+        var classroom = new Classroom
+        {
+            Id = Guid.NewGuid(),
+            InstitutionId = inst.Id,
+            Name = "12-MF",
+            GradeLevel = 12,
+            AcademicYear = "2026-2027"
+        };
+        var classTeacher = new ClassroomTeacher
+        {
+            Id = Guid.NewGuid(),
+            InstitutionId = inst.Id,
+            TeacherId = teacher.Id,
+            ClassroomId = classroom.Id
+        };
+        var student = new Student
+        {
+            Id = Guid.NewGuid(),
+            InstitutionId = inst.Id,
+            UserId = studentUserId,
+            StudentNumber = "STD-UPL-1",
+            FirstName = "Elif",
+            LastName = "Demir"
+        };
+        var classStudent = new ClassroomStudent
+        {
+            Id = Guid.NewGuid(),
+            InstitutionId = inst.Id,
+            ClassroomId = classroom.Id,
+            StudentId = student.Id
+        };
+        db.AddRange(teacher, classroom, classTeacher, student, classStudent);
+        await db.SaveChangesAsync();
+
+        var tempStorage = Path.Combine(Path.GetTempPath(), $"egitim_mat_mssql_{Guid.NewGuid():N}");
+        try
+        {
+            var storageService = new LocalFileStorageService(tempStorage);
+            var auditService = new AuditService(db);
+
+            var teacherUser = Substitute.For<ICurrentUser>();
+            teacherUser.IsAuthenticated.Returns(true);
+            teacherUser.UserId.Returns(teacherUserId);
+            teacherUser.GetInstitutionIdAsync().Returns(inst.Id);
+            teacherUser.Roles.Returns([Roles.Teacher]);
+
+            var teacherMaterialsHandler = new MaterialsHandler(db, teacherUser, storageService, auditService);
+
+            var pdfBytes = Encoding.UTF8.GetBytes("%PDF-1.4\n1 0 obj\n<< /Type /Catalog >>\nendobj\n%%EOF\n");
+            var pdfFormFile = new FormFile(new MemoryStream(pdfBytes), 0, pdfBytes.Length, "File", @"..\..\uploads\analitik_""ozel"".pdf")
+            {
+                Headers = new HeaderDictionary(),
+                ContentType = "application/pdf"
+            };
+
+            var specialTitle = "Analitik \"Özel\" Fasikül \\ Bölüm 2";
+            var createdMaterial = await teacherMaterialsHandler.CreateMaterialAsync(new CreateMaterialRequest(
+                specialTitle,
+                "Matematik",
+                "Analitik Geometri",
+                "12. Sınıf",
+                "fasikul",
+                "MSSQL entegrasyon testi",
+                12,
+                30,
+                45,
+                pdfFormFile,
+                [classroom.Id]
+            ));
+
+            Assert.Equal("analitik_\"ozel\".pdf", createdMaterial.OriginalFileName);
+            Assert.Equal(1, createdMaterial.AssignedClassesCount);
+
+            // Verify Student download against real MSSQL + LocalFileStorageService
+            var studentUser = Substitute.For<ICurrentUser>();
+            studentUser.IsAuthenticated.Returns(true);
+            studentUser.UserId.Returns(studentUserId);
+            studentUser.GetInstitutionIdAsync().Returns(inst.Id);
+            studentUser.Roles.Returns([Roles.Student]);
+
+            var studentMaterialsHandler = new MaterialsHandler(db, studentUser, storageService, auditService);
+            var studentList = await studentMaterialsHandler.GetStudentMaterialsAsync();
+            Assert.Single(studentList);
+            Assert.Equal(createdMaterial.Id, studentList[0].Id);
+
+            var (downloadStream, contentType, downloadFileName) = await studentMaterialsHandler.DownloadMaterialAsync(createdMaterial.Id);
+            await using (downloadStream)
+            {
+                using var downloadedMs = new MemoryStream();
+                await downloadStream.CopyToAsync(downloadedMs);
+                Assert.Equal(pdfBytes, downloadedMs.ToArray());
+            }
+            Assert.Equal("application/pdf", contentType);
+            Assert.Equal("analitik_\"ozel\".pdf", downloadFileName);
+
+            // Verify persisted AuditLog in MSSQL has valid JSON
+            using var checkDb = Db();
+            var persistedAudit = await checkDb.Set<AuditLog>()
+                .SingleAsync(a => a.Action == "CreateMaterial" && a.EntityId == createdMaterial.Id.ToString());
+            Assert.NotNull(persistedAudit.MetadataJson);
+            using var jsonDoc = JsonDocument.Parse(persistedAudit.MetadataJson!);
+            Assert.Equal(specialTitle, jsonDoc.RootElement.GetProperty("title").GetString());
+            Assert.Equal("analitik_\"ozel\".pdf", jsonDoc.RootElement.GetProperty("fileName").GetString());
+        }
+        finally
+        {
+            if (Directory.Exists(tempStorage)) Directory.Delete(tempStorage, true);
+        }
+
+        // Verify HTTP pipeline rejects oversized multipart (> 5 MB) on ExamResultImportsController before handler execution
+        using var client = factory.CreateClient();
+        var tokenHandler = new JwtSecurityTokenHandler();
+        var key = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(IntegrationTestFactory.TestSigningKey));
+        var token = tokenHandler.CreateToken(new SecurityTokenDescriptor
+        {
+            Issuer = IntegrationTestFactory.TestIssuer,
+            Audience = IntegrationTestFactory.TestAudience,
+            Subject = new ClaimsIdentity(
+            [
+                new Claim(ClaimTypes.NameIdentifier, Guid.NewGuid().ToString()),
+                new Claim(ClaimTypes.Role, Roles.SuperAdmin)
+            ]),
+            Expires = DateTime.UtcNow.AddMinutes(15),
+            SigningCredentials = new SigningCredentials(key, SecurityAlgorithms.HmacSha256)
+        });
+        client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", tokenHandler.WriteToken(token));
+
+        var oversizedBytes = new byte[ImportFileValidator.MaxFileSizeBytes + 1024];
+        using var multipart = new MultipartFormDataContent();
+        multipart.Add(new StringContent("AggregateResults"), "importType");
+        var fileContent = new ByteArrayContent(oversizedBytes);
+        fileContent.Headers.ContentType = new MediaTypeHeaderValue("application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");
+        multipart.Add(fileContent, "file", "oversized.xlsx");
+
+        var previewResp = await client.PostAsync($"/api/v1/exams/{Guid.NewGuid()}/result-imports/preview", multipart);
+        Assert.Equal(HttpStatusCode.BadRequest, previewResp.StatusCode);
     }
 }

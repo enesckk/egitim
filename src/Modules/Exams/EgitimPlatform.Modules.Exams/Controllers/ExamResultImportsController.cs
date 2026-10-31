@@ -1,5 +1,6 @@
 using EgitimPlatform.BuildingBlocks.Constants;
 using EgitimPlatform.Modules.Exams.Features.ExamResultImport;
+using EgitimPlatform.Modules.Exams.Services;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
@@ -35,6 +36,8 @@ public class ExamResultImportsController : ControllerBase
     [HttpPost("preview")]
     [Authorize(Policy = Policies.CanRecordExamResults)]
     [Consumes("multipart/form-data")]
+    [RequestSizeLimit(ImportFileValidator.MaxFileSizeBytes)]
+    [RequestFormLimits(MultipartBodyLengthLimit = ImportFileValidator.MaxFileSizeBytes)]
     public async Task<ActionResult<ExamResultImportPreviewDto>> PreviewImport(
         [FromRoute] Guid examId,
         [FromForm] ImportType importType,
@@ -49,6 +52,8 @@ public class ExamResultImportsController : ControllerBase
     [HttpPost("commit")]
     [Authorize(Policy = Policies.CanRecordExamResults)]
     [Consumes("multipart/form-data")]
+    [RequestSizeLimit(ImportFileValidator.MaxFileSizeBytes)]
+    [RequestFormLimits(MultipartBodyLengthLimit = ImportFileValidator.MaxFileSizeBytes)]
     public async Task<ActionResult<ExamResultImportCommitResultDto>> CommitImport(
         [FromRoute] Guid examId,
         [FromForm] ImportType importType,

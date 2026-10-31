@@ -1,14 +1,22 @@
+using System.Reflection;
 using System.Security;
 using System.Text;
+using System.Text.Json;
 using EgitimPlatform.BuildingBlocks.Constants;
 using EgitimPlatform.BuildingBlocks.Interfaces;
 using EgitimPlatform.Infrastructure;
+using EgitimPlatform.Modules.Content.Controllers;
 using EgitimPlatform.Modules.Content.Entities;
 using EgitimPlatform.Modules.Content.Features.ManageMaterials;
 using EgitimPlatform.Modules.Content.Services;
+using EgitimPlatform.Modules.Exams.Controllers;
+using EgitimPlatform.Modules.Exams.Services;
+using EgitimPlatform.Modules.Identity.Entities;
+using EgitimPlatform.Modules.Identity.Services;
 using EgitimPlatform.Modules.Students.Entities;
 using EgitimPlatform.Modules.Teachers.Entities;
 using Microsoft.AspNetCore.Http;
+using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using NSubstitute;
 using Xunit;
@@ -20,20 +28,19 @@ public class Phase4ContentMaterialsSecurityTests
     private ApplicationDbContext CreateDb() => new(new DbContextOptionsBuilder<ApplicationDbContext>()
         .UseInMemoryDatabase(Guid.NewGuid().ToString()).Options);
 
-    private IFormFile CreateMockFormFile(string fileName = "test_material.pdf", string contentType = "application/pdf", byte[]? content = null)
+    private IFormFile CreateMockFormFile(string fileName = "test_material.pdf", string contentType = "application/pdf", byte[]? content = null, long? overrideLength = null)
     {
         content ??= Encoding.UTF8.GetBytes("%PDF-1.4 Mock PDF Content for testing");
-        var stream = new MemoryStream(content);
         var file = Substitute.For<IFormFile>();
         file.FileName.Returns(fileName);
-        file.Length.Returns(content.Length);
+        file.Length.Returns(overrideLength ?? content.Length);
         file.ContentType.Returns(contentType);
-        file.OpenReadStream().Returns(stream);
+        file.OpenReadStream().Returns(_ => new MemoryStream(content));
         file.CopyToAsync(Arg.Any<Stream>(), Arg.Any<CancellationToken>())
             .Returns(async (ci) =>
             {
                 var targetStream = ci.Arg<Stream>();
-                await stream.CopyToAsync(targetStream);
+                await targetStream.WriteAsync(content);
             });
         return file;
     }
@@ -446,5 +453,165 @@ public class Phase4ContentMaterialsSecurityTests
         {
             if (Directory.Exists(outerFolder)) Directory.Delete(outerFolder, true);
         }
+    }
+
+    [Fact]
+    public void Upload_Endpoints_Enforce_Multipart_And_RequestSizeLimits_Before_Handler_Execution()
+    {
+        var createMaterialMethod = typeof(ContentMaterialsController).GetMethod(nameof(ContentMaterialsController.CreateMaterial))!;
+        var createReqSize = createMaterialMethod.GetCustomAttribute<RequestSizeLimitAttribute>();
+        var createFormLimits = createMaterialMethod.GetCustomAttribute<RequestFormLimitsAttribute>();
+
+        Assert.NotNull(createReqSize);
+        Assert.NotNull(createFormLimits);
+        Assert.Equal(LocalFileStorageService.MaxFileSize, createFormLimits.MultipartBodyLengthLimit);
+
+        foreach (var actionName in new[] { nameof(ExamResultImportsController.PreviewImport), nameof(ExamResultImportsController.CommitImport) })
+        {
+            var method = typeof(ExamResultImportsController).GetMethod(actionName)!;
+            var reqSize = method.GetCustomAttribute<RequestSizeLimitAttribute>();
+            var formLimits = method.GetCustomAttribute<RequestFormLimitsAttribute>();
+
+            Assert.NotNull(reqSize);
+            Assert.NotNull(formLimits);
+            Assert.Equal(ImportFileValidator.MaxFileSizeBytes, formLimits.MultipartBodyLengthLimit);
+        }
+    }
+
+    [Fact]
+    public async Task Oversized_Material_Upload_Exceeding_25MB_Throws_InvalidOperationException()
+    {
+        var tempFolder = Path.Combine(Path.GetTempPath(), Guid.NewGuid().ToString("N"));
+        try
+        {
+            var storage = new LocalFileStorageService(tempFolder);
+            var oversizedPdf = CreateMockFormFile(
+                "oversized.pdf",
+                "application/pdf",
+                Encoding.UTF8.GetBytes("%PDF-1.4 header"),
+                overrideLength: LocalFileStorageService.MaxFileSize + 1);
+
+            var ex = await Assert.ThrowsAsync<InvalidOperationException>(() =>
+                storage.SaveFileAsync(oversizedPdf, "inst_1/teacher_1"));
+
+            Assert.Contains("25MB", ex.Message);
+        }
+        finally
+        {
+            if (Directory.Exists(tempFolder)) Directory.Delete(tempFolder, true);
+        }
+    }
+
+    [Fact]
+    public async Task Malformed_Truncated_Or_Corrupt_File_Header_Throws_InvalidOperationException()
+    {
+        var tempFolder = Path.Combine(Path.GetTempPath(), Guid.NewGuid().ToString("N"));
+        try
+        {
+            var storage = new LocalFileStorageService(tempFolder);
+
+            // Truncated 2-byte PDF shorter than 4-byte %PDF signature
+            var truncatedPdf = CreateMockFormFile("truncated.pdf", "application/pdf", new byte[] { 0x25, 0x50 });
+            await Assert.ThrowsAsync<InvalidOperationException>(() =>
+                storage.SaveFileAsync(truncatedPdf, "inst_1/teacher_1"));
+
+            // Corrupt PNG header
+            var corruptPng = CreateMockFormFile("corrupt.png", "image/png", new byte[] { 0x89, 0x50, 0x00, 0x00 });
+            await Assert.ThrowsAsync<InvalidOperationException>(() =>
+                storage.SaveFileAsync(corruptPng, "inst_1/teacher_1"));
+        }
+        finally
+        {
+            if (Directory.Exists(tempFolder)) Directory.Delete(tempFolder, true);
+        }
+    }
+
+    [Fact]
+    public async Task Path_Traversal_In_SaveFileAsync_DeleteFileAsync_And_FileName_Cannot_Escape_BaseStorage()
+    {
+        var outerFolder = Path.Combine(Path.GetTempPath(), Guid.NewGuid().ToString("N"));
+        var baseStorage = Path.Combine(outerFolder, "Storage", "Materials");
+        Directory.CreateDirectory(outerFolder);
+        var protectedOutsideFile = Path.Combine(outerFolder, "protected.pdf");
+        await File.WriteAllTextAsync(protectedOutsideFile, "%PDF-1.4 do not delete");
+
+        try
+        {
+            var storage = new LocalFileStorageService(baseStorage);
+            var validPdfBytes = Encoding.UTF8.GetBytes("%PDF-1.4 valid content");
+            var traversalFile = CreateMockFormFile(@"..\..\outside\evil.pdf", "application/pdf", validPdfBytes);
+
+            var relativeSaved = await storage.SaveFileAsync(traversalFile, @"..\..\escaped_folder");
+            Assert.DoesNotContain("..", relativeSaved);
+
+            var (_, _, downloadedName) = await storage.GetFileAsync(relativeSaved, @"..\..\outside\evil.pdf", "application/pdf");
+            Assert.Equal("evil.pdf", downloadedName);
+
+            // Attempt to delete file outside baseStorage via path traversal must not delete protectedOutsideFile
+            await storage.DeleteFileAsync("../../protected.pdf");
+            Assert.True(File.Exists(protectedOutsideFile));
+        }
+        finally
+        {
+            if (Directory.Exists(outerFolder)) Directory.Delete(outerFolder, true);
+        }
+    }
+
+    [Fact]
+    public async Task CreateMaterialAsync_Serializes_Valid_Escaped_Audit_Metadata_Json()
+    {
+        using var db = CreateDb();
+        var instId = Guid.NewGuid();
+        var teacherUserId = Guid.NewGuid();
+
+        var teacher = new Teacher
+        {
+            Id = Guid.NewGuid(),
+            InstitutionId = instId,
+            UserId = teacherUserId,
+            FirstName = "Zeynep",
+            LastName = "Hoca"
+        };
+        db.Set<Teacher>().Add(teacher);
+        await db.SaveChangesAsync();
+
+        var currentUser = Substitute.For<ICurrentUser>();
+        currentUser.IsAuthenticated.Returns(true);
+        currentUser.UserId.Returns(teacherUserId);
+        currentUser.GetInstitutionIdAsync().Returns(instId);
+        currentUser.Roles.Returns([Roles.Teacher]);
+
+        var storage = Substitute.For<IFileStorageService>();
+        storage.SaveFileAsync(Arg.Any<IFormFile>(), Arg.Any<string>(), Arg.Any<CancellationToken>())
+            .Returns("inst_1/teacher_1/safe.pdf");
+
+        var auditService = new AuditService(db);
+        var handler = new MaterialsHandler(db, currentUser, storage, auditService);
+
+        var specialTitle = "Türev \"Özel\" Fasikülü \\ Bölüm 1\nSatır 2";
+        var rawFileName = @"..\..\path\turev_""ozel""_notlar.pdf";
+
+        var created = await handler.CreateMaterialAsync(new CreateMaterialRequest(
+            specialTitle,
+            "Matematik",
+            "Türev",
+            "12. Sınıf",
+            "fasikul",
+            null,
+            10,
+            20,
+            40,
+            CreateMockFormFile(rawFileName, "application/pdf"),
+            null
+        ));
+
+        Assert.Equal("turev_\"ozel\"_notlar.pdf", created.OriginalFileName);
+
+        var auditLog = await db.Set<AuditLog>().SingleAsync(a => a.Action == "CreateMaterial" && a.EntityId == created.Id.ToString());
+        Assert.NotNull(auditLog.MetadataJson);
+
+        using var doc = JsonDocument.Parse(auditLog.MetadataJson!);
+        Assert.Equal(specialTitle, doc.RootElement.GetProperty("title").GetString());
+        Assert.Equal("turev_\"ozel\"_notlar.pdf", doc.RootElement.GetProperty("fileName").GetString());
     }
 }

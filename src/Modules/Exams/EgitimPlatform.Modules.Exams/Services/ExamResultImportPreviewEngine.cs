@@ -41,17 +41,20 @@ public class ExamResultImportPreviewEngine(
             .FirstOrDefaultAsync(e => e.Id == examId && e.InstitutionId == institutionId, ct)
             ?? throw new NotFoundException($"Exam '{examId}' was not found.");
 
-        // Compute File Hash (SHA-256)
-        using var stream = file.OpenReadStream();
-        var fileBytes = new byte[file.Length];
-        int bytesRead = 0;
-        while (bytesRead < file.Length)
+        // Validate file header and size policy before streaming hash or workbook parsing
+        fileValidator.ValidateFileHeader(file);
+
+        // Compute File Hash (SHA-256) via streaming without whole-file byte[] allocation
+        string fileHash;
+        await using (var stream = file.OpenReadStream())
         {
-            int read = await stream.ReadAsync(fileBytes.AsMemory(bytesRead, (int)file.Length - bytesRead), ct);
-            if (read == 0) break;
-            bytesRead += read;
+            if (stream.CanSeek)
+            {
+                stream.Position = 0;
+            }
+            var hashBytes = await SHA256.HashDataAsync(stream, ct);
+            fileHash = Convert.ToHexString(hashBytes);
         }
-        var fileHash = Convert.ToHexString(SHA256.HashData(fileBytes));
 
         using var workbook = fileValidator.OpenWorkbook(file);
         var issues = new List<ImportIssueDto>();

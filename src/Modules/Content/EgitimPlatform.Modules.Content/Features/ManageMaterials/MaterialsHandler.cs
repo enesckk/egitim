@@ -1,4 +1,5 @@
 using System.Security;
+using System.Text.Json;
 using EgitimPlatform.BuildingBlocks.Constants;
 using EgitimPlatform.BuildingBlocks.Interfaces;
 using EgitimPlatform.Modules.Content.Entities;
@@ -111,7 +112,7 @@ public class MaterialsHandler : IMaterialsHandler
                 PageCount = request.PageCount,
                 QuestionCount = request.QuestionCount,
                 DurationMinutes = request.DurationMinutes,
-                OriginalFileName = Path.GetFileName(request.File.FileName),
+                OriginalFileName = Path.GetFileName((request.File.FileName ?? string.Empty).Replace('\\', '/')),
                 StoragePath = storagePath,
                 ContentType = request.File.ContentType ?? "application/octet-stream",
                 FileSizeBytes = request.File.Length,
@@ -149,13 +150,19 @@ public class MaterialsHandler : IMaterialsHandler
             _db.Set<ContentMaterial>().Add(material);
             await _db.SaveChangesAsync(cancellationToken);
 
+            var metadataJson = JsonSerializer.Serialize(new
+            {
+                title = material.Title,
+                fileName = material.OriginalFileName
+            });
+
             await _auditService.LogAsync(
                 userId: _currentUser.UserId ?? Guid.Empty,
                 action: "CreateMaterial",
                 entityType: nameof(ContentMaterial),
                 entityId: material.Id.ToString(),
                 institutionId: instId,
-                metadataJson: $"{{\"title\":\"{material.Title}\",\"fileName\":\"{material.OriginalFileName}\"}}",
+                metadataJson: metadataJson,
                 cancellationToken: cancellationToken
             );
 

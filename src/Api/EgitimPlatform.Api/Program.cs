@@ -36,13 +36,12 @@ try
 
     var builder = WebApplication.CreateBuilder(args);
 
-    // Serilog
+    // Serilog (console sink is configured via appsettings.json ReadFrom.Configuration)
     builder.Host.UseSerilog((context, services, configuration) => configuration
         .ReadFrom.Configuration(context.Configuration)
         .ReadFrom.Services(services)
         .Enrich.FromLogContext()
-        .Enrich.WithProperty("Application", "EgitimPlatform.Api")
-        .WriteTo.Console());
+        .Enrich.WithProperty("Application", "EgitimPlatform.Api"));
 
     // P2-12: Platform persistence (DbContext, Identity EF stores) — neutral Infrastructure layer.
     // Must be registered before Identity module (which configures JWT, policies, handlers).

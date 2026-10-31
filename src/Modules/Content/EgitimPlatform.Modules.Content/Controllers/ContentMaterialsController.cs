@@ -1,5 +1,6 @@
 using EgitimPlatform.BuildingBlocks.Constants;
 using EgitimPlatform.Modules.Content.Features.ManageMaterials;
+using EgitimPlatform.Modules.Content.Services;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
@@ -31,6 +32,8 @@ public class ContentMaterialsController : ControllerBase
     [Authorize(Roles = Roles.Teacher)]
     [EnableRateLimiting("upload")]
     [Consumes("multipart/form-data")]
+    [RequestSizeLimit(LocalFileStorageService.MaxFileSize)]
+    [RequestFormLimits(MultipartBodyLengthLimit = LocalFileStorageService.MaxFileSize)]
     public async Task<IActionResult> CreateMaterial([FromForm] CreateMaterialFormModel form, CancellationToken cancellationToken)
     {
         List<Guid>? classIds = null;

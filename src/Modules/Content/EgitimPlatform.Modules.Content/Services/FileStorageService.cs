@@ -1,3 +1,4 @@
+using System.Security;
 using Microsoft.AspNetCore.Http;
 
 namespace EgitimPlatform.Modules.Content.Services;
@@ -12,6 +13,7 @@ public interface IFileStorageService
 public class LocalFileStorageService : IFileStorageService
 {
     private readonly string _baseStoragePath;
+    private readonly string _baseStoragePathWithSeparator;
     private static readonly HashSet<string> AllowedExtensions = new(StringComparer.OrdinalIgnoreCase)
     {
         ".pdf", ".docx", ".doc", ".xlsx", ".pptx", ".png", ".jpg", ".jpeg"
@@ -34,7 +36,10 @@ public class LocalFileStorageService : IFileStorageService
 
     public LocalFileStorageService(string? baseStoragePath = null)
     {
-        _baseStoragePath = baseStoragePath ?? Path.Combine(Directory.GetCurrentDirectory(), "Storage", "Materials");
+        var resolvedBase = baseStoragePath ?? Path.Combine(Directory.GetCurrentDirectory(), "Storage", "Materials");
+        _baseStoragePath = Path.GetFullPath(resolvedBase);
+        _baseStoragePathWithSeparator = _baseStoragePath.TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar)
+            + Path.DirectorySeparatorChar;
         if (!Directory.Exists(_baseStoragePath))
         {
             Directory.CreateDirectory(_baseStoragePath);
@@ -53,8 +58,9 @@ public class LocalFileStorageService : IFileStorageService
             throw new InvalidOperationException($"Dosya boyutu 25MB sınırını aşamaz ({file.Length / (1024 * 1024.0):F1} MB).");
         }
 
-        var extension = Path.GetExtension(file.FileName).ToLowerInvariant();
-        if (!AllowedExtensions.Contains(extension))
+        var normalizedFileName = Path.GetFileName((file.FileName ?? string.Empty).Replace('\\', '/'));
+        var extension = Path.GetExtension(normalizedFileName).ToLowerInvariant();
+        if (string.IsNullOrEmpty(extension) || !AllowedExtensions.Contains(extension))
         {
             throw new InvalidOperationException($"Geçersiz dosya uzantısı '{extension}'. Sadece PDF, Word, Excel, PowerPoint ve görsel dosyalarına izin verilir.");
         }
@@ -62,51 +68,67 @@ public class LocalFileStorageService : IFileStorageService
         // Verify file signature (magic bytes)
         if (FileSignatures.TryGetValue(extension, out var signatures))
         {
-            using var reader = new BinaryReader(file.OpenReadStream());
-            var headerBytes = reader.ReadBytes(8);
-            var matchesSignature = signatures.Any(sig => headerBytes.Take(sig.Length).SequenceEqual(sig));
+            await using var headerStream = file.OpenReadStream();
+            if (headerStream.CanSeek)
+            {
+                headerStream.Position = 0;
+            }
+
+            var headerBytes = new byte[8];
+            var bytesRead = await headerStream.ReadAsync(headerBytes.AsMemory(0, 8), cancellationToken);
+            var matchesSignature = signatures.Any(sig =>
+                bytesRead >= sig.Length && headerBytes.AsSpan(0, sig.Length).SequenceEqual(sig));
             if (!matchesSignature)
             {
                 throw new InvalidOperationException($"Dosya içeriği '{extension}' uzantısı ile uyuşmuyor (sahte dosya tipi).");
             }
+
+            if (headerStream.CanSeek)
+            {
+                headerStream.Position = 0;
+            }
         }
 
-        var folderPath = Path.Combine(_baseStoragePath, folder);
-        if (!Directory.Exists(folderPath))
+        var sanitizedFolder = SanitizeRelativePath(folder, out var folderFullPath);
+        if (!Directory.Exists(folderFullPath))
         {
-            Directory.CreateDirectory(folderPath);
+            Directory.CreateDirectory(folderFullPath);
         }
 
         // Safe unique file name: guid + clean extension
         var safeFileName = $"{Guid.NewGuid():N}{extension}";
-        var fullPath = Path.Combine(folderPath, safeFileName);
+        var fullPath = Path.GetFullPath(Path.Combine(folderFullPath, safeFileName));
+        EnsureWithinBaseStorage(fullPath);
 
         await using var stream = new FileStream(fullPath, FileMode.Create, FileAccess.Write, FileShare.None);
         await file.CopyToAsync(stream, cancellationToken);
 
         // Return relative path from base storage
-        return Path.Combine(folder, safeFileName).Replace('\\', '/');
+        return Path.Combine(sanitizedFolder, safeFileName).Replace('\\', '/');
     }
 
     public Task<(Stream stream, string contentType, string fileName)> GetFileAsync(string relativePath, string originalFileName, string contentType, CancellationToken cancellationToken = default)
     {
-        // Prevent path traversal
-        var sanitizedRelative = relativePath.Replace("..", "").TrimStart('/', '\\');
-        var fullPath = Path.Combine(_baseStoragePath, sanitizedRelative);
+        SanitizeRelativePath(relativePath, out var fullPath);
 
         if (!File.Exists(fullPath))
         {
             throw new FileNotFoundException("İstenen materyal dosyası sunucuda bulunamadı.");
         }
 
+        var safeDownloadName = Path.GetFileName((originalFileName ?? string.Empty).Replace('\\', '/'));
+        if (string.IsNullOrWhiteSpace(safeDownloadName))
+        {
+            safeDownloadName = Path.GetFileName(fullPath);
+        }
+
         var stream = new FileStream(fullPath, FileMode.Open, FileAccess.Read, FileShare.Read);
-        return Task.FromResult(((Stream)stream, contentType, originalFileName));
+        return Task.FromResult(((Stream)stream, contentType, safeDownloadName));
     }
 
     public Task DeleteFileAsync(string relativePath, CancellationToken cancellationToken = default)
     {
-        var sanitizedRelative = relativePath.Replace("..", "").TrimStart('/', '\\');
-        var fullPath = Path.Combine(_baseStoragePath, sanitizedRelative);
+        SanitizeRelativePath(relativePath, out var fullPath);
 
         if (File.Exists(fullPath))
         {
@@ -114,5 +136,32 @@ public class LocalFileStorageService : IFileStorageService
         }
 
         return Task.CompletedTask;
+    }
+
+    private string SanitizeRelativePath(string relativePath, out string fullPath)
+    {
+        var normalized = (relativePath ?? string.Empty).Replace('\\', '/');
+        var safeSegments = normalized
+            .Split('/', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
+            .Select(segment => segment.Replace("..", string.Empty))
+            .Where(segment => !string.IsNullOrWhiteSpace(segment) && segment != ".")
+            .ToArray();
+
+        var sanitizedRelative = safeSegments.Length > 0
+            ? Path.Combine(safeSegments)
+            : string.Empty;
+
+        fullPath = Path.GetFullPath(Path.Combine(_baseStoragePath, sanitizedRelative));
+        EnsureWithinBaseStorage(fullPath);
+        return sanitizedRelative;
+    }
+
+    private void EnsureWithinBaseStorage(string fullPath)
+    {
+        if (!string.Equals(fullPath, _baseStoragePath, StringComparison.Ordinal) &&
+            !fullPath.StartsWith(_baseStoragePathWithSeparator, StringComparison.Ordinal))
+        {
+            throw new SecurityException("Dosya yolu güvenli depolama dizini dışına çıkamaz.");
+        }
     }
 }

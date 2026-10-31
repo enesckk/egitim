@@ -58,6 +58,7 @@ public class ExceptionHandlingMiddleware
             ForbiddenException => (StatusCodes.Status403Forbidden, "Access denied"),
             ConflictException => (StatusCodes.Status409Conflict, "Conflict"),
             FluentValidation.ValidationException => (StatusCodes.Status400BadRequest, "Validation failed"),
+            BadHttpRequestException badReqEx => (badReqEx.StatusCode, badReqEx.StatusCode == StatusCodes.Status413PayloadTooLarge ? "Payload too large" : "Bad request"),
             UnauthorizedAccessException => (StatusCodes.Status401Unauthorized, "Unauthorized"),
             _ => (StatusCodes.Status500InternalServerError, "An unexpected error occurred")
         };
@@ -114,6 +115,7 @@ public class ExceptionHandlingMiddleware
         403 => "https://tools.ietf.org/html/rfc7231#section-6.5.3",
         404 => "https://tools.ietf.org/html/rfc7231#section-6.5.4",
         409 => "https://tools.ietf.org/html/rfc7231#section-6.5.8",
+        413 => "https://tools.ietf.org/html/rfc7231#section-6.5.11",
         _ => "https://tools.ietf.org/html/rfc7231#section-6.6.1",
     };
 }

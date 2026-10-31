@@ -12,7 +12,7 @@ public interface IImportFileValidator
 
 public class ImportFileValidator : IImportFileValidator
 {
-    private const long MaxFileSizeBytes = 5 * 1024 * 1024; // 5 MB
+    public const long MaxFileSizeBytes = 5 * 1024 * 1024; // 5 MB
 
     public void ValidateFileHeader(IFormFile? file)
     {
@@ -26,7 +26,8 @@ public class ImportFileValidator : IImportFileValidator
             throw new ValidationException($"Import file exceeds maximum allowed size of 5 MB (Current size: {file.Length / (1024 * 1024.0):F2} MB).");
         }
 
-        var extension = Path.GetExtension(file.FileName).ToLowerInvariant();
+        var normalizedFileName = (file.FileName ?? string.Empty).Replace('\\', '/');
+        var extension = Path.GetExtension(normalizedFileName).ToLowerInvariant();
         if (extension != ".xlsx")
         {
             throw new ValidationException($"Unsupported file format '{extension}'. Only standard Excel workbooks (.xlsx) are allowed.");
@@ -48,6 +49,10 @@ public class ImportFileValidator : IImportFileValidator
         try
         {
             using var stream = file.OpenReadStream();
+            if (stream.CanSeek)
+            {
+                stream.Position = 0;
+            }
             return new XLWorkbook(stream);
         }
         catch (Exception ex) when (ex is not ValidationException)

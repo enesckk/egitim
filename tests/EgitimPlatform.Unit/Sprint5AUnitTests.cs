@@ -1,9 +1,11 @@
+using System.Security.Cryptography;
 using ClosedXML.Excel;
 using EgitimPlatform.BuildingBlocks.Interfaces;
 using EgitimPlatform.Infrastructure;
 using EgitimPlatform.Modules.Exams.Entities;
 using EgitimPlatform.Modules.Exams.Features.ExamResultImport;
 using EgitimPlatform.Modules.Exams.Services;
+using FluentValidation;
 using Microsoft.AspNetCore.Http;
 using Microsoft.EntityFrameworkCore;
 using NSubstitute;
@@ -210,6 +212,127 @@ public class Sprint5AUnitTests
         // Assert
         Assert.False(result.CanImport);
         Assert.Contains(result.Issues, i => i.Code == ImportIssueCodes.ExamTemplateMismatch);
+    }
+
+    [Fact]
+    public async Task GeneratePreviewAsync_StreamingSha256_MatchesByteArrayHash_WithChunkedNonSeekableStream()
+    {
+        using var db = CreateInMemoryDbContext();
+        var exam = new Exam { Id = _examId, InstitutionId = _institutionId, Title = "TYT Streaming", Code = "TYT-STR", WrongAnswerPenalty = 4m };
+        var section = new ExamSection { Id = Guid.NewGuid(), ExamId = _examId, InstitutionId = _institutionId, SubjectId = _subjectId, QuestionCount = 40, DisplayOrder = 1 };
+        db.AddRange(exam, section);
+        await db.SaveChangesAsync();
+
+        var studentDto = new StudentImportLookupDto(Guid.NewGuid(), _institutionId, "STD-901", "Zeynep", "Kaya");
+        _studentDirectory.GetActiveStudentsForImportAsync(_institutionId, Arg.Any<CancellationToken>())
+            .Returns(new List<StudentImportLookupDto> { studentDto });
+        _academicCatalog.GetSubjectNamesAsync(Arg.Any<IEnumerable<Guid>>(), Arg.Any<CancellationToken>())
+            .Returns(new Dictionary<Guid, string> { { _subjectId, "Matematik" } });
+
+        using var workbook = new XLWorkbook();
+        var ws = workbook.Worksheets.Add("Sheet1");
+        ws.Cell(1, 1).Value = "StudentId";
+        ws.Cell(1, 2).Value = "StudentNumber";
+        ws.Cell(1, 3).Value = "StudentName";
+        ws.Cell(1, 4).Value = $"SEC_{section.Id}_Correct";
+        ws.Cell(1, 5).Value = $"SEC_{section.Id}_Wrong";
+        ws.Cell(1, 6).Value = $"SEC_{section.Id}_Blank";
+        ws.Cell(2, 1).Value = studentDto.Id.ToString();
+        ws.Cell(2, 2).Value = "STD-901";
+        ws.Cell(2, 3).Value = "Zeynep Kaya";
+        ws.Cell(2, 4).Value = 32;
+        ws.Cell(2, 5).Value = 4;
+        ws.Cell(2, 6).Value = 4;
+
+        using var ms = new MemoryStream();
+        workbook.SaveAs(ms);
+        var rawBytes = ms.ToArray();
+        var expectedHexHash = Convert.ToHexString(SHA256.HashData(rawBytes));
+
+        var file = Substitute.For<IFormFile>();
+        file.Length.Returns(rawBytes.Length);
+        file.FileName.Returns("streaming.xlsx");
+        file.ContentType.Returns("application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");
+        // First OpenReadStream call is used for streaming SHA-256 (non-seekable, max 512 bytes per read); second is for workbook open
+        var callCount = 0;
+        file.OpenReadStream().Returns(_ =>
+            Interlocked.Increment(ref callCount) == 1
+                ? new ChunkedNonSeekableReadStream(rawBytes, maxBytesPerRead: 512)
+                : new MemoryStream(rawBytes));
+
+        var engine = new ExamResultImportPreviewEngine(db, _validator, _studentDirectory, _academicCatalog, _scoringService);
+        var preview = await engine.GeneratePreviewAsync(_examId, _institutionId, ImportType.AggregateResults, file);
+
+        Assert.True(preview.CanImport);
+        Assert.Equal(expectedHexHash, preview.FileHash);
+    }
+
+    [Fact]
+    public async Task GeneratePreviewAsync_OversizedOrMalformedFile_ThrowsValidationExceptionBeforeProcessing()
+    {
+        using var db = CreateInMemoryDbContext();
+        var exam = new Exam { Id = _examId, InstitutionId = _institutionId, Title = "TYT Limits", Code = "TYT-LIM" };
+        db.Add(exam);
+        await db.SaveChangesAsync();
+
+        var engine = new ExamResultImportPreviewEngine(db, _validator, _studentDirectory, _academicCatalog, _scoringService);
+
+        // 1. Oversized file (> 5 MB) rejected before OpenReadStream is ever called
+        var oversizedFile = Substitute.For<IFormFile>();
+        oversizedFile.Length.Returns(ImportFileValidator.MaxFileSizeBytes + 1);
+        oversizedFile.FileName.Returns("oversized.xlsx");
+        oversizedFile.ContentType.Returns("application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");
+
+        var sizeEx = await Assert.ThrowsAsync<ValidationException>(() =>
+            engine.GeneratePreviewAsync(_examId, _institutionId, ImportType.AggregateResults, oversizedFile));
+        Assert.Contains("maximum allowed size of 5 MB", sizeEx.Message);
+        oversizedFile.DidNotReceive().OpenReadStream();
+
+        // 2. Malformed/corrupt .xlsx bytes rejected with ValidationException
+        var corruptBytes = new byte[] { 0x50, 0x4B, 0x03, 0x04, 0xFF, 0x00, 0x11, 0x22, 0x33 };
+        var malformedFile = Substitute.For<IFormFile>();
+        malformedFile.Length.Returns(corruptBytes.Length);
+        malformedFile.FileName.Returns("corrupt.xlsx");
+        malformedFile.ContentType.Returns("application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");
+        malformedFile.OpenReadStream().Returns(_ => new MemoryStream(corruptBytes));
+
+        var corruptEx = await Assert.ThrowsAsync<ValidationException>(() =>
+            engine.GeneratePreviewAsync(_examId, _institutionId, ImportType.AggregateResults, malformedFile));
+        Assert.Contains("Failed to read Excel workbook", corruptEx.Message);
+    }
+
+    private sealed class ChunkedNonSeekableReadStream(byte[] data, int maxBytesPerRead) : Stream
+    {
+        private int _position;
+        public override bool CanRead => true;
+        public override bool CanSeek => false;
+        public override bool CanWrite => false;
+        public override long Length => throw new NotSupportedException();
+        public override long Position
+        {
+            get => throw new NotSupportedException();
+            set => throw new NotSupportedException();
+        }
+        public override void Flush() { }
+        public override int Read(byte[] buffer, int offset, int count)
+        {
+            if (_position >= data.Length) return 0;
+            var toCopy = Math.Min(Math.Min(count, maxBytesPerRead), data.Length - _position);
+            Buffer.BlockCopy(data, _position, buffer, offset, toCopy);
+            _position += toCopy;
+            return toCopy;
+        }
+        public override ValueTask<int> ReadAsync(Memory<byte> buffer, CancellationToken cancellationToken = default)
+        {
+            if (_position >= data.Length) return ValueTask.FromResult(0);
+            var toCopy = Math.Min(Math.Min(buffer.Length, maxBytesPerRead), data.Length - _position);
+            data.AsMemory(_position, toCopy).CopyTo(buffer);
+            _position += toCopy;
+            return ValueTask.FromResult(toCopy);
+        }
+        public override long Seek(long offset, SeekOrigin origin) => throw new NotSupportedException();
+        public override void SetLength(long value) => throw new NotSupportedException();
+        public override void Write(byte[] buffer, int offset, int count) => throw new NotSupportedException();
     }
 
     private static IFormFile CreateMockFormFile(XLWorkbook workbook)
