@@ -17,9 +17,10 @@ import {
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useAuth } from '@/auth';
+import { isCanceledError } from '@/services/api/apiErrors';
 import { academicService } from '@/services/academicService';
 import { coachTaskService, CoachTaskStatus } from '@/services/coachTaskService';
-import { coachMeetingService, CoachMeetingDto } from '@/services/coachMeetingService';
+import type { CoachMeetingDto } from '@/services/coachMeetingService';
 import { examService } from '@/services/examService';
 import { getRecommendationTypeLabel } from '@/features/student/academic/types';
 import { Alert } from '@/components/ui/Alert';
@@ -87,12 +88,11 @@ export const StudentTodayView: React.FC<StudentTodayViewProps> = ({
         return;
       }
 
-      const [activePlanRes, coachTasksRes, recsRes, student360Res, meetingsRes, examsRes] = await Promise.allSettled([
+      const [activePlanRes, coachTasksRes, recsRes, student360Res, examsRes] = await Promise.allSettled([
         academicService.getActiveStudyPlan(studentId),
         coachTaskService.getCoachTasks(studentId),
         academicService.getRecommendations(studentId, { recommendationLimit: 1 }),
         academicService.getStudent360(studentId),
-        coachMeetingService.listMeetings(),
         examService.getStudentExamResults(studentId, { pageSize: 5 }),
       ]);
 
@@ -107,11 +107,9 @@ export const StudentTodayView: React.FC<StudentTodayViewProps> = ({
           : null;
       const student360 = student360Res.status === 'fulfilled' ? student360Res.value : null;
 
-      // Real Meetings
-      if (meetingsRes.status === 'fulfilled' && Array.isArray(meetingsRes.value)) {
-        const upcoming = meetingsRes.value.find(m => m.status === 'upcoming');
-        setUpcomingMeeting(upcoming || null);
-      }
+      // Note: Backend /api/v1/coaching/meetings is coach/admin scoped.
+      // Student-authorized meeting endpoint is not present in the backend; skip to avoid 403 Forbidden.
+      setUpcomingMeeting(null);
 
       // Real Exams (compare latest with previous if available)
       if (examsRes.status === 'fulfilled' && examsRes.value?.items?.length) {
@@ -246,7 +244,8 @@ export const StudentTodayView: React.FC<StudentTodayViewProps> = ({
         upcomingEvents: [],
         monthlyStats: [],
       });
-    } catch {
+    } catch (err: unknown) {
+      if (isCanceledError(err)) return;
       setViewData(undefined);
       setPlans([]);
     } finally {

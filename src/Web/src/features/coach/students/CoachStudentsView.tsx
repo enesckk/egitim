@@ -2,6 +2,7 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Search, Users, AlertCircle, RefreshCw, Calendar, MessageSquare } from 'lucide-react';
 import { academicService, StudentSummaryDto } from '@/services/academicService';
+import { isCanceledError } from '@/services/api/apiErrors';
 import { Input } from '@/components/ui/Input';
 import { Select } from '@/components/ui/Select';
 import { Button } from '@/components/ui/Button';
@@ -111,6 +112,7 @@ export const CoachStudentsView: React.FC<CoachStudentsViewProps> = ({
 
       setData({ students: enriched });
     } catch (err: unknown) {
+      if (isCanceledError(err)) return;
       const msg = err instanceof Error ? err.message : 'Atanmış öğrenci listesi alınamadı.';
       setErrorMessage(msg);
     } finally {

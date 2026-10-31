@@ -1,4 +1,5 @@
 import { apiClient } from './api/apiClient';
+import { ApiError } from './api/apiErrors';
 import { TaxonomyDto } from '@/types/question';
 import {
   StudentSubjectPerformanceDto,
@@ -287,14 +288,24 @@ export const academicService = {
     );
   },
 
-  getActiveStudyPlan: (
+  getActiveStudyPlan: async (
     studentId: string,
     signal?: AbortSignal
-  ): Promise<PersistentStudyPlanDetailDto> => {
-    return apiClient.get<PersistentStudyPlanDetailDto>(
-      `/api/v1/students/${studentId}/study-plans/active`,
-      { signal }
-    );
+  ): Promise<PersistentStudyPlanDetailDto | null> => {
+    try {
+      return await apiClient.get<PersistentStudyPlanDetailDto>(
+        `/api/v1/students/${studentId}/study-plans/active`,
+        { signal }
+      );
+    } catch (err: unknown) {
+      if (
+        (err instanceof ApiError && err.status === 404) ||
+        (typeof err === 'object' && err !== null && (err as { status?: number }).status === 404)
+      ) {
+        return null;
+      }
+      throw err;
+    }
   },
 
   getStudyPlanDetail: (

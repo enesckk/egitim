@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { CalendarDays, AlertCircle, RefreshCw, Filter } from 'lucide-react';
 import { academicService } from '@/services/academicService';
+import { isCanceledError, ApiError } from '@/services/api/apiErrors';
 import { PersistentStudyPlanDetailDto } from '@/features/student/academic/types';
 import { Select } from '@/components/ui/Select';
 import { Button } from '@/components/ui/Button';
@@ -206,8 +207,18 @@ export const StudentPlansView: React.FC<StudentPlansViewProps> = ({
         setPlanData(undefined);
         setTasks([]);
       }
-    } catch (err: any) {
-      setErrorMessage(err?.response?.data?.detail || err?.message || 'Çalışma planı yüklenirken bir sorun oluştu.');
+    } catch (err: unknown) {
+      if (isCanceledError(err)) return;
+      if (
+        (err instanceof ApiError && err.status === 404) ||
+        (typeof err === 'object' && err !== null && (err as { status?: number }).status === 404)
+      ) {
+        setPlanData(undefined);
+        setTasks([]);
+        return;
+      }
+      const msg = err instanceof Error ? err.message : 'Çalışma planı yüklenirken bir sorun oluştu.';
+      setErrorMessage(msg);
     } finally {
       setIsLoading(false);
     }

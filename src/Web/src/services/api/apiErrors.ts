@@ -58,6 +58,10 @@ export class ApiError extends Error {
     return this.status >= 500;
   }
 
+  get isCanceled(): boolean {
+    return this.name === 'AbortError' || this.name === 'CanceledError' || this.message.toLowerCase().includes('aborted');
+  }
+
   /**
    * Returns a user-safe localized description of the error.
    */
@@ -92,4 +96,19 @@ export class ApiError extends Error {
     return 'Beklenmeyen bir hata oluştu. Lütfen daha sonra tekrar deneyiniz.';
   }
 }
+
+/**
+ * Returns true if the error represents a canceled or aborted request.
+ */
+export function isCanceledError(error: unknown): boolean {
+  if (!error) return false;
+  if (error instanceof Error && (error.name === 'AbortError' || error.name === 'CanceledError')) return true;
+  if (typeof error === 'object') {
+    const errObj = error as { name?: string; message?: string; isCanceled?: boolean };
+    if (errObj.name === 'AbortError' || errObj.name === 'CanceledError' || errObj.isCanceled) return true;
+    if (typeof errObj.message === 'string' && (errObj.message.includes('aborted') || errObj.message.includes('iptal'))) return true;
+  }
+  return false;
+}
+
 

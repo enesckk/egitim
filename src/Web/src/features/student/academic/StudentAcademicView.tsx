@@ -16,6 +16,7 @@ import { Button } from '@/components/ui/Button';
 import { Skeleton } from '@/components/ui/Skeleton';
 import { Select } from '@/components/ui/Select';
 import { academicService, AcademicQueryParams } from '@/services/academicService';
+import { isCanceledError } from '@/services/api/apiErrors';
 import {
   StudentSubjectPerformanceDto,
   SubjectTrendDto,
@@ -144,7 +145,7 @@ export const StudentAcademicView: React.FC<StudentAcademicViewProps> = ({
         setStudyPlan(planRes);
         setQuestionStyles(qStylesRes || []);
       } catch (err: unknown) {
-        if (err instanceof Error && err.name === 'AbortError') {
+        if (isCanceledError(err) || (err instanceof Error && err.name === 'AbortError')) {
           return;
         }
         if (sequenceId !== undefined && sequenceId !== requestSeqRef.current) {

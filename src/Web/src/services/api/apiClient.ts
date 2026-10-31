@@ -135,6 +135,15 @@ class ApiClient {
     try {
       response = await fetch(url, config);
     } catch (networkError) {
+      if (
+        (networkError instanceof Error && networkError.name === 'AbortError') ||
+        customConfig.signal?.aborted
+      ) {
+        if (networkError instanceof Error && networkError.name === 'AbortError') {
+          throw networkError;
+        }
+        throw new DOMException('The user aborted a request.', 'AbortError');
+      }
       throw new ApiError(
         0,
         networkError instanceof Error ? networkError.message : 'Ağ bağlantısı hatası oluştu.'
