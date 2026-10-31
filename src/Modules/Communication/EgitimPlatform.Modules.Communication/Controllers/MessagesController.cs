@@ -18,6 +18,14 @@ public class MessagesController(MessagesHandler messagesHandler) : ControllerBas
         return Ok(result);
     }
 
+    [HttpGet("recipients")]
+    [ProducesResponseType(typeof(List<RecipientDto>), StatusCodes.Status200OK)]
+    public async Task<IActionResult> ListRecipients(CancellationToken ct)
+    {
+        var result = await messagesHandler.ListPermittedRecipientsAsync(ct);
+        return Ok(result);
+    }
+
     [HttpGet("conversations/{conversationId:guid}")]
     [ProducesResponseType(typeof(List<MessageDto>), StatusCodes.Status200OK)]
     public async Task<IActionResult> GetConversationMessages(

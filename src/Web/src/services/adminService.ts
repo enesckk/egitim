@@ -66,7 +66,7 @@ export interface TeacherListDto {
 }
 
 export interface CreateTeacherRequest {
-  institutionId: string;
+  institutionId?: string;
   userId?: string;
   firstName: string;
   lastName: string;
@@ -94,7 +94,7 @@ export interface CoachSummaryDto {
 }
 
 export interface CreateCoachRequest {
-  institutionId: string;
+  institutionId?: string;
   userId?: string;
   firstName: string;
   lastName: string;
@@ -198,7 +198,11 @@ export const adminService = {
 
   // Teachers
   createTeacher: (cmd: CreateTeacherRequest): Promise<TeacherListDto> => {
-    return apiClient.post<TeacherListDto>('/api/v1/teachers', cmd);
+    const payload = {
+      ...cmd,
+      institutionId: cmd.institutionId || '00000000-0000-0000-0000-000000000000',
+    };
+    return apiClient.post<TeacherListDto>('/api/v1/teachers', payload);
   },
 
   listTeachers: (params?: {
@@ -226,7 +230,11 @@ export const adminService = {
 
   // Coaches
   createCoach: (cmd: CreateCoachRequest): Promise<CoachSummaryDto> => {
-    return apiClient.post<CoachSummaryDto>('/api/v1/coaching/coaches', cmd);
+    const payload = {
+      ...cmd,
+      institutionId: cmd.institutionId || '00000000-0000-0000-0000-000000000000',
+    };
+    return apiClient.post<CoachSummaryDto>('/api/v1/coaching/coaches', payload);
   },
 
   listCoaches: (params?: {

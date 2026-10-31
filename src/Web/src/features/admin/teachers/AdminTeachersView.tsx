@@ -23,6 +23,7 @@ import {
 } from '@/services/adminService';
 import { academicService } from '@/services/academicService';
 import { TaxonomyDto } from '@/types/question';
+import { useAuth } from '@/auth';
 import { AdminTeacherDirectoryItem, AdminTeachersViewModel } from './types';
 
 export interface AdminTeachersViewProps {
@@ -38,6 +39,7 @@ export const AdminTeachersView: React.FC<AdminTeachersViewProps> = ({
   errorMessage: propErrorMessage,
   onRetry,
 }) => {
+  const { user } = useAuth();
   const [data, setData] = useState<AdminTeachersViewModel | undefined>(initialData);
   const [isLoading, setIsLoading] = useState<boolean>(propIsLoading || (!initialData && !propErrorMessage));
   const [errorMessage, setErrorMessage] = useState<string | undefined>(propErrorMessage);
@@ -201,7 +203,7 @@ export const AdminTeachersView: React.FC<AdminTeachersViewProps> = ({
 
     try {
       await adminService.createTeacher({
-        institutionId: '',
+        institutionId: user?.institutionId || '00000000-0000-0000-0000-000000000000',
         firstName: newFirstName.trim(),
         lastName: newLastName.trim(),
         email: newEmail.trim(),

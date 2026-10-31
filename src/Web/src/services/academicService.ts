@@ -46,6 +46,7 @@ export interface StudentSummaryDto {
   studentNumber?: string | null;
   gradeLevel?: number | null;
   enrollmentDate?: string | null;
+  userId?: string | null;
 }
 
 export interface StudentGoalSummaryDto {

@@ -3,12 +3,20 @@ import { apiClient } from './api/apiClient';
 export interface ConversationSummaryDto {
   id: string;
   otherUserId: string;
+  otherStudentId?: string | null;
   otherUserName: string;
   otherUserRole: string;
-  subject?: string;
+  subject?: string | null;
   lastMessageSnippet?: string;
   lastMessageAt: string;
   unreadCount: number;
+}
+
+export interface RecipientDto {
+  userId: string;
+  fullName: string;
+  role: string;
+  studentId?: string | null;
 }
 
 export interface MessageDto {
@@ -33,6 +41,10 @@ export interface SendMessageRequest {
 export const messagingService = {
   async listConversations(): Promise<ConversationSummaryDto[]> {
     return apiClient.get<ConversationSummaryDto[]>('/api/v1/communication/messages/conversations');
+  },
+
+  async getRecipients(): Promise<RecipientDto[]> {
+    return apiClient.get<RecipientDto[]>('/api/v1/communication/messages/recipients');
   },
 
   async getConversationMessages(conversationId: string, page = 1, pageSize = 200): Promise<MessageDto[]> {

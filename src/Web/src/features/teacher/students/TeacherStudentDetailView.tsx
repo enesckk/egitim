@@ -82,6 +82,7 @@ function mapStudent360ToTeacherModel(
 
   return {
     id: dto.student.id,
+    userId: dto.student.userId || undefined,
     name,
     initials,
     grade: dto.student.gradeLevel ? `${dto.student.gradeLevel}. Sınıf` : '12. Sınıf',
@@ -326,7 +327,7 @@ export const TeacherStudentDetailView: React.FC<TeacherStudentDetailViewProps> =
             <Button
               variant="secondary"
               size="sm"
-              onClick={() => navigate(`/teacher/messages?studentId=${activeStudent.id}`)}
+              onClick={() => navigate(`/teacher/messages?studentId=${activeStudent.id}${activeStudent.userId ? `&userId=${activeStudent.userId}` : ''}`)}
               leftIcon={<Send className="h-3.5 w-3.5" />}
               className="bg-[#F8F7F3] border-neutral-200 hover:bg-neutral-100"
             >

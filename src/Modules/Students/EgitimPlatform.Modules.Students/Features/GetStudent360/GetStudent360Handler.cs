@@ -36,6 +36,12 @@ public class GetStudent360Handler(IApplicationDbContext db, ICurrentUser user, I
             ? await examSummary.GetRecentExamSummaryAsync(student.Id, student.InstitutionId, ct)
             : null;
 
-        return new(student.ToDto(), goals, await coaches.GetAsync(student.Id, student.InstitutionId, ct), parents, exams, recentExamDto);
+        var studentDto = student.ToDto();
+        if (StudentReadAccess.IsParentOnly(user))
+        {
+            studentDto = studentDto with { UserId = null };
+        }
+
+        return new(studentDto, goals, await coaches.GetAsync(student.Id, student.InstitutionId, ct), parents, exams, recentExamDto);
     }
 }

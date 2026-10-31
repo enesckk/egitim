@@ -189,6 +189,7 @@ export const parseUserFromToken = (token: string): AuthUser | null => {
     initials,
     roleLabel: getRoleDisplayName(role),
     institutionName,
+    institutionId,
   };
 };
 

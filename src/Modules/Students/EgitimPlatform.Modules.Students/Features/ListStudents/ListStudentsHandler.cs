@@ -114,7 +114,8 @@ public class ListStudentsHandler
             s.SchoolName,
             s.StudentNumber,
             s.GradeLevel,
-            s.EnrollmentDate));
+            s.EnrollmentDate,
+            s.UserId));
 
         return await PaginatedList<StudentDto>.CreateAsync(dtoSource, query.Page, query.PageSize, ct);
     }

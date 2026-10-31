@@ -10,7 +10,14 @@ public record ConversationSummaryDto(
     string? Subject,
     string? LastMessageSnippet,
     DateTimeOffset LastMessageAt,
-    int UnreadCount);
+    int UnreadCount,
+    Guid? OtherStudentId = null);
+
+public record RecipientDto(
+    Guid UserId,
+    string FullName,
+    string Role,
+    Guid? StudentId = null);
 
 public record MessageDto(
     Guid Id,

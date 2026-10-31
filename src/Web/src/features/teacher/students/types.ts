@@ -40,6 +40,7 @@ export interface TeacherStudentSubjectSummary {
 
 export interface TeacherStudentDetailModel {
   id: string;
+  userId?: string;
   name: string;
   initials: string;
   grade: string;

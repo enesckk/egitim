@@ -15,6 +15,7 @@ import { Skeleton } from '@/components/ui/Skeleton';
 import { Modal } from '@/components/ui/Modal';
 import { Input } from '@/components/ui/Input';
 import { adminService, CoachSummaryDto, StudentSummaryDto } from '@/services/adminService';
+import { useAuth } from '@/auth';
 import { AdminCoachDirectoryItem, AdminCoachesViewModel } from './types';
 
 function mapCoachToItem(c: CoachSummaryDto): AdminCoachDirectoryItem {
@@ -46,6 +47,7 @@ export const AdminCoachesView: React.FC<AdminCoachesViewProps> = ({
   errorMessage: propErrorMessage,
   onRetry,
 }) => {
+  const { user } = useAuth();
   const [data, setData] = useState<AdminCoachesViewModel | undefined>(initialData);
   const [isLoading, setIsLoading] = useState<boolean>(propIsLoading || (!initialData && !propErrorMessage));
   const [errorMessage, setErrorMessage] = useState<string | undefined>(propErrorMessage);
@@ -126,7 +128,7 @@ export const AdminCoachesView: React.FC<AdminCoachesViewProps> = ({
 
     try {
       await adminService.createCoach({
-        institutionId: '',
+        institutionId: user?.institutionId || '00000000-0000-0000-0000-000000000000',
         firstName: newFirstName.trim(),
         lastName: newLastName.trim(),
         email: newEmail.trim(),

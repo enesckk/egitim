@@ -82,7 +82,7 @@ public sealed class MessagesHandler(
 
         var students = await db.Set<Student>().AsNoTracking()
             .Where(s => s.UserId.HasValue && otherUserIds.Contains(s.UserId.Value) && s.InstitutionId == institutionId && !s.IsDeleted)
-            .ToDictionaryAsync(s => s.UserId!.Value, s => $"{s.FirstName} {s.LastName}".Trim(), ct);
+            .ToDictionaryAsync(s => s.UserId!.Value, s => s, ct);
 
         var teachers = await db.Set<Teacher>().AsNoTracking()
             .Where(t => otherUserIds.Contains(t.UserId) && t.InstitutionId == institutionId && !t.IsDeleted)
@@ -99,8 +99,14 @@ public sealed class MessagesHandler(
             userInfoMap.TryGetValue(otherId, out var otherUser);
 
             var name = "";
+            Guid? otherStudentId = null;
             if (coaches.TryGetValue(otherId, out var coachName) && !string.IsNullOrWhiteSpace(coachName)) name = coachName;
-            else if (students.TryGetValue(otherId, out var studentName) && !string.IsNullOrWhiteSpace(studentName)) name = studentName;
+            else if (students.TryGetValue(otherId, out var studentEntity))
+            {
+                otherStudentId = studentEntity.Id;
+                var sName = $"{studentEntity.FirstName} {studentEntity.LastName}".Trim();
+                if (!string.IsNullOrWhiteSpace(sName)) name = sName;
+            }
             else if (teachers.TryGetValue(otherId, out var teacherName) && !string.IsNullOrWhiteSpace(teacherName)) name = teacherName;
             else if (parents.TryGetValue(otherId, out var parentName) && !string.IsNullOrWhiteSpace(parentName)) name = parentName;
             else if (otherUser != null && !string.IsNullOrWhiteSpace($"{otherUser.FirstName} {otherUser.LastName}".Trim())) name = $"{otherUser.FirstName} {otherUser.LastName}".Trim();
@@ -117,8 +123,171 @@ public sealed class MessagesHandler(
                 conv.Subject,
                 conv.LastMessageSnippet,
                 conv.LastMessageAt,
-                unread
+                unread,
+                otherStudentId
             ));
+        }
+
+        return results;
+    }
+
+    public async Task<List<RecipientDto>> ListPermittedRecipientsAsync(CancellationToken ct = default)
+    {
+        var currentUserId = currentUser.UserId ?? throw new UnauthorizedAccessException("Giriş yapılmış kullanıcı gereklidir.");
+        var institutionId = await currentUser.GetInstitutionIdAsync() ?? throw new UnauthorizedAccessException("Kurum bağlamı gereklidir.");
+
+        var roles = currentUser.Roles;
+        var results = new List<RecipientDto>();
+
+        if (currentUser.IsSuperAdmin || roles.Contains(Roles.InstitutionAdmin))
+        {
+            var users = await (
+                from u in db.Set<ApplicationUser>().AsNoTracking()
+                where u.InstitutionId == institutionId && u.IsActive && !u.IsDeleted && u.Id != currentUserId
+                join ur in db.Set<IdentityUserRole<Guid>>().AsNoTracking() on u.Id equals ur.UserId into userRoles
+                from ur in userRoles.DefaultIfEmpty()
+                join r in db.Set<ApplicationRole>().AsNoTracking() on ur.RoleId equals r.Id into roleList
+                from r in roleList.DefaultIfEmpty()
+                select new { u.Id, u.FirstName, u.LastName, Role = r != null ? r.Name : "User" }
+            ).ToListAsync(ct);
+
+            var students = await db.Set<Student>().AsNoTracking()
+                .Where(s => s.InstitutionId == institutionId && !s.IsDeleted && s.UserId.HasValue)
+                .ToDictionaryAsync(s => s.UserId!.Value, s => s.Id, ct);
+
+            foreach (var u in users.GroupBy(x => x.Id).Select(g => g.First()))
+            {
+                students.TryGetValue(u.Id, out var studentId);
+                results.Add(new RecipientDto(u.Id, $"{u.FirstName} {u.LastName}".Trim(), u.Role ?? "User", studentId == Guid.Empty ? null : studentId));
+            }
+            return results;
+        }
+
+        if (roles.Contains(Roles.Coach))
+        {
+            var coach = await db.Set<Coach>().AsNoTracking()
+                .FirstOrDefaultAsync(c => c.UserId == currentUserId && c.InstitutionId == institutionId && !c.IsDeleted, ct);
+            if (coach != null)
+            {
+                var assignedStudents = await (
+                    from a in db.Set<StudentCoachAssignment>().AsNoTracking()
+                    join s in db.Set<Student>().AsNoTracking() on a.StudentId equals s.Id
+                    where a.CoachId == coach.Id && a.InstitutionId == institutionId && a.IsActive && a.EndedAt == null
+                       && s.InstitutionId == institutionId && !s.IsDeleted && s.UserId.HasValue
+                    select new { s.Id, s.UserId, s.FirstName, s.LastName }
+                ).ToListAsync(ct);
+
+                foreach (var s in assignedStudents.GroupBy(x => x.UserId).Select(g => g.First()))
+                {
+                    results.Add(new RecipientDto(s.UserId!.Value, $"{s.FirstName} {s.LastName}".Trim(), Roles.Student, s.Id));
+                }
+            }
+        }
+        else if (roles.Contains(Roles.Teacher))
+        {
+            var teacher = await db.Set<Teacher>().AsNoTracking()
+                .FirstOrDefaultAsync(t => t.UserId == currentUserId && t.InstitutionId == institutionId && !t.IsDeleted, ct);
+            if (teacher != null)
+            {
+                var classStudents = await (
+                    from ctLink in db.Set<ClassroomTeacher>().AsNoTracking()
+                    join c in db.Set<Classroom>().AsNoTracking() on ctLink.ClassroomId equals c.Id
+                    join cs in db.Set<ClassroomStudent>().AsNoTracking() on c.Id equals cs.ClassroomId
+                    join s in db.Set<Student>().AsNoTracking() on cs.StudentId equals s.Id
+                    where ctLink.TeacherId == teacher.Id && ctLink.InstitutionId == institutionId && !ctLink.IsDeleted
+                       && c.InstitutionId == institutionId && !c.IsDeleted
+                       && cs.InstitutionId == institutionId && !cs.IsDeleted
+                       && s.InstitutionId == institutionId && !s.IsDeleted && s.UserId.HasValue
+                    select new { s.Id, s.UserId, s.FirstName, s.LastName }
+                ).ToListAsync(ct);
+
+                foreach (var s in classStudents.GroupBy(x => x.UserId).Select(g => g.First()))
+                {
+                    results.Add(new RecipientDto(s.UserId!.Value, $"{s.FirstName} {s.LastName}".Trim(), Roles.Student, s.Id));
+                }
+            }
+        }
+        else if (roles.Contains(Roles.Student))
+        {
+            var student = await db.Set<Student>().AsNoTracking()
+                .FirstOrDefaultAsync(s => s.UserId == currentUserId && s.InstitutionId == institutionId && !s.IsDeleted, ct);
+            if (student != null)
+            {
+                var coachList = await (
+                    from a in db.Set<StudentCoachAssignment>().AsNoTracking()
+                    join c in db.Set<Coach>().AsNoTracking() on a.CoachId equals c.Id
+                    where a.StudentId == student.Id && a.InstitutionId == institutionId && a.IsActive && a.EndedAt == null
+                       && c.InstitutionId == institutionId && !c.IsDeleted
+                    select new { c.UserId, c.FirstName, c.LastName }
+                ).ToListAsync(ct);
+
+                foreach (var c in coachList.GroupBy(x => x.UserId).Select(g => g.First()))
+                {
+                    results.Add(new RecipientDto(c.UserId, $"{c.FirstName} {c.LastName}".Trim(), Roles.Coach));
+                }
+
+                var teacherList = await (
+                    from cs in db.Set<ClassroomStudent>().AsNoTracking()
+                    join c in db.Set<Classroom>().AsNoTracking() on cs.ClassroomId equals c.Id
+                    join ctLink in db.Set<ClassroomTeacher>().AsNoTracking() on c.Id equals ctLink.ClassroomId
+                    join t in db.Set<Teacher>().AsNoTracking() on ctLink.TeacherId equals t.Id
+                    where cs.StudentId == student.Id && cs.InstitutionId == institutionId && !cs.IsDeleted
+                       && c.InstitutionId == institutionId && !c.IsDeleted
+                       && ctLink.InstitutionId == institutionId && !ctLink.IsDeleted
+                       && t.InstitutionId == institutionId && !t.IsDeleted
+                    select new { t.UserId, t.FirstName, t.LastName }
+                ).ToListAsync(ct);
+
+                foreach (var t in teacherList.GroupBy(x => x.UserId).Select(g => g.First()))
+                {
+                    results.Add(new RecipientDto(t.UserId, $"{t.FirstName} {t.LastName}".Trim(), Roles.Teacher));
+                }
+            }
+        }
+        else if (roles.Contains(Roles.Parent))
+        {
+            var parent = await db.Set<Parent>().AsNoTracking()
+                .FirstOrDefaultAsync(p => p.UserId == currentUserId && p.InstitutionId == institutionId && !p.IsDeleted, ct);
+            if (parent != null)
+            {
+                var studentIds = await db.Set<StudentParent>().AsNoTracking()
+                    .Where(sp => sp.ParentId == parent.Id && sp.InstitutionId == institutionId && !sp.IsDeleted)
+                    .Select(sp => sp.StudentId)
+                    .ToListAsync(ct);
+
+                if (studentIds.Count > 0)
+                {
+                    var coaches = await (
+                        from a in db.Set<StudentCoachAssignment>().AsNoTracking()
+                        join c in db.Set<Coach>().AsNoTracking() on a.CoachId equals c.Id
+                        where studentIds.Contains(a.StudentId) && a.InstitutionId == institutionId && a.IsActive && a.EndedAt == null
+                           && c.InstitutionId == institutionId && !c.IsDeleted
+                        select new { c.UserId, c.FirstName, c.LastName }
+                    ).ToListAsync(ct);
+
+                    foreach (var c in coaches.GroupBy(x => x.UserId).Select(g => g.First()))
+                    {
+                        results.Add(new RecipientDto(c.UserId, $"{c.FirstName} {c.LastName}".Trim(), Roles.Coach));
+                    }
+
+                    var teachers = await (
+                        from cs in db.Set<ClassroomStudent>().AsNoTracking()
+                        join c in db.Set<Classroom>().AsNoTracking() on cs.ClassroomId equals c.Id
+                        join ctLink in db.Set<ClassroomTeacher>().AsNoTracking() on c.Id equals ctLink.ClassroomId
+                        join t in db.Set<Teacher>().AsNoTracking() on ctLink.TeacherId equals t.Id
+                        where studentIds.Contains(cs.StudentId) && cs.InstitutionId == institutionId && !cs.IsDeleted
+                           && c.InstitutionId == institutionId && !c.IsDeleted
+                           && ctLink.InstitutionId == institutionId && !ctLink.IsDeleted
+                           && t.InstitutionId == institutionId && !t.IsDeleted
+                        select new { t.UserId, t.FirstName, t.LastName }
+                    ).ToListAsync(ct);
+
+                    foreach (var t in teachers.GroupBy(x => x.UserId).Select(g => g.First()))
+                    {
+                        results.Add(new RecipientDto(t.UserId, $"{t.FirstName} {t.LastName}".Trim(), Roles.Teacher));
+                    }
+                }
+            }
         }
 
         return results;
@@ -261,6 +430,16 @@ public sealed class MessagesHandler(
         else if (req.RecipientUserId.HasValue)
         {
             recipientUserId = req.RecipientUserId.Value;
+
+            var studentUser = await db.Set<Student>().AsNoTracking()
+                .Where(s => s.Id == recipientUserId && s.InstitutionId == institutionId && !s.IsDeleted && s.UserId.HasValue)
+                .Select(s => s.UserId!.Value)
+                .FirstOrDefaultAsync(ct);
+            if (studentUser != Guid.Empty)
+            {
+                recipientUserId = studentUser;
+            }
+
             if (recipientUserId == currentUserId)
                 throw new ArgumentException("Kendinize mesaj gönderemezsiniz.");
 
@@ -376,6 +555,16 @@ public sealed class MessagesHandler(
     public async Task ValidateCommunicationRelationshipAsync(
         Guid senderUserId, Guid recipientUserId, Guid institutionId, CancellationToken ct)
     {
+        // Check if recipientUserId was provided as Student.Id rather than ApplicationUser.Id
+        var studentUser = await db.Set<Student>().AsNoTracking()
+            .Where(s => s.Id == recipientUserId && s.InstitutionId == institutionId && !s.IsDeleted && s.UserId.HasValue)
+            .Select(s => s.UserId!.Value)
+            .FirstOrDefaultAsync(ct);
+        if (studentUser != Guid.Empty)
+        {
+            recipientUserId = studentUser;
+        }
+
         // 1. Both users must be active and belonging to the same institution
         var recipient = await (
             from u in db.Set<ApplicationUser>().AsNoTracking()

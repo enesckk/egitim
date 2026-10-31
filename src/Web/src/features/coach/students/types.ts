@@ -34,6 +34,7 @@ export interface StudentExamReviewItem {
 
 export interface AssignedStudentDetail {
   id: string;
+  userId?: string;
   name: string;
   initials: string;
   grade: string;

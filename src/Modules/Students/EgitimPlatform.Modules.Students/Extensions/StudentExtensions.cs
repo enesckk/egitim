@@ -17,6 +17,7 @@ internal static class StudentExtensions
             student.SchoolName,
             student.StudentNumber,
             student.GradeLevel,
-            student.EnrollmentDate);
+            student.EnrollmentDate,
+            student.UserId);
     }
 }

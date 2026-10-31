@@ -219,6 +219,7 @@ export const CoachStudentDetailView: React.FC<CoachStudentDetailViewProps> = ({
 
       setStudent((prev) => ({
         id: baseStudentDto.id,
+        userId: baseStudentDto.userId || undefined,
         name: fullName,
         initials,
         grade: baseStudentDto.gradeLevel ? `${baseStudentDto.gradeLevel}. Sınıf` : '12. Sınıf',
@@ -408,7 +409,7 @@ export const CoachStudentDetailView: React.FC<CoachStudentDetailViewProps> = ({
             <Button
               variant="primary"
               size="sm"
-              onClick={() => navigate(`/coach/messages?studentId=${student.id}`)}
+              onClick={() => navigate(`/coach/messages?studentId=${student.id}${student.userId ? `&userId=${student.userId}` : ''}`)}
               leftIcon={<MessageSquare className="h-4 w-4" />}
               className="bg-[#315FE8] hover:bg-blue-600 text-white text-xs rounded-xl shadow-soft-xs"
             >

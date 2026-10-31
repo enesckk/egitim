@@ -46,6 +46,7 @@ function mapStudentSummary(
 
   return {
     id: dto.id,
+    userId: dto.userId || undefined,
     name: fullName,
     initials,
     grade: dto.gradeLevel ? `${dto.gradeLevel}. Sınıf` : '12. Sınıf',

@@ -12,4 +12,6 @@ public sealed record StudentDto(
     string? SchoolName = null,
     string? StudentNumber = null,
     int? GradeLevel = null,
-    DateTimeOffset? EnrollmentDate = null);
+    DateTimeOffset? EnrollmentDate = null,
+    [property: System.Text.Json.Serialization.JsonIgnore(Condition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingNull)]
+    Guid? UserId = null);
