@@ -4,10 +4,12 @@ using EgitimPlatform.Api.Seeding;
 using EgitimPlatform.Modules.Academic.Entities;
 using EgitimPlatform.Modules.Coaching.Entities;
 using EgitimPlatform.Modules.Communication.Entities;
+using EgitimPlatform.Modules.Content.Entities;
 using EgitimPlatform.Modules.Exams.Entities;
 using EgitimPlatform.Modules.Exams.Features.AcademicIntelligence;
 using EgitimPlatform.Modules.Identity.Entities;
 using EgitimPlatform.Modules.Institutions.Entities;
+using EgitimPlatform.Modules.Notebook.Entities;
 using EgitimPlatform.Modules.Planning.Entities;
 using EgitimPlatform.Modules.Questions.Entities;
 using EgitimPlatform.Modules.Students.Entities;
@@ -162,11 +164,42 @@ public class DemoSeederUnitTests
         var parents = await db.Set<Parent>().IgnoreQueryFilters().Where(p => p.InstitutionId == DemoDataSeeder.DemoInstitutionId).ToListAsync();
         Assert.Equal(10, parents.Count);
 
-        // Verify Historical CoachTask
-        var coachTask = await db.Set<CoachTask>().IgnoreQueryFilters().FirstOrDefaultAsync(t => t.InstitutionId == DemoDataSeeder.DemoInstitutionId);
-        Assert.NotNull(coachTask);
-        Assert.Equal("Paragraf Tekrar Çalışması", coachTask.Title);
-        Assert.Equal(CoachTaskStatus.Completed, coachTask.Status);
+        // Verify Phase 2 CoachTasks
+        var coachTasks = await db.Set<CoachTask>().IgnoreQueryFilters().Where(t => t.InstitutionId == DemoDataSeeder.DemoInstitutionId).ToListAsync();
+        Assert.Equal(7, coachTasks.Count);
+        Assert.Contains(coachTasks, t => t.Title == "Paragraf Tekrar Çalışması" && t.Status == CoachTaskStatus.Completed);
+        Assert.Contains(coachTasks, t => t.Title == "Trigonometri Formül ve Soru Uygulaması" && t.Status == CoachTaskStatus.Active);
+        Assert.Contains(coachTasks, t => t.Title == "Elektrik Devreleri Pekiştirme" && t.Status == CoachTaskStatus.Active);
+
+        // Verify Phase 2 StudyPlans & Tasks
+        var studyPlans = await db.Set<StudyPlan>().IgnoreQueryFilters().Where(p => p.InstitutionId == DemoDataSeeder.DemoInstitutionId).ToListAsync();
+        Assert.Equal(2, studyPlans.Count);
+        var studyTasks = await db.Set<StudyTask>().IgnoreQueryFilters().Where(t => t.InstitutionId == DemoDataSeeder.DemoInstitutionId).ToListAsync();
+        Assert.Equal(10, studyTasks.Count);
+
+        // Verify Phase 2 Meetings
+        var meetings = await db.Set<CoachMeeting>().IgnoreQueryFilters().Where(m => m.InstitutionId == DemoDataSeeder.DemoInstitutionId).ToListAsync();
+        Assert.Equal(5, meetings.Count);
+        Assert.Equal(2, meetings.Count(m => m.Status == CoachMeetingStatus.Completed));
+        Assert.Equal(3, meetings.Count(m => m.Status == CoachMeetingStatus.Upcoming));
+
+        // Verify Phase 2 Conversations & Messages
+        var conversations = await db.Set<Conversation>().IgnoreQueryFilters().Where(c => c.InstitutionId == DemoDataSeeder.DemoInstitutionId).ToListAsync();
+        Assert.Equal(5, conversations.Count);
+        var messages = await db.Set<Message>().IgnoreQueryFilters().Where(m => m.InstitutionId == DemoDataSeeder.DemoInstitutionId).ToListAsync();
+        Assert.Equal(11, messages.Count);
+
+        // Verify Phase 2 Content Materials & Classroom Assignments
+        var materials = await db.Set<ContentMaterial>().IgnoreQueryFilters().Where(m => m.InstitutionId == DemoDataSeeder.DemoInstitutionId).ToListAsync();
+        Assert.Equal(2, materials.Count);
+        var assignments = await db.Set<ContentMaterialAssignment>().IgnoreQueryFilters().Where(a => a.InstitutionId == DemoDataSeeder.DemoInstitutionId).ToListAsync();
+        Assert.Equal(4, assignments.Count);
+
+        // Verify Phase 2 Coach Private Notes & Personal Notebook
+        var coachNotes = await db.Set<CoachPrivateNote>().IgnoreQueryFilters().Where(n => n.InstitutionId == DemoDataSeeder.DemoInstitutionId).ToListAsync();
+        Assert.Equal(5, coachNotes.Count);
+        var notebookEntries = await db.Set<NotebookEntry>().IgnoreQueryFilters().Where(n => n.InstitutionId == DemoDataSeeder.DemoInstitutionId).ToListAsync();
+        Assert.Equal(2, notebookEntries.Count);
 
         // Verify Notifications
         var notifications = await db.Set<Notification>().IgnoreQueryFilters().Where(n => n.InstitutionId == DemoDataSeeder.DemoInstitutionId).ToListAsync();
@@ -186,5 +219,29 @@ public class DemoSeederUnitTests
 
         var topicCount = await db.Set<StudentExamTopicResult>().IgnoreQueryFilters().CountAsync(r => r.InstitutionId == DemoDataSeeder.DemoInstitutionId);
         Assert.Equal(2400, topicCount);
+
+        var meetingCount = await db.Set<CoachMeeting>().IgnoreQueryFilters().CountAsync(m => m.InstitutionId == DemoDataSeeder.DemoInstitutionId);
+        Assert.Equal(5, meetingCount);
+
+        var conversationCount = await db.Set<Conversation>().IgnoreQueryFilters().CountAsync(c => c.InstitutionId == DemoDataSeeder.DemoInstitutionId);
+        Assert.Equal(5, conversationCount);
+
+        var messageCount = await db.Set<Message>().IgnoreQueryFilters().CountAsync(m => m.InstitutionId == DemoDataSeeder.DemoInstitutionId);
+        Assert.Equal(11, messageCount);
+
+        var materialCount = await db.Set<ContentMaterial>().IgnoreQueryFilters().CountAsync(m => m.InstitutionId == DemoDataSeeder.DemoInstitutionId);
+        Assert.Equal(2, materialCount);
+
+        var assignmentCount = await db.Set<ContentMaterialAssignment>().IgnoreQueryFilters().CountAsync(a => a.InstitutionId == DemoDataSeeder.DemoInstitutionId);
+        Assert.Equal(4, assignmentCount);
+
+        var taskCount = await db.Set<CoachTask>().IgnoreQueryFilters().CountAsync(t => t.InstitutionId == DemoDataSeeder.DemoInstitutionId);
+        Assert.Equal(7, taskCount);
+
+        var planCount = await db.Set<StudyPlan>().IgnoreQueryFilters().CountAsync(p => p.InstitutionId == DemoDataSeeder.DemoInstitutionId);
+        Assert.Equal(2, planCount);
+
+        var noteCount = await db.Set<CoachPrivateNote>().IgnoreQueryFilters().CountAsync(n => n.InstitutionId == DemoDataSeeder.DemoInstitutionId);
+        Assert.Equal(5, noteCount);
     }
 }

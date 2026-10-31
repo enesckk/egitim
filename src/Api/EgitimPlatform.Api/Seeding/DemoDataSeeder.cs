@@ -4,6 +4,7 @@ using EgitimPlatform.Infrastructure;
 using EgitimPlatform.Modules.Academic.Entities;
 using EgitimPlatform.Modules.Coaching.Entities;
 using EgitimPlatform.Modules.Communication.Entities;
+using EgitimPlatform.Modules.Content.Entities;
 using EgitimPlatform.Modules.Exams.Entities;
 using EgitimPlatform.Modules.Exams.Features.AcademicIntelligence;
 using EgitimPlatform.Modules.Identity.Entities;
@@ -54,6 +55,27 @@ public class DemoDataSeeder
     public static readonly Guid DemoClassroom12BId = Guid.Parse("d0000000-0000-0000-0000-000000000061");
     public static readonly Guid DemoClassroom12CId = Guid.Parse("d0000000-0000-0000-0000-000000000067");
     public static readonly Guid DemoStudyPlanId = Guid.Parse("d0000000-0000-0000-0000-000000000070");
+    public static readonly Guid DemoStudyPlanS9Id = Guid.Parse("d0000000-0000-0000-0000-000000000090");
+
+    // Phase 2 Deterministic Identifiers
+    public static readonly Guid DemoMaterial1Id = Guid.Parse("d0000000-0000-0040-0000-000000000001");
+    public static readonly Guid DemoMaterial2Id = Guid.Parse("d0000000-0000-0040-0000-000000000002");
+    public static readonly Guid DemoMaterialAssignment1Id = Guid.Parse("d0000000-0000-0041-0000-000000000001");
+    public static readonly Guid DemoMaterialAssignment2Id = Guid.Parse("d0000000-0000-0041-0000-000000000002");
+    public static readonly Guid DemoMaterialAssignment3Id = Guid.Parse("d0000000-0000-0041-0000-000000000003");
+    public static readonly Guid DemoMaterialAssignment4Id = Guid.Parse("d0000000-0000-0041-0000-000000000004");
+
+    public static readonly Guid DemoMeeting1Id = Guid.Parse("d0000000-0000-0050-0000-000000000001");
+    public static readonly Guid DemoMeeting2Id = Guid.Parse("d0000000-0000-0050-0000-000000000002");
+    public static readonly Guid DemoMeeting3Id = Guid.Parse("d0000000-0000-0050-0000-000000000003");
+    public static readonly Guid DemoMeeting4Id = Guid.Parse("d0000000-0000-0050-0000-000000000004");
+    public static readonly Guid DemoMeeting5Id = Guid.Parse("d0000000-0000-0050-0000-000000000005");
+
+    public static readonly Guid DemoConvCoachStudent1Id = Guid.Parse("d0000000-0000-0060-0000-000000000001");
+    public static readonly Guid DemoConvCoachParent1Id = Guid.Parse("d0000000-0000-0060-0000-000000000002");
+    public static readonly Guid DemoConvTeacherStudent1Id = Guid.Parse("d0000000-0000-0060-0000-000000000003");
+    public static readonly Guid DemoConvTeacherParent1Id = Guid.Parse("d0000000-0000-0060-0000-000000000004");
+    public static readonly Guid DemoConvCoachStudent9Id = Guid.Parse("d0000000-0000-0060-0000-000000000005");
 
     public static Guid DemoStudentUserGuid(int s) =>
         s == 1 ? DemoStudentUserId : Guid.Parse($"d0000000-0000-0010-0000-{s:D12}");
@@ -215,6 +237,21 @@ public class DemoDataSeeder
 
         var coachNotes = await _db.Set<CoachPrivateNote>().IgnoreQueryFilters().Where(n => n.InstitutionId == DemoInstitutionId).ToListAsync(ct);
         _db.Set<CoachPrivateNote>().RemoveRange(coachNotes);
+
+        var assignments = await _db.Set<ContentMaterialAssignment>().IgnoreQueryFilters().Where(a => a.InstitutionId == DemoInstitutionId).ToListAsync(ct);
+        _db.Set<ContentMaterialAssignment>().RemoveRange(assignments);
+
+        var materials = await _db.Set<ContentMaterial>().IgnoreQueryFilters().Where(m => m.InstitutionId == DemoInstitutionId).ToListAsync(ct);
+        _db.Set<ContentMaterial>().RemoveRange(materials);
+
+        var meetings = await _db.Set<CoachMeeting>().IgnoreQueryFilters().Where(m => m.InstitutionId == DemoInstitutionId).ToListAsync(ct);
+        _db.Set<CoachMeeting>().RemoveRange(meetings);
+
+        var messages = await _db.Set<Message>().IgnoreQueryFilters().Where(m => m.InstitutionId == DemoInstitutionId).ToListAsync(ct);
+        _db.Set<Message>().RemoveRange(messages);
+
+        var conversations = await _db.Set<Conversation>().IgnoreQueryFilters().Where(c => c.InstitutionId == DemoInstitutionId).ToListAsync(ct);
+        _db.Set<Conversation>().RemoveRange(conversations);
 
         var classroomStudents = await _db.Set<ClassroomStudent>().IgnoreQueryFilters().Where(c => c.InstitutionId == DemoInstitutionId).ToListAsync(ct);
         _db.Set<ClassroomStudent>().RemoveRange(classroomStudents);
@@ -919,15 +956,24 @@ public class DemoDataSeeder
 
     private async Task SeedCoachTasksAsync(CancellationToken ct)
     {
-        var taskId = Guid.Parse("d0000000-0000-0000-0000-000000000040");
-        if (!await _db.Set<CoachTask>().IgnoreQueryFilters().AnyAsync(t => t.Id == taskId, ct))
+        var coach1User = DemoCoachUserGuid(1);
+        var coach2User = DemoCoachUserGuid(2);
+        var coach3User = DemoCoachUserGuid(3);
+
+        var s1 = DemoStudentEntityGuid(1);
+        var s9 = DemoStudentEntityGuid(9);
+        var s10 = DemoStudentEntityGuid(10);
+        var s11 = DemoStudentEntityGuid(11);
+        var s21 = DemoStudentEntityGuid(21);
+
+        var tasks = new[]
         {
-            _db.Set<CoachTask>().Add(new CoachTask
+            new CoachTask
             {
-                Id = taskId,
+                Id = Guid.Parse("d0000000-0000-0000-0000-000000000040"),
                 InstitutionId = DemoInstitutionId,
-                StudentId = DemoStudentId,
-                CoachUserId = DemoCoachUserId,
+                StudentId = s1,
+                CoachUserId = coach1User,
                 Title = "Paragraf Tekrar Çalışması",
                 Description = "Son deneme sonucuna göre Türkçe Paragraf soruları üzerinde 30 soru çözümü.",
                 DueDate = DateTimeOffset.UtcNow.AddDays(-1),
@@ -936,9 +982,103 @@ public class DemoDataSeeder
                 TopicName = "Paragraf",
                 Status = CoachTaskStatus.Completed,
                 CompletedAt = DateTimeOffset.UtcNow.AddDays(-2)
-            });
-            await _db.SaveChangesAsync(ct);
+            },
+            new CoachTask
+            {
+                Id = Guid.Parse("d0000000-0000-0000-0000-000000000041"),
+                InstitutionId = DemoInstitutionId,
+                StudentId = s1,
+                CoachUserId = coach1User,
+                Title = "Trigonometri Formül ve Soru Uygulaması",
+                Description = "Yarım açı ve toplam-fark formüllerini içeren 40 soru çözümü ve analiz.",
+                DueDate = DateTimeOffset.UtcNow.AddDays(2),
+                DurationMinutes = 60,
+                SubjectName = "Matematik",
+                TopicName = "Trigonometri",
+                Status = CoachTaskStatus.Active
+            },
+            new CoachTask
+            {
+                Id = Guid.Parse("d0000000-0000-0000-0000-000000000042"),
+                InstitutionId = DemoInstitutionId,
+                StudentId = s9,
+                CoachUserId = coach1User,
+                Title = "Elektrik Devreleri Pekiştirme",
+                Description = "Eşdeğer direnç ve Ohm kanunu odaklı 25 temel soru çözümü.",
+                DueDate = DateTimeOffset.UtcNow.AddDays(1),
+                DurationMinutes = 45,
+                SubjectName = "Fizik",
+                TopicName = "Elektrik",
+                Status = CoachTaskStatus.Active
+            },
+            new CoachTask
+            {
+                Id = Guid.Parse("d0000000-0000-0000-0000-000000000043"),
+                InstitutionId = DemoInstitutionId,
+                StudentId = s9,
+                CoachUserId = coach1User,
+                Title = "Hücre ve Kalıtım Soru Çözümü",
+                Description = "Mitoz-mayoz bölünmeler ve temel kalıtım çaprazlama tekrarları.",
+                DueDate = DateTimeOffset.UtcNow.AddDays(-3),
+                DurationMinutes = 45,
+                SubjectName = "Biyoloji",
+                TopicName = "Hücre",
+                Status = CoachTaskStatus.Completed,
+                CompletedAt = DateTimeOffset.UtcNow.AddDays(-4)
+            },
+            new CoachTask
+            {
+                Id = Guid.Parse("d0000000-0000-0000-0000-000000000044"),
+                InstitutionId = DemoInstitutionId,
+                StudentId = s10,
+                CoachUserId = coach1User,
+                Title = "Problemler Rutin Pratiği",
+                Description = "Dalgalanan netleri stabilize etmek için günlük 20 karma problem pratiği.",
+                DueDate = DateTimeOffset.UtcNow.AddDays(3),
+                DurationMinutes = 50,
+                SubjectName = "Matematik",
+                TopicName = "Problemler",
+                Status = CoachTaskStatus.Active
+            },
+            new CoachTask
+            {
+                Id = Guid.Parse("d0000000-0000-0000-0000-000000000045"),
+                InstitutionId = DemoInstitutionId,
+                StudentId = s11,
+                CoachUserId = coach2User,
+                Title = "Fonksiyonlar Grafikler ve Analiz",
+                Description = "Fonksiyon grafiği okuma ve bileşke fonksiyon soru çözümü.",
+                DueDate = DateTimeOffset.UtcNow.AddDays(2),
+                DurationMinutes = 60,
+                SubjectName = "Matematik",
+                TopicName = "Fonksiyonlar",
+                Status = CoachTaskStatus.Active
+            },
+            new CoachTask
+            {
+                Id = Guid.Parse("d0000000-0000-0000-0000-000000000046"),
+                InstitutionId = DemoInstitutionId,
+                StudentId = s21,
+                CoachUserId = coach3User,
+                Title = "Temel Kavramlar Pekiştirme",
+                Description = "Sözel branş için TYT temel matematik soru çözüm etüdü.",
+                DueDate = DateTimeOffset.UtcNow.AddDays(4),
+                DurationMinutes = 45,
+                SubjectName = "Matematik",
+                TopicName = "Temel Kavramlar",
+                Status = CoachTaskStatus.Active
+            }
+        };
+
+        foreach (var t in tasks)
+        {
+            if (!await _db.Set<CoachTask>().IgnoreQueryFilters().AnyAsync(x => x.Id == t.Id, ct))
+            {
+                _db.Set<CoachTask>().Add(t);
+            }
         }
+
+        await _db.SaveChangesAsync(ct);
     }
 
     private async Task SeedNotificationsAsync(CancellationToken ct)
@@ -1005,8 +1145,12 @@ public class DemoDataSeeder
         await SeedExpandedExamsAndAttemptsAsync(tax, ct);
         await SeedQuestionStyleAssignmentsAsync(ct);
         await SeedQuestionLevelResultsAsync(ct);
+        await SeedCoachTasksAsync(ct);
         await SeedStudyPlanAsync(ct);
         await SeedNotesAsync(ct);
+        await SeedMeetingsAsync(ct);
+        await SeedConversationsAndMessagesAsync(ct);
+        await SeedMaterialsAsync(ct);
     }
 
     private async Task SeedExpandedHierarchyAsync(DemoTaxonomyContainer tax, CancellationToken ct)
@@ -1410,13 +1554,11 @@ public class DemoDataSeeder
 
     private async Task SeedStudyPlanAsync(CancellationToken ct)
     {
-        if (await _db.Set<StudyPlan>().IgnoreQueryFilters().AnyAsync(p => p.Id == DemoStudyPlanId, ct))
-            return;
-        // Respect the domain's single-active-plan rule.
-        if (await _db.Set<StudyPlan>().AnyAsync(p => p.StudentId == DemoStudentId && p.Status == StudyPlanStatus.Active, ct))
-            return;
-
-        var topicIds = new[] { DemoQuestionId(51), DemoQuestionId(31), DemoQuestionId(61), DemoQuestionId(1), DemoQuestionId(41) };
+        var topicIds = new[]
+        {
+            DemoQuestionId(1), DemoQuestionId(11), DemoQuestionId(31), DemoQuestionId(41),
+            DemoQuestionId(51), DemoQuestionId(61), DemoQuestionId(71), DemoQuestionId(81), DemoQuestionId(91)
+        };
         var topicInfo = await _db.Set<Question>().IgnoreQueryFilters().AsNoTracking()
             .Where(q => topicIds.Contains(q.Id))
             .Select(q => new { q.Id, q.SubjectId, q.TopicId })
@@ -1429,76 +1571,160 @@ public class DemoDataSeeder
             .Where(s => subjectIds.Contains(s.Id)).ToDictionaryAsync(s => s.Id, ct);
 
         var start = new DateTimeOffset(DateTimeOffset.UtcNow.Date, TimeSpan.Zero).AddDays(-2);
-        var specs = new (int QIdx, AcademicClassificationState State, int Priority, AcademicRecommendationType Type, bool Done)[]
-        {
-            (51, AcademicClassificationState.Critical, 92, AcademicRecommendationType.RemediateCritical, true),
-            (31, AcademicClassificationState.Weak, 78, AcademicRecommendationType.StrengthenWeak, true),
-            (61, AcademicClassificationState.Weak, 74, AcademicRecommendationType.MonitorDeclining, false),
-            (1, AcademicClassificationState.Developing, 55, AcademicRecommendationType.ReinforceDeveloping, false),
-            (41, AcademicClassificationState.Developing, 50, AcademicRecommendationType.ReinforceDeveloping, false),
-        };
 
-        var plan = new StudyPlan
+        // 1. Primary Student 1 (Ahmet Yılmaz - Improving) Study Plan
+        if (!await _db.Set<StudyPlan>().IgnoreQueryFilters().AnyAsync(p => p.Id == DemoStudyPlanId, ct) &&
+            !await _db.Set<StudyPlan>().AnyAsync(p => p.StudentId == DemoStudentId && p.Status == StudyPlanStatus.Active, ct))
         {
-            Id = DemoStudyPlanId,
-            InstitutionId = DemoInstitutionId,
-            StudentId = DemoStudentId,
-            Title = "Haftalık Çalışma Planı",
-            StartDate = start,
-            EndDate = start.AddDays(7),
-            Status = StudyPlanStatus.Active,
-            Source = StudyPlanSource.AcademicIntelligence,
-            RecommendationPolicyVersion = "demo-v1",
-            StudyPlanPolicyVersion = "demo-v1",
-            ActivatedAt = start,
-            PlanDays = 7,
-            DailyStudyMinutes = 60,
-            SessionMinutes = 45,
-            TotalAvailableMinutes = 420,
-            ScheduledRecommendationCount = specs.Length,
-            UnscheduledRecommendationCount = 0
-        };
-
-        int day = 0;
-        foreach (var s in specs)
-        {
-            var info = topicInfo.FirstOrDefault(t => t.Id == DemoQuestionId(s.QIdx));
-            if (info == null) continue;
-            var topic = topics.GetValueOrDefault(info.TopicId);
-            var subject = subjects.GetValueOrDefault(info.SubjectId);
-            plan.Tasks.Add(new StudyTask
+            var specs = new (int QIdx, AcademicClassificationState State, int Priority, AcademicRecommendationType Type, bool Done)[]
             {
-                Id = Guid.Parse($"d0000000-0000-0000-0000-0000000000{71 + day}"),
+                (51, AcademicClassificationState.Critical, 92, AcademicRecommendationType.RemediateCritical, true),
+                (31, AcademicClassificationState.Weak, 78, AcademicRecommendationType.StrengthenWeak, true),
+                (61, AcademicClassificationState.Weak, 74, AcademicRecommendationType.MonitorDeclining, false),
+                (1, AcademicClassificationState.Developing, 55, AcademicRecommendationType.ReinforceDeveloping, false),
+                (41, AcademicClassificationState.Developing, 50, AcademicRecommendationType.ReinforceDeveloping, false),
+            };
+
+            var plan = new StudyPlan
+            {
+                Id = DemoStudyPlanId,
                 InstitutionId = DemoInstitutionId,
-                StudyPlanId = DemoStudyPlanId,
                 StudentId = DemoStudentId,
-                DayIndex = day,
-                PlannedDate = start.AddDays(day),
-                Sequence = 1,
-                DurationMinutes = 45,
-                NodeType = RecommendationNodeType.Topic,
-                NodeId = info.TopicId,
-                SubjectId = info.SubjectId,
-                SubjectName = subject?.Name,
-                TopicId = info.TopicId,
-                TopicName = topic?.Name,
-                TitleSnapshot = $"{subject?.Name} - {topic?.Name} konu tekrarı ve soru çözümü",
-                ClassificationStateSnapshot = s.State,
-                PriorityScoreSnapshot = s.Priority,
-                RecommendationType = s.Type,
-                IsCompleted = s.Done,
-                CompletedAt = s.Done ? start.AddDays(day).AddHours(18) : null
-            });
-            day++;
+                Title = "Haftalık Çalışma Planı",
+                StartDate = start,
+                EndDate = start.AddDays(7),
+                Status = StudyPlanStatus.Active,
+                Source = StudyPlanSource.AcademicIntelligence,
+                RecommendationPolicyVersion = "demo-v1",
+                StudyPlanPolicyVersion = "demo-v1",
+                ActivatedAt = start,
+                PlanDays = 7,
+                DailyStudyMinutes = 60,
+                SessionMinutes = 45,
+                TotalAvailableMinutes = 420,
+                ScheduledRecommendationCount = specs.Length,
+                UnscheduledRecommendationCount = 0
+            };
+
+            int day = 0;
+            foreach (var s in specs)
+            {
+                var info = topicInfo.FirstOrDefault(t => t.Id == DemoQuestionId(s.QIdx));
+                if (info == null) continue;
+                var topic = topics.GetValueOrDefault(info.TopicId);
+                var subject = subjects.GetValueOrDefault(info.SubjectId);
+                plan.Tasks.Add(new StudyTask
+                {
+                    Id = Guid.Parse($"d0000000-0000-0000-0000-0000000000{71 + day}"),
+                    InstitutionId = DemoInstitutionId,
+                    StudyPlanId = DemoStudyPlanId,
+                    StudentId = DemoStudentId,
+                    DayIndex = day,
+                    PlannedDate = start.AddDays(day),
+                    Sequence = 1,
+                    DurationMinutes = 45,
+                    NodeType = RecommendationNodeType.Topic,
+                    NodeId = info.TopicId,
+                    SubjectId = info.SubjectId,
+                    SubjectName = subject?.Name,
+                    TopicId = info.TopicId,
+                    TopicName = topic?.Name,
+                    TitleSnapshot = $"{subject?.Name} - {topic?.Name} konu tekrarı ve soru çözümü",
+                    ClassificationStateSnapshot = s.State,
+                    PriorityScoreSnapshot = s.Priority,
+                    RecommendationType = s.Type,
+                    IsCompleted = s.Done,
+                    CompletedAt = s.Done ? start.AddDays(day).AddHours(18) : null
+                });
+                day++;
+            }
+
+            plan.TotalPlannedMinutes = plan.Tasks.Sum(t => t.DurationMinutes);
+            plan.UnallocatedMinutes = plan.TotalAvailableMinutes - plan.TotalPlannedMinutes;
+            plan.UtilizationRate = plan.TotalAvailableMinutes > 0
+                ? Math.Round((decimal)plan.TotalPlannedMinutes / plan.TotalAvailableMinutes, 4)
+                : 0m;
+
+            _db.Set<StudyPlan>().Add(plan);
         }
 
-        plan.TotalPlannedMinutes = plan.Tasks.Sum(t => t.DurationMinutes);
-        plan.UnallocatedMinutes = plan.TotalAvailableMinutes - plan.TotalPlannedMinutes;
-        plan.UtilizationRate = plan.TotalAvailableMinutes > 0
-            ? Math.Round((decimal)plan.TotalPlannedMinutes / plan.TotalAvailableMinutes, 4)
-            : 0m;
+        // 2. Student 9 (Gamze Doğan - Declining) Targeted Study Plan
+        var s9Id = DemoStudentEntityGuid(9);
+        if (!await _db.Set<StudyPlan>().IgnoreQueryFilters().AnyAsync(p => p.Id == DemoStudyPlanS9Id, ct) &&
+            !await _db.Set<StudyPlan>().AnyAsync(p => p.StudentId == s9Id && p.Status == StudyPlanStatus.Active, ct))
+        {
+            var s9Specs = new (int QIdx, AcademicClassificationState State, int Priority, AcademicRecommendationType Type, bool Done)[]
+            {
+                (61, AcademicClassificationState.Critical, 95, AcademicRecommendationType.RemediateCritical, false),
+                (81, AcademicClassificationState.Critical, 90, AcademicRecommendationType.RemediateCritical, false),
+                (51, AcademicClassificationState.Weak, 82, AcademicRecommendationType.StrengthenWeak, false),
+                (71, AcademicClassificationState.Weak, 76, AcademicRecommendationType.StrengthenWeak, true),
+                (1, AcademicClassificationState.Developing, 60, AcademicRecommendationType.ReinforceDeveloping, true),
+            };
 
-        _db.Set<StudyPlan>().Add(plan);
+            var plan9 = new StudyPlan
+            {
+                Id = DemoStudyPlanS9Id,
+                InstitutionId = DemoInstitutionId,
+                StudentId = s9Id,
+                Title = "Fizik & Kimya Toparlanma Çalışma Planı",
+                StartDate = start,
+                EndDate = start.AddDays(7),
+                Status = StudyPlanStatus.Active,
+                Source = StudyPlanSource.AcademicIntelligence,
+                RecommendationPolicyVersion = "demo-v1",
+                StudyPlanPolicyVersion = "demo-v1",
+                ActivatedAt = start,
+                PlanDays = 7,
+                DailyStudyMinutes = 60,
+                SessionMinutes = 45,
+                TotalAvailableMinutes = 420,
+                ScheduledRecommendationCount = s9Specs.Length,
+                UnscheduledRecommendationCount = 0
+            };
+
+            int day9 = 0;
+            foreach (var s in s9Specs)
+            {
+                var info = topicInfo.FirstOrDefault(t => t.Id == DemoQuestionId(s.QIdx));
+                if (info == null) continue;
+                var topic = topics.GetValueOrDefault(info.TopicId);
+                var subject = subjects.GetValueOrDefault(info.SubjectId);
+                plan9.Tasks.Add(new StudyTask
+                {
+                    Id = Guid.Parse($"d0000000-0000-0000-0000-0000000000{91 + day9}"),
+                    InstitutionId = DemoInstitutionId,
+                    StudyPlanId = DemoStudyPlanS9Id,
+                    StudentId = s9Id,
+                    DayIndex = day9,
+                    PlannedDate = start.AddDays(day9),
+                    Sequence = 1,
+                    DurationMinutes = 45,
+                    NodeType = RecommendationNodeType.Topic,
+                    NodeId = info.TopicId,
+                    SubjectId = info.SubjectId,
+                    SubjectName = subject?.Name,
+                    TopicId = info.TopicId,
+                    TopicName = topic?.Name,
+                    TitleSnapshot = $"{subject?.Name} - {topic?.Name} toparlanma ve soru çözümü",
+                    ClassificationStateSnapshot = s.State,
+                    PriorityScoreSnapshot = s.Priority,
+                    RecommendationType = s.Type,
+                    IsCompleted = s.Done,
+                    CompletedAt = s.Done ? start.AddDays(day9).AddHours(18) : null
+                });
+                day9++;
+            }
+
+            plan9.TotalPlannedMinutes = plan9.Tasks.Sum(t => t.DurationMinutes);
+            plan9.UnallocatedMinutes = plan9.TotalAvailableMinutes - plan9.TotalPlannedMinutes;
+            plan9.UtilizationRate = plan9.TotalAvailableMinutes > 0
+                ? Math.Round((decimal)plan9.TotalPlannedMinutes / plan9.TotalAvailableMinutes, 4)
+                : 0m;
+
+            _db.Set<StudyPlan>().Add(plan9);
+        }
+
         await _db.SaveChangesAsync(ct);
     }
 
@@ -1528,12 +1754,18 @@ public class DemoDataSeeder
             }
         }
 
-        var coachNotes = new (Guid Id, string Category, string Content)[]
+        var coachNotes = new (Guid Id, Guid StudentId, string Category, string Content)[]
         {
-            (Guid.Parse("d0000000-0000-0000-0000-000000000082"), "Akademik",
+            (Guid.Parse("d0000000-0000-0000-0000-000000000082"), DemoStudentId, "Akademik",
                 "Matematikte istikrarlı yükseliş var (4 → 7 doğru). Trigonometri hâlâ kritik; haftalık planda önceliklendirildi."),
-            (Guid.Parse("d0000000-0000-0000-0000-000000000083"), "Motivasyon",
+            (Guid.Parse("d0000000-0000-0000-0000-000000000083"), DemoStudentId, "Motivasyon",
                 "Fizikte son denemelerde düşüş var; görüşmede sınav kaygısı ve çalışma düzeni konuşulacak."),
+            (Guid.Parse("d0000000-0000-0000-0000-000000000084"), DemoStudentEntityGuid(9), "Akademik Risk",
+                "Son 4 denemedir Fizik ve Kimya netlerinde düşüş sürüyor (Elektrik ve Kimyasal Türler kritik seviyede). Deneme kaygısı ve haftalık soru hedefi düşüklüğü tespit edildi; acil toparlanma planı oluşturuldu."),
+            (Guid.Parse("d0000000-0000-0000-0000-000000000085"), DemoStudentEntityGuid(3), "Hedef Odaklı",
+                "Tıp fakültesi hedefi doğrultusunda performansı mükemmel düzeyde (35+ net). Süre yönetimi ve AYT fen denemelerine erken geçiş planlandı."),
+            (Guid.Parse("d0000000-0000-0000-0000-000000000086"), DemoStudentEntityGuid(10), "Çalışma Düzeni",
+                "Deneme netleri 18 ile 28 arasında dalgalanıyor. Çalışma saatlerinin düzensiz olduğu görüldü; günlük soru takip çizelgesi uygulamaya alındı.")
         };
         foreach (var n in coachNotes)
         {
@@ -1544,11 +1776,361 @@ public class DemoDataSeeder
                     Id = n.Id,
                     InstitutionId = DemoInstitutionId,
                     CoachId = DemoCoachEntityId,
-                    StudentId = DemoStudentId,
+                    StudentId = n.StudentId,
                     Category = n.Category,
                     Content = n.Content
                 });
             }
+        }
+
+        await _db.SaveChangesAsync(ct);
+    }
+
+    private async Task SeedMeetingsAsync(CancellationToken ct)
+    {
+        var coach1Id = DemoCoachEntityGuid(1);
+        var coach2Id = DemoCoachEntityGuid(2);
+        var coach3Id = DemoCoachEntityGuid(3);
+
+        var student1Id = DemoStudentEntityGuid(1);
+        var student9Id = DemoStudentEntityGuid(9);
+        var student11Id = DemoStudentEntityGuid(11);
+        var student21Id = DemoStudentEntityGuid(21);
+
+        var today = new DateTimeOffset(DateTimeOffset.UtcNow.Date, TimeSpan.Zero);
+
+        var meetings = new[]
+        {
+            new CoachMeeting
+            {
+                Id = DemoMeeting1Id,
+                InstitutionId = DemoInstitutionId,
+                CoachId = coach1Id,
+                StudentId = student1Id,
+                StartTime = today.AddDays(-3).AddHours(14),
+                DurationMinutes = 45,
+                EndTime = today.AddDays(-3).AddHours(14).AddMinutes(45),
+                MeetingType = "Haftalık Takip & Analiz",
+                LocationType = "Online Video",
+                Status = CoachMeetingStatus.Completed,
+                Notes = "Deneme 9 analizi yapıldı. Matematik yükselişi takdir edildi; trigonometri çalışma planı başlatıldı."
+            },
+            new CoachMeeting
+            {
+                Id = DemoMeeting2Id,
+                InstitutionId = DemoInstitutionId,
+                CoachId = coach1Id,
+                StudentId = student1Id,
+                StartTime = today.AddDays(2).AddHours(15),
+                DurationMinutes = 45,
+                EndTime = today.AddDays(2).AddHours(15).AddMinutes(45),
+                MeetingType = "Sınav Stratejisi & Hedef Belirleme",
+                LocationType = "Online Video",
+                Status = CoachMeetingStatus.Upcoming,
+                Notes = "Deneme 10 netleri ve hedef üniversite puan aralıkları değerlendirilecek."
+            },
+            new CoachMeeting
+            {
+                Id = DemoMeeting3Id,
+                InstitutionId = DemoInstitutionId,
+                CoachId = coach1Id,
+                StudentId = student9Id,
+                StartTime = today.AddDays(1).AddHours(16),
+                DurationMinutes = 30,
+                EndTime = today.AddDays(1).AddHours(16).AddMinutes(30),
+                MeetingType = "Akademik İyileştirme & Motivasyon",
+                LocationType = "Yüz Yüze • Kurum",
+                Status = CoachMeetingStatus.Upcoming,
+                Notes = "Fizik netlerindeki düşüşün kök nedenleri ve çalışma takvimi planlaması."
+            },
+            new CoachMeeting
+            {
+                Id = DemoMeeting4Id,
+                InstitutionId = DemoInstitutionId,
+                CoachId = coach2Id,
+                StudentId = student11Id,
+                StartTime = today.AddDays(-4).AddHours(10),
+                DurationMinutes = 45,
+                EndTime = today.AddDays(-4).AddHours(10).AddMinutes(45),
+                MeetingType = "Haftalık Takip & Analiz",
+                LocationType = "Online Video",
+                Status = CoachMeetingStatus.Completed,
+                Notes = "Dalgalı deneme grafiği ve çalışma sürekliliği değerlendirildi."
+            },
+            new CoachMeeting
+            {
+                Id = DemoMeeting5Id,
+                InstitutionId = DemoInstitutionId,
+                CoachId = coach3Id,
+                StudentId = student21Id,
+                StartTime = today.AddDays(3).AddHours(11),
+                DurationMinutes = 45,
+                EndTime = today.AddDays(3).AddHours(11).AddMinutes(45),
+                MeetingType = "Hedef Belirleme",
+                LocationType = "Online Video",
+                Status = CoachMeetingStatus.Upcoming,
+                Notes = "Sözel bölüm tercihleri ve deneme zaman yönetimi."
+            }
+        };
+
+        foreach (var m in meetings)
+        {
+            if (!await _db.Set<CoachMeeting>().IgnoreQueryFilters().AnyAsync(x => x.Id == m.Id, ct))
+            {
+                _db.Set<CoachMeeting>().Add(m);
+            }
+        }
+
+        await _db.SaveChangesAsync(ct);
+    }
+
+    private async Task SeedConversationsAndMessagesAsync(CancellationToken ct)
+    {
+        var coach1User = DemoCoachUserGuid(1);
+        var teacher1User = DemoTeacherUserGuid(1);
+        var student1User = DemoStudentUserGuid(1);
+        var parent1User = DemoParentUserGuid(1);
+        var student9User = DemoStudentUserGuid(9);
+
+        var convSpecs = new[]
+        {
+            (
+                Id: DemoConvCoachStudent1Id,
+                UserA: coach1User,
+                UserB: student1User,
+                Subject: "Bireysel Koçluk Takibi",
+                Messages: new[]
+                {
+                    (Id: Guid.Parse("d0000000-0000-0061-0000-000000000001"), Sender: coach1User, Recipient: student1User, Content: "Merhaba Ahmet, son denemedeki Matematik artışını tebrik ederim. Trigonometri için eklediğim çalışma planını tamamlamayı unutma.", DaysAgo: 2),
+                    (Id: Guid.Parse("d0000000-0000-0061-0000-000000000002"), Sender: student1User, Recipient: coach1User, Content: "Teşekkürler hocam, trigonometri sorularına başladım. Takıldığım 2 soruyu bir sonraki görüşmemizde konuşabilir miyiz?", DaysAgo: 1),
+                    (Id: Guid.Parse("d0000000-0000-0061-0000-000000000003"), Sender: coach1User, Recipient: student1User, Content: "Tabii ki, haftalık takip görüşmemizde detaylıca inceleriz.", DaysAgo: 0)
+                }
+            ),
+            (
+                Id: DemoConvCoachParent1Id,
+                UserA: coach1User,
+                UserB: parent1User,
+                Subject: "Ahmet Yılmaz Gelişim Raporu",
+                Messages: new[]
+                {
+                    (Id: Guid.Parse("d0000000-0000-0061-0000-000000000004"), Sender: coach1User, Recipient: parent1User, Content: "Fatma Hanım merhaba, Ahmet'in son deneme sonuçları ve gelişim grafiği oldukça olumlu. Çalışma temposunu koruyoruz.", DaysAgo: 3),
+                    (Id: Guid.Parse("d0000000-0000-0061-0000-000000000005"), Sender: parent1User, Recipient: coach1User, Content: "Mehmet Hocam bilgilendirme için teşekkürler. Evdeki çalışma saatlerine de özen gösteriyor.", DaysAgo: 2)
+                }
+            ),
+            (
+                Id: DemoConvTeacherStudent1Id,
+                UserA: teacher1User,
+                UserB: student1User,
+                Subject: "Matematik Çalışma Fasikülü",
+                Messages: new[]
+                {
+                    (Id: Guid.Parse("d0000000-0000-0061-0000-000000000006"), Sender: teacher1User, Recipient: student1User, Content: "Ahmet, derste bahsettiğim Trigonometri fasikülünü materyaller kısmına yükledim. İnceleyip soruları çözebilirsin.", DaysAgo: 2),
+                    (Id: Guid.Parse("d0000000-0000-0061-0000-000000000007"), Sender: student1User, Recipient: teacher1User, Content: "Çok teşekkürler Ayşe Öğretmenim, hemen indirip çözmeye başlıyorum.", DaysAgo: 1)
+                }
+            ),
+            (
+                Id: DemoConvTeacherParent1Id,
+                UserA: teacher1User,
+                UserB: parent1User,
+                Subject: "Matematik Dersi Katılımı",
+                Messages: new[]
+                {
+                    (Id: Guid.Parse("d0000000-0000-0061-0000-000000000008"), Sender: teacher1User, Recipient: parent1User, Content: "İyi günler Fatma Hanım, Ahmet'in Matematik dersindeki katılımı ve soru çözme isteği çok iyi seviyede.", DaysAgo: 4),
+                    (Id: Guid.Parse("d0000000-0000-0061-0000-000000000009"), Sender: parent1User, Recipient: teacher1User, Content: "Çok teşekkürler Ayşe Öğretmenim, desteğiniz bizim için çok kıymetli.", DaysAgo: 3)
+                }
+            ),
+            (
+                Id: DemoConvCoachStudent9Id,
+                UserA: coach1User,
+                UserB: student9User,
+                Subject: "Akademik İyileştirme Planı",
+                Messages: new[]
+                {
+                    (Id: Guid.Parse("d0000000-0000-0061-0000-000000000010"), Sender: coach1User, Recipient: student9User, Content: "Gamze merhaba, Fizik ve Kimya konularındaki eksikleri toparlamak için bir çalışma planı hazırlayalım, görüşme saatimizi belirledim.", DaysAgo: 5),
+                    (Id: Guid.Parse("d0000000-0000-0061-0000-000000000011"), Sender: student9User, Recipient: coach1User, Content: "Hocam biraz zorlanıyorum bu aralar, görüşmede planlama yaparsak çok sevinirim.", DaysAgo: 4)
+                }
+            )
+        };
+
+        foreach (var cs in convSpecs)
+        {
+            var p1 = cs.UserA.CompareTo(cs.UserB) < 0 ? cs.UserA : cs.UserB;
+            var p2 = cs.UserA.CompareTo(cs.UserB) < 0 ? cs.UserB : cs.UserA;
+            var lastMsg = cs.Messages.Last();
+            var lastTime = DateTimeOffset.UtcNow.AddDays(-lastMsg.DaysAgo).AddHours(14);
+
+            if (!await _db.Set<Conversation>().IgnoreQueryFilters().AnyAsync(c => c.Id == cs.Id, ct))
+            {
+                var conv = new Conversation
+                {
+                    Id = cs.Id,
+                    InstitutionId = DemoInstitutionId,
+                    Participant1Id = p1,
+                    Participant2Id = p2,
+                    Subject = cs.Subject,
+                    LastMessageAt = lastTime,
+                    LastMessageSnippet = lastMsg.Content
+                };
+
+                foreach (var m in cs.Messages)
+                {
+                    var mTime = DateTimeOffset.UtcNow.AddDays(-m.DaysAgo).AddHours(12);
+                    conv.Messages.Add(new Message
+                    {
+                        Id = m.Id,
+                        InstitutionId = DemoInstitutionId,
+                        ConversationId = cs.Id,
+                        SenderUserId = m.Sender,
+                        RecipientUserId = m.Recipient,
+                        Content = m.Content,
+                        IsRead = m.DaysAgo > 0,
+                        ReadAt = m.DaysAgo > 0 ? mTime.AddMinutes(15) : null
+                    });
+                }
+
+                _db.Set<Conversation>().Add(conv);
+            }
+        }
+
+        await _db.SaveChangesAsync(ct);
+    }
+
+    private static readonly byte[] SamplePdfBytes = System.Text.Encoding.ASCII.GetBytes(
+        "%PDF-1.4\n" +
+        "1 0 obj <</Type /Catalog /Pages 2 0 R>> endobj\n" +
+        "2 0 obj <</Type /Pages /Kids [3 0 R] /Count 1>> endobj\n" +
+        "3 0 obj <</Type /Page /Parent 2 0 R /MediaBox [0 0 612 792] /Resources <<>>>> endobj\n" +
+        "xref\n0 4\n0000000000 65535 f \n0000000009 00000 n \n0000000056 00000 n \n0000000111 00000 n \n" +
+        "trailer <</Size 4 /Root 1 0 R>>\nstartxref\n185\n%%EOF\n"
+    );
+
+    private static void EnsureSamplePdfOnDisk(string relativeStoragePath, byte[] content)
+    {
+        var basePaths = new[]
+        {
+            Path.Combine(Directory.GetCurrentDirectory(), "Storage", "Materials"),
+            Path.Combine(Directory.GetCurrentDirectory(), "src", "Api", "EgitimPlatform.Api", "Storage", "Materials"),
+            Path.Combine(AppContext.BaseDirectory, "Storage", "Materials")
+        };
+
+        foreach (var bp in basePaths.Distinct())
+        {
+            try
+            {
+                var fullPath = Path.GetFullPath(Path.Combine(bp, relativeStoragePath));
+                var dir = Path.GetDirectoryName(fullPath);
+                if (!string.IsNullOrEmpty(dir) && !Directory.Exists(dir))
+                {
+                    Directory.CreateDirectory(dir);
+                }
+                File.WriteAllBytes(fullPath, content);
+            }
+            catch
+            {
+                // Best effort write across test / production working directories
+            }
+        }
+    }
+
+    private async Task SeedMaterialsAsync(CancellationToken ct)
+    {
+        var teacher1Id = DemoTeacherEntityGuid(1);
+        var teacher3Id = DemoTeacherEntityGuid(3);
+
+        var mat1Storage = $"inst_{DemoInstitutionId:N}/teacher_{teacher1Id:N}/d0000000000000400000000000000001.pdf";
+        var mat2Storage = $"inst_{DemoInstitutionId:N}/teacher_{teacher3Id:N}/d0000000000000400000000000000002.pdf";
+
+        EnsureSamplePdfOnDisk(mat1Storage, SamplePdfBytes);
+        EnsureSamplePdfOnDisk(mat2Storage, SamplePdfBytes);
+
+        if (!await _db.Set<ContentMaterial>().IgnoreQueryFilters().AnyAsync(m => m.Id == DemoMaterial1Id, ct))
+        {
+            var mat1 = new ContentMaterial
+            {
+                Id = DemoMaterial1Id,
+                InstitutionId = DemoInstitutionId,
+                TeacherId = teacher1Id,
+                Title = "TYT Matematik — Fonksiyonlar ve Trigonometri Çalışma Fasikülü",
+                Subject = "Matematik",
+                Topic = "Trigonometri",
+                Grade = "12",
+                MaterialType = "fasikul",
+                Description = "12. Sınıf TYT/AYT hazırlık için kapsamlı trigonometri konu özeti ve yeni nesil soru fasikülü.",
+                PageCount = 24,
+                QuestionCount = 60,
+                DurationMinutes = 90,
+                OriginalFileName = "TYT_Matematik_Trigonometri_Fasikulu.pdf",
+                StoragePath = mat1Storage,
+                ContentType = "application/pdf",
+                FileSizeBytes = SamplePdfBytes.Length
+            };
+
+            mat1.Assignments.Add(new ContentMaterialAssignment
+            {
+                Id = DemoMaterialAssignment1Id,
+                InstitutionId = DemoInstitutionId,
+                MaterialId = DemoMaterial1Id,
+                ClassroomId = DemoClassroom12AId,
+                Note = "12-A sınıfı hafta sonu çalışma ödevi",
+                IsActive = true
+            });
+
+            mat1.Assignments.Add(new ContentMaterialAssignment
+            {
+                Id = DemoMaterialAssignment2Id,
+                InstitutionId = DemoInstitutionId,
+                MaterialId = DemoMaterial1Id,
+                ClassroomId = DemoClassroom12BId,
+                Note = "12-B sınıfı trigonometri pekiştirme fasikülü",
+                IsActive = true
+            });
+
+            _db.Set<ContentMaterial>().Add(mat1);
+        }
+
+        if (!await _db.Set<ContentMaterial>().IgnoreQueryFilters().AnyAsync(m => m.Id == DemoMaterial2Id, ct))
+        {
+            var mat2 = new ContentMaterial
+            {
+                Id = DemoMaterial2Id,
+                InstitutionId = DemoInstitutionId,
+                TeacherId = teacher3Id,
+                Title = "TYT Fizik — Elektrik Devreleri ve Manyetizma Ders Notları",
+                Subject = "Fizik",
+                Topic = "Elektrik",
+                Grade = "12",
+                MaterialType = "fasikul",
+                Description = "Temel elektrik devreleri, eşdeğer direnç ve manyetizma özetli soru föyü.",
+                PageCount = 16,
+                QuestionCount = 40,
+                DurationMinutes = 60,
+                OriginalFileName = "TYT_Fizik_Elektrik_Ders_Notlari.pdf",
+                StoragePath = mat2Storage,
+                ContentType = "application/pdf",
+                FileSizeBytes = SamplePdfBytes.Length
+            };
+
+            mat2.Assignments.Add(new ContentMaterialAssignment
+            {
+                Id = DemoMaterialAssignment3Id,
+                InstitutionId = DemoInstitutionId,
+                MaterialId = DemoMaterial2Id,
+                ClassroomId = DemoClassroom12AId,
+                Note = "12-A sınıfı fizik etüt materyali",
+                IsActive = true
+            });
+
+            mat2.Assignments.Add(new ContentMaterialAssignment
+            {
+                Id = DemoMaterialAssignment4Id,
+                InstitutionId = DemoInstitutionId,
+                MaterialId = DemoMaterial2Id,
+                ClassroomId = DemoClassroom12CId,
+                Note = "12-C sınıfı fizik konu özeti",
+                IsActive = true
+            });
+
+            _db.Set<ContentMaterial>().Add(mat2);
         }
 
         await _db.SaveChangesAsync(ct);
