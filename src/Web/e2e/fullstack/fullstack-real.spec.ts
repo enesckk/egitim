@@ -45,10 +45,9 @@ test.describe('Real Full-Stack Verification — 5 Role Portals, Exam Import & MS
       const examsRes = await request.get('http://localhost:5005/api/v1/exams', {
         headers: { Authorization: `Bearer ${accessToken}` }
       });
-      const exams = await examsRes.json();
-      const firstExamId = exams.items[0]?.id || 'd0000000-0000-0000-0000-000000000015';
+      const targetExamId = 'd0000000-0000-0000-0000-000000000015';
 
-      const templateRes = await request.get(`http://localhost:5005/api/v1/exams/${firstExamId}/result-imports/templates/aggregate`, {
+      const templateRes = await request.get(`http://localhost:5005/api/v1/exams/${targetExamId}/result-imports/templates/aggregate`, {
         headers: { Authorization: `Bearer ${accessToken}` }
       });
       const buffer = await templateRes.body();

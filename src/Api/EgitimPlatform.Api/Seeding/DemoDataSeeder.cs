@@ -49,6 +49,46 @@ public class DemoDataSeeder
     public static readonly Guid DemoParentEntityId = Guid.Parse("d0000000-0000-0000-0000-000000000008");
     public static readonly Guid DemoTeacherEntityId = Guid.Parse("d0000000-0000-0000-0000-000000000009");
     public static readonly Guid DemoCoachEntityId = Guid.Parse("d0000000-0000-0000-0000-00000000000a");
+    public static readonly Guid DemoStudent2Id = Guid.Parse("d0000000-0000-0000-0000-00000000000d");
+    public static readonly Guid DemoClassroom12AId = Guid.Parse("d0000000-0000-0000-0000-000000000060");
+    public static readonly Guid DemoClassroom12BId = Guid.Parse("d0000000-0000-0000-0000-000000000061");
+    public static readonly Guid DemoClassroom12CId = Guid.Parse("d0000000-0000-0000-0000-000000000067");
+    public static readonly Guid DemoStudyPlanId = Guid.Parse("d0000000-0000-0000-0000-000000000070");
+
+    public static Guid DemoStudentUserGuid(int s) =>
+        s == 1 ? DemoStudentUserId : Guid.Parse($"d0000000-0000-0010-0000-{s:D12}");
+
+    public static Guid DemoStudentEntityGuid(int s) =>
+        s == 1 ? DemoStudentId : s == 2 ? DemoStudent2Id : Guid.Parse($"d0000000-0000-0011-0000-{s:D12}");
+
+    public static Guid DemoTeacherUserGuid(int t) =>
+        t == 1 ? DemoTeacherUserId : Guid.Parse($"d0000000-0000-0012-0000-{t:D12}");
+
+    public static Guid DemoTeacherEntityGuid(int t) =>
+        t == 1 ? DemoTeacherEntityId : Guid.Parse($"d0000000-0000-0013-0000-{t:D12}");
+
+    public static Guid DemoCoachUserGuid(int c) =>
+        c == 1 ? DemoCoachUserId : Guid.Parse($"d0000000-0000-0014-0000-{c:D12}");
+
+    public static Guid DemoCoachEntityGuid(int c) =>
+        c == 1 ? DemoCoachEntityId : Guid.Parse($"d0000000-0000-0015-0000-{c:D12}");
+
+    public static Guid DemoParentUserGuid(int p) =>
+        p == 1 ? DemoParentUserId : Guid.Parse($"d0000000-0000-0016-0000-{p:D12}");
+
+    public static Guid DemoParentEntityGuid(int p) =>
+        p == 1 ? DemoParentEntityId : Guid.Parse($"d0000000-0000-0017-0000-{p:D12}");
+
+    public static Guid DemoAttemptGuid(int s, int e) =>
+        s == 1 && e <= 5
+            ? Guid.Parse($"d0000000-0000-0000-0000-00000000002{e}")
+            : Guid.Parse($"d0000000-0000-0020-{s:D4}-{e:D12}");
+
+    public static Guid DemoSubjectResultGuid(int s, int e, int secOrder) =>
+        Guid.Parse($"d0000000-0000-0021-{s:D4}-00000000{e:D2}{secOrder:D2}");
+
+    public static Guid DemoTopicResultGuid(int s, int e, int topIdx) =>
+        Guid.Parse($"d0000000-0000-0022-{s:D4}-00000000{e:D2}{topIdx:D2}");
 
     public DemoDataSeeder(
         ApplicationDbContext db,
@@ -114,16 +154,19 @@ public class DemoDataSeeder
         var taxonomy = await SeedTaxonomyAsync(ct);
         var questions = await SeedQuestionsAsync(taxonomy, ct);
 
-        // 5. 5 Finalized Demo Exams & Attempts
-        await SeedExamsAndAttemptsAsync(taxonomy, questions, ct);
+        // 5. Hierarchy (Classrooms, Teachers, Coaches, Parents, Students)
+        await SeedExpandedHierarchyAsync(taxonomy, ct);
 
-        // 6. Historical Coach Task
+        // 6. 10 Chronological Demo Exams & Consistent Attempts (Phase 1)
+        await SeedExpandedExamsAndAttemptsAsync(taxonomy, ct);
+
+        // 7. Historical Coach Task
         await SeedCoachTasksAsync(ct);
 
-        // 7. Notifications
+        // 8. Notifications
         await SeedNotificationsAsync(ct);
 
-        // 8. Linked classrooms, question-level data, study plan and notes
+        // 9. Linked question-level data, study plan and notes
         await SeedShowcaseEnrichmentAsync(ct);
 
         _logger.LogInformation("Demo Showcase Dataset (DEMO_SHOWCASE_V1) successfully seeded.");
@@ -139,11 +182,27 @@ public class DemoDataSeeder
         _logger.LogInformation("Resetting Demo Showcase Dataset (DEMO_SHOWCASE_V1)...");
 
         // Safe removal restricted exclusively to DemoInstitutionId and deterministic Demo IDs
+        var topicResults = await _db.Set<StudentExamTopicResult>().IgnoreQueryFilters().Where(r => r.InstitutionId == DemoInstitutionId).ToListAsync(ct);
+        _db.Set<StudentExamTopicResult>().RemoveRange(topicResults);
+
+        var subjectResults = await _db.Set<StudentExamSubjectResult>().IgnoreQueryFilters().Where(r => r.InstitutionId == DemoInstitutionId).ToListAsync(ct);
+        _db.Set<StudentExamSubjectResult>().RemoveRange(subjectResults);
+
         var questionResults = await _db.Set<StudentExamQuestionResult>().IgnoreQueryFilters().Where(r => r.InstitutionId == DemoInstitutionId).ToListAsync(ct);
         _db.Set<StudentExamQuestionResult>().RemoveRange(questionResults);
 
         var examQuestions = await _db.Set<ExamQuestion>().IgnoreQueryFilters().Where(q => q.InstitutionId == DemoInstitutionId).ToListAsync(ct);
         _db.Set<ExamQuestion>().RemoveRange(examQuestions);
+
+        var attempts = await _db.Set<StudentExamAttempt>().IgnoreQueryFilters().Where(a => a.InstitutionId == DemoInstitutionId).ToListAsync(ct);
+        _db.Set<StudentExamAttempt>().RemoveRange(attempts);
+
+        var exams = await _db.Set<Exam>().IgnoreQueryFilters().Include(e => e.Sections).Where(e => e.InstitutionId == DemoInstitutionId).ToListAsync(ct);
+        foreach (var exam in exams)
+        {
+            _db.Set<ExamSection>().RemoveRange(exam.Sections);
+        }
+        _db.Set<Exam>().RemoveRange(exams);
 
         var studyTasks = await _db.Set<StudyTask>().IgnoreQueryFilters().Where(t => t.InstitutionId == DemoInstitutionId).ToListAsync(ct);
         _db.Set<StudyTask>().RemoveRange(studyTasks);
@@ -173,12 +232,6 @@ public class DemoDataSeeder
         var styleAssignments = await _db.Set<QuestionStyleAssignment>().Where(a => demoQuestionIds.Contains(a.QuestionId)).ToListAsync(ct);
         _db.Set<QuestionStyleAssignment>().RemoveRange(styleAssignments);
 
-        var attempts = await _db.Set<StudentExamAttempt>().IgnoreQueryFilters().Where(a => a.InstitutionId == DemoInstitutionId).ToListAsync(ct);
-        _db.Set<StudentExamAttempt>().RemoveRange(attempts);
-
-        var exams = await _db.Set<Exam>().IgnoreQueryFilters().Where(e => e.InstitutionId == DemoInstitutionId).ToListAsync(ct);
-        _db.Set<Exam>().RemoveRange(exams);
-
         var tasks = await _db.Set<CoachTask>().IgnoreQueryFilters().Where(t => t.InstitutionId == DemoInstitutionId).ToListAsync(ct);
         _db.Set<CoachTask>().RemoveRange(tasks);
 
@@ -206,11 +259,11 @@ public class DemoDataSeeder
         var inst = await _db.Set<Institution>().IgnoreQueryFilters().FirstOrDefaultAsync(i => i.Id == DemoInstitutionId, ct);
         if (inst != null) _db.Set<Institution>().Remove(inst);
 
-        var userIds = new[] { DemoAdminUserId, DemoTeacherUserId, DemoCoachUserId, DemoStudentUserId, DemoParentUserId };
-        foreach (var uid in userIds)
+        // Delete all users belonging to DemoInstitutionId
+        var demoUsers = await _userManager.Users.Where(u => u.InstitutionId == DemoInstitutionId).ToListAsync(ct);
+        foreach (var user in demoUsers)
         {
-            var user = await _userManager.FindByIdAsync(uid.ToString());
-            if (user != null) await _userManager.DeleteAsync(user);
+            await _userManager.DeleteAsync(user);
         }
 
         await _db.SaveChangesAsync(ct);
@@ -501,21 +554,200 @@ public class DemoDataSeeder
         return questions;
     }
 
-    private async Task SeedExamsAndAttemptsAsync(DemoTaxonomyContainer tax, List<Question> questions, CancellationToken ct)
+    public enum DemoPerformanceArchetype
     {
-        var examDates = new (string Title, DateTimeOffset Date, Guid ExamId, Guid AttemptId)[]
+        HighAchieving,
+        Improving,
+        Stable,
+        Declining,
+        Fluctuating
+    }
+
+    private static readonly (string FirstName, string LastName)[] StudentProfiles =
+    [
+        ("Ahmet", "Yılmaz"),    // 1 (12-A) - Improving
+        ("Zeynep", "Demir"),   // 2 (12-A) - Stable
+        ("Ece", "Kaya"),       // 3 (12-A) - HighAchieving
+        ("Burak", "Yıldız"),   // 4 (12-A) - HighAchieving
+        ("Selin", "Aydın"),    // 5 (12-A) - Improving
+        ("Emre", "Çetin"),     // 6 (12-A) - Improving
+        ("Aylin", "Koç"),      // 7 (12-A) - Stable
+        ("Kerem", "Arslan"),   // 8 (12-A) - Stable
+        ("Gamze", "Doğan"),    // 9 (12-A) - Declining
+        ("Mert", "Şahin"),     // 10 (12-A) - Fluctuating
+        ("Can", "Polat"),      // 11 (12-B) - Fluctuating
+        ("Zümra", "Yılmaz"),   // 12 (12-B) - HighAchieving
+        ("Ozan", "Kılıç"),     // 13 (12-B) - HighAchieving
+        ("Buse", "Aksoy"),     // 14 (12-B) - Improving
+        ("Tarık", "Erdem"),    // 15 (12-B) - Improving
+        ("Melis", "Öztürk"),   // 16 (12-B) - Improving
+        ("Kaan", "Bozkurt"),   // 17 (12-B) - Stable
+        ("Esra", "Güneş"),     // 18 (12-B) - Stable
+        ("Onur", "Korkmaz"),   // 19 (12-B) - Declining
+        ("Derya", "Kurt"),     // 20 (12-B) - Declining
+        ("Serkan", "Çelik"),   // 21 (12-C) - Fluctuating
+        ("Nazlı", "Yavuz"),    // 22 (12-C) - HighAchieving
+        ("Umut", "Bulut"),     // 23 (12-C) - HighAchieving
+        ("Pınar", "Taş"),      // 24 (12-C) - Improving
+        ("Deniz", "Aslan"),    // 25 (12-C) - Improving
+        ("Tolga", "Eren"),     // 26 (12-C) - Stable
+        ("İrem", "Vural"),     // 27 (12-C) - Stable
+        ("Hakan", "Tekin"),    // 28 (12-C) - Declining
+        ("Cansu", "Bilgin"),   // 29 (12-C) - Declining
+        ("Barış", "Şen")       // 30 (12-C) - Fluctuating
+    ];
+
+    private static readonly (string FirstName, string LastName, string Title)[] TeacherProfiles =
+    [
+        ("Ayşe", "Öğretmen", "Matematik Öğretmeni"),
+        ("Mehmet", "Kaya", "Türkçe Öğretmeni"),
+        ("Fatma", "Çelik", "Fizik Öğretmeni"),
+        ("Ali", "Demir", "Kimya Öğretmeni"),
+        ("Zeynep", "Şahin", "Biyoloji Öğretmeni")
+    ];
+
+    private static readonly (string FirstName, string LastName)[] CoachProfiles =
+    [
+        ("Mehmet", "Koç"),
+        ("Selin", "Aksoy"),
+        ("Emre", "Yurt")
+    ];
+
+    private static readonly (string FirstName, string LastName, string Phone, string Relationship)[] ParentProfiles =
+    [
+        ("Fatma", "Yılmaz", "5550001122", "Mother"),
+        ("Emine", "Demir", "5550001123", "Mother"),
+        ("Hasan", "Kaya", "5550001124", "Father"),
+        ("Ayfer", "Yıldız", "5550001125", "Mother"),
+        ("Mustafa", "Aydın", "5550001126", "Father"),
+        ("Hatice", "Çetin", "5550001127", "Mother"),
+        ("İbrahim", "Koç", "5550001128", "Father"),
+        ("Sevim", "Arslan", "5550001129", "Mother"),
+        ("Hüseyin", "Doğan", "5550001130", "Father"),
+        ("Nurten", "Şahin", "5550001131", "Mother")
+    ];
+
+    private static readonly (string Title, DateTimeOffset Date, Guid ExamId)[] DemoExams =
+    [
+        ("Demo TYT 1", new DateTimeOffset(2026, 9, 6, 10, 0, 0, TimeSpan.FromHours(3)), Guid.Parse("d0000000-0000-0000-0000-000000000011")),
+        ("Demo TYT 2", new DateTimeOffset(2026, 9, 13, 10, 0, 0, TimeSpan.FromHours(3)), Guid.Parse("d0000000-0000-0000-0000-000000000012")),
+        ("Demo TYT 3", new DateTimeOffset(2026, 9, 20, 10, 0, 0, TimeSpan.FromHours(3)), Guid.Parse("d0000000-0000-0000-0000-000000000013")),
+        ("Demo TYT 4", new DateTimeOffset(2026, 9, 27, 10, 0, 0, TimeSpan.FromHours(3)), Guid.Parse("d0000000-0000-0000-0000-000000000014")),
+        ("Demo TYT 5", new DateTimeOffset(2026, 10, 4, 10, 0, 0, TimeSpan.FromHours(3)), Guid.Parse("d0000000-0000-0000-0000-000000000015")),
+        ("Demo TYT 6", new DateTimeOffset(2026, 10, 11, 10, 0, 0, TimeSpan.FromHours(3)), Guid.Parse("d0000000-0000-0000-0000-000000000016")),
+        ("Demo TYT 7", new DateTimeOffset(2026, 10, 18, 10, 0, 0, TimeSpan.FromHours(3)), Guid.Parse("d0000000-0000-0000-0000-000000000017")),
+        ("Demo TYT 8", new DateTimeOffset(2026, 10, 25, 10, 0, 0, TimeSpan.FromHours(3)), Guid.Parse("d0000000-0000-0000-0000-000000000018")),
+        ("Demo TYT 9", new DateTimeOffset(2026, 11, 1, 10, 0, 0, TimeSpan.FromHours(3)), Guid.Parse("d0000000-0000-0000-0000-000000000019")),
+        ("Demo TYT 10", new DateTimeOffset(2026, 11, 8, 10, 0, 0, TimeSpan.FromHours(3)), Guid.Parse("d0000000-0000-0000-0000-00000000001a")),
+    ];
+
+    public static DemoPerformanceArchetype GetArchetype(int studentIndex) => studentIndex switch
+    {
+        3 or 4 or 12 or 13 or 22 or 23 => DemoPerformanceArchetype.HighAchieving,
+        1 or 5 or 6 or 14 or 15 or 16 or 24 or 25 => DemoPerformanceArchetype.Improving,
+        2 or 7 or 8 or 17 or 18 or 26 or 27 => DemoPerformanceArchetype.Stable,
+        9 or 19 or 20 or 28 or 29 => DemoPerformanceArchetype.Declining,
+        10 or 11 or 21 or 30 => DemoPerformanceArchetype.Fluctuating,
+        _ => DemoPerformanceArchetype.Stable
+    };
+
+    private static (int TurC, int TurW, int TurB, int MatC, int MatW, int MatB, int FizC, int FizW, int FizB, int KimC, int KimW, int KimB)
+        CalculateExamScores(int studentIndex, int examIndex, DemoPerformanceArchetype archetype)
+    {
+        if (studentIndex == 1)
         {
-            ("Demo TYT 1", new DateTimeOffset(2026, 9, 6, 10, 0, 0, TimeSpan.FromHours(3)), Guid.Parse("d0000000-0000-0000-0000-000000000011"), Guid.Parse("d0000000-0000-0000-0000-000000000021")),
-            ("Demo TYT 2", new DateTimeOffset(2026, 9, 13, 10, 0, 0, TimeSpan.FromHours(3)), Guid.Parse("d0000000-0000-0000-0000-000000000012"), Guid.Parse("d0000000-0000-0000-0000-000000000022")),
-            ("Demo TYT 3", new DateTimeOffset(2026, 9, 20, 10, 0, 0, TimeSpan.FromHours(3)), Guid.Parse("d0000000-0000-0000-0000-000000000013"), Guid.Parse("d0000000-0000-0000-0000-000000000023")),
-            ("Demo TYT 4", new DateTimeOffset(2026, 9, 27, 10, 0, 0, TimeSpan.FromHours(3)), Guid.Parse("d0000000-0000-0000-0000-000000000014"), Guid.Parse("d0000000-0000-0000-0000-000000000024")),
-            ("Demo TYT 5", new DateTimeOffset(2026, 10, 4, 10, 0, 0, TimeSpan.FromHours(3)), Guid.Parse("d0000000-0000-0000-0000-000000000015"), Guid.Parse("d0000000-0000-0000-0000-000000000025")),
+            // Ahmet Yılmaz baseline progression
+            return examIndex switch
+            {
+                1 => (7, 3, 0, 4, 6, 0, 7, 3, 0, 5, 5, 0),
+                2 => (7, 3, 0, 4, 6, 0, 6, 4, 0, 6, 4, 0),
+                3 => (8, 2, 0, 5, 5, 0, 6, 4, 0, 6, 4, 0),
+                4 => (8, 2, 0, 6, 4, 0, 5, 5, 0, 6, 4, 0),
+                5 => (8, 2, 0, 7, 3, 0, 4, 6, 0, 6, 4, 0),
+                6 => (8, 2, 0, 7, 3, 0, 5, 5, 0, 6, 4, 0),
+                7 => (8, 2, 0, 8, 2, 0, 5, 5, 0, 7, 3, 0),
+                8 => (9, 1, 0, 8, 2, 0, 5, 5, 0, 7, 3, 0),
+                9 => (9, 1, 0, 9, 1, 0, 6, 4, 0, 7, 3, 0),
+                10 => (9, 1, 0, 9, 1, 0, 6, 4, 0, 8, 2, 0),
+                _ => (8, 2, 0, 7, 3, 0, 5, 5, 0, 6, 4, 0)
+            };
+        }
+
+        switch (archetype)
+        {
+            case DemoPerformanceArchetype.HighAchieving:
+            {
+                int matC = (examIndex >= 7 && studentIndex % 2 == 1) ? 10 : 9;
+                int fizC = examIndex <= 4 ? 8 : 9;
+                return (9, 1, 0, matC, 10 - matC, 0, fizC, 10 - fizC, 0, 9, 1, 0);
+            }
+            case DemoPerformanceArchetype.Improving:
+            {
+                int turC = examIndex <= 3 ? 7 : (examIndex <= 7 ? 8 : 9);
+                int matC = examIndex <= 2 ? 4 : (examIndex <= 4 ? 5 : (examIndex <= 6 ? 6 : (examIndex <= 8 ? 7 : 8)));
+                int fizC = examIndex <= 3 ? 5 : (examIndex <= 7 ? 6 : 7);
+                int kimC = examIndex <= 4 ? 5 : (examIndex <= 7 ? 6 : 7);
+                return (turC, 10 - turC, 0, matC, 10 - matC, 0, fizC, 10 - fizC, 0, kimC, 10 - kimC, 0);
+            }
+            case DemoPerformanceArchetype.Stable:
+            {
+                int matW = examIndex % 2 == 0 ? 3 : 4;
+                int matB = 10 - 6 - matW;
+                int fizW = examIndex % 2 == 1 ? 3 : 4;
+                int fizB = 10 - 6 - fizW;
+                return (8, 2, 0, 6, matW, matB, 6, fizW, fizB, 6, 4, 0);
+            }
+            case DemoPerformanceArchetype.Declining:
+            {
+                if (examIndex <= 3) return (8, 2, 0, 8, 2, 0, 8, 2, 0, 7, 3, 0);
+                if (examIndex <= 6) return (8, 2, 0, 6, 4, 0, 5, 5, 0, 6, 4, 0);
+                return (7, 3, 0, 4, 6, 0, 3, 7, 0, 5, 5, 0);
+            }
+            case DemoPerformanceArchetype.Fluctuating:
+            {
+                if (examIndex % 2 == 1) return (9, 1, 0, 8, 2, 0, 8, 2, 0, 7, 3, 0);
+                return (6, 4, 0, 4, 6, 0, 4, 6, 0, 5, 5, 0);
+            }
+            default:
+                return (7, 3, 0, 6, 4, 0, 6, 4, 0, 6, 4, 0);
+        }
+    }
+
+    private async Task<ApplicationUser> EnsureDemoUserAsync(Guid id, string email, string role, string password)
+    {
+        var existing = await _userManager.FindByIdAsync(id.ToString()) ?? await _userManager.FindByEmailAsync(email);
+        if (existing != null) return existing;
+
+        var user = new ApplicationUser
+        {
+            Id = id,
+            UserName = email,
+            Email = email,
+            EmailConfirmed = true,
+            InstitutionId = DemoInstitutionId,
+            IsActive = true
         };
 
-        for (int idx = 0; idx < examDates.Length; idx++)
+        var res = await _userManager.CreateAsync(user, password);
+        if (res.Succeeded)
         {
-            var eInfo = examDates[idx];
-            var exam = await _db.Set<Exam>().IgnoreQueryFilters().FirstOrDefaultAsync(e => e.Id == eInfo.ExamId, ct);
+            await _userManager.AddToRoleAsync(user, role);
+        }
+        else
+        {
+            _logger.LogError("Failed to create expanded demo user {Email}: {Errors}", email, string.Join(", ", res.Errors.Select(e => e.Description)));
+        }
+        return user;
+    }
+
+    private async Task SeedExpandedExamsAndAttemptsAsync(DemoTaxonomyContainer tax, CancellationToken ct)
+    {
+        // 1. Ensure all 10 Exams exist
+        var examEntities = new List<Exam>();
+        for (int idx = 0; idx < DemoExams.Length; idx++)
+        {
+            var eInfo = DemoExams[idx];
+            var exam = await _db.Set<Exam>().IgnoreQueryFilters().Include(e => e.Sections).FirstOrDefaultAsync(e => e.Id == eInfo.ExamId, ct);
             if (exam == null)
             {
                 exam = new Exam
@@ -523,93 +755,165 @@ public class DemoDataSeeder
                     Id = eInfo.ExamId,
                     InstitutionId = DemoInstitutionId,
                     ExamTypeId = tax.ExamTypeId,
-                    Code = $"TYT-2026-0{idx + 1}",
+                    Code = $"TYT-2026-{(idx + 1):D2}",
                     Title = eInfo.Title,
                     ExamDate = eInfo.Date,
                     Status = ExamStatus.Published,
                     WrongAnswerPenalty = 4m
                 };
 
-                var secTur = new ExamSection { Id = Guid.NewGuid(), InstitutionId = DemoInstitutionId, ExamId = exam.Id, SubjectId = tax.SubTur.Id, DisplayOrder = 1, QuestionCount = 10 };
-                var secMat = new ExamSection { Id = Guid.NewGuid(), InstitutionId = DemoInstitutionId, ExamId = exam.Id, SubjectId = tax.SubMat.Id, DisplayOrder = 2, QuestionCount = 10 };
-                var secFiz = new ExamSection { Id = Guid.NewGuid(), InstitutionId = DemoInstitutionId, ExamId = exam.Id, SubjectId = tax.SubFiz.Id, DisplayOrder = 3, QuestionCount = 10 };
-                var secKim = new ExamSection { Id = Guid.NewGuid(), InstitutionId = DemoInstitutionId, ExamId = exam.Id, SubjectId = tax.SubKim.Id, DisplayOrder = 4, QuestionCount = 10 };
-                var secBiy = new ExamSection { Id = Guid.NewGuid(), InstitutionId = DemoInstitutionId, ExamId = exam.Id, SubjectId = tax.SubBiy.Id, DisplayOrder = 5, QuestionCount = 0 };
+                var secTur = new ExamSection { Id = Guid.Parse($"d0000000-0000-0040-{(idx + 1):D4}-000000000001"), InstitutionId = DemoInstitutionId, ExamId = exam.Id, SubjectId = tax.SubTur.Id, DisplayOrder = 1, QuestionCount = 10 };
+                var secMat = new ExamSection { Id = Guid.Parse($"d0000000-0000-0040-{(idx + 1):D4}-000000000002"), InstitutionId = DemoInstitutionId, ExamId = exam.Id, SubjectId = tax.SubMat.Id, DisplayOrder = 2, QuestionCount = 10 };
+                var secFiz = new ExamSection { Id = Guid.Parse($"d0000000-0000-0040-{(idx + 1):D4}-000000000003"), InstitutionId = DemoInstitutionId, ExamId = exam.Id, SubjectId = tax.SubFiz.Id, DisplayOrder = 3, QuestionCount = 10 };
+                var secKim = new ExamSection { Id = Guid.Parse($"d0000000-0000-0040-{(idx + 1):D4}-000000000004"), InstitutionId = DemoInstitutionId, ExamId = exam.Id, SubjectId = tax.SubKim.Id, DisplayOrder = 4, QuestionCount = 10 };
+                var secBiy = new ExamSection { Id = Guid.Parse($"d0000000-0000-0040-{(idx + 1):D4}-000000000005"), InstitutionId = DemoInstitutionId, ExamId = exam.Id, SubjectId = tax.SubBiy.Id, DisplayOrder = 5, QuestionCount = 0 };
 
                 exam.Sections.AddRange([secTur, secMat, secFiz, secKim, secBiy]);
                 _db.Set<Exam>().Add(exam);
                 await _db.SaveChangesAsync(ct);
             }
+            examEntities.Add(exam);
+        }
 
-            var attempt = await _db.Set<StudentExamAttempt>().IgnoreQueryFilters().FirstOrDefaultAsync(a => a.Id == eInfo.AttemptId, ct);
-            if (attempt == null)
+        // 2. Ensure Attempts for all 30 Students across all 10 Exams (300 attempts total)
+        for (int s = 1; s <= 30; s++)
+        {
+            var studentId = DemoStudentEntityGuid(s);
+            var archetype = GetArchetype(s);
+
+            for (int eIdx = 1; eIdx <= 10; eIdx++)
             {
-                attempt = new StudentExamAttempt
+                var exam = examEntities[eIdx - 1];
+                var attemptId = DemoAttemptGuid(s, eIdx);
+
+                var existingAttempt = await _db.Set<StudentExamAttempt>().IgnoreQueryFilters().FirstOrDefaultAsync(a => a.Id == attemptId, ct);
+                if (existingAttempt != null)
                 {
-                    Id = eInfo.AttemptId,
-                    InstitutionId = DemoInstitutionId,
-                    ExamId = exam.Id,
-                    StudentId = DemoStudentId,
-                    AttemptNumber = 1,
-                    TakenAt = eInfo.Date,
-                    Status = AttemptStatus.Finalized,
-                    FinalizedAt = eInfo.Date.AddHours(3),
-                    IsRawAvailable = true
-                };
+                    continue;
+                }
 
-                int turCorrect = idx < 2 ? 7 : 8;
-                int turWrong = 10 - turCorrect;
+                var (turC, turW, turB, matC, matW, matB, fizC, fizW, fizB, kimC, kimW, kimB) = CalculateExamScores(s, eIdx, archetype);
 
-                int matCorrect = idx == 0 ? 4 : idx == 1 ? 4 : idx == 2 ? 5 : idx == 3 ? 6 : 7;
-                int matWrong = 10 - matCorrect;
-
-                int fizCorrect = idx == 0 ? 7 : idx == 1 ? 6 : idx == 2 ? 6 : idx == 3 ? 5 : 4;
-                int fizWrong = 10 - fizCorrect;
-
-                int kimCorrect = idx == 0 ? 5 : 6;
-                int kimWrong = 10 - kimCorrect;
-
-                int totalCorrect = turCorrect + matCorrect + fizCorrect + kimCorrect;
-                int totalWrong = turWrong + matWrong + fizWrong + kimWrong;
+                int totalCorrect = turC + matC + fizC + kimC;
+                int totalWrong = turW + matW + fizW + kimW;
+                int totalBlank = turB + matB + fizB + kimB;
                 decimal totalNet = totalCorrect - (totalWrong / 4m);
 
-                attempt.TotalCorrect = totalCorrect;
-                attempt.TotalWrong = totalWrong;
-                attempt.TotalBlank = 0;
-                attempt.TotalNet = totalNet;
+                var attempt = new StudentExamAttempt
+                {
+                    Id = attemptId,
+                    InstitutionId = DemoInstitutionId,
+                    ExamId = exam.Id,
+                    StudentId = studentId,
+                    AttemptNumber = 1,
+                    TakenAt = exam.ExamDate,
+                    Status = AttemptStatus.Finalized,
+                    FinalizedAt = exam.ExamDate.AddHours(3),
+                    IsRawAvailable = true,
+                    TotalCorrect = totalCorrect,
+                    TotalWrong = totalWrong,
+                    TotalBlank = totalBlank,
+                    TotalNet = totalNet
+                };
+
+                // Section order: 1: Tur, 2: Mat, 3: Fiz, 4: Kim
+                var secTur = exam.Sections.First(sec => sec.DisplayOrder == 1);
+                var secMat = exam.Sections.First(sec => sec.DisplayOrder == 2);
+                var secFiz = exam.Sections.First(sec => sec.DisplayOrder == 3);
+                var secKim = exam.Sections.First(sec => sec.DisplayOrder == 4);
 
                 attempt.SubjectResults = new List<StudentExamSubjectResult>
                 {
-                    new StudentExamSubjectResult { Id = Guid.NewGuid(), InstitutionId = DemoInstitutionId, StudentExamAttemptId = attempt.Id, ExamSectionId = exam.Sections[0].Id, Correct = turCorrect, Wrong = turWrong, Blank = 0, Net = turCorrect - (turWrong / 4m) },
-                    new StudentExamSubjectResult { Id = Guid.NewGuid(), InstitutionId = DemoInstitutionId, StudentExamAttemptId = attempt.Id, ExamSectionId = exam.Sections[1].Id, Correct = matCorrect, Wrong = matWrong, Blank = 0, Net = matCorrect - (matWrong / 4m) },
-                    new StudentExamSubjectResult { Id = Guid.NewGuid(), InstitutionId = DemoInstitutionId, StudentExamAttemptId = attempt.Id, ExamSectionId = exam.Sections[2].Id, Correct = fizCorrect, Wrong = fizWrong, Blank = 0, Net = fizCorrect - (fizWrong / 4m) },
-                    new StudentExamSubjectResult { Id = Guid.NewGuid(), InstitutionId = DemoInstitutionId, StudentExamAttemptId = attempt.Id, ExamSectionId = exam.Sections[3].Id, Correct = kimCorrect, Wrong = kimWrong, Blank = 0, Net = kimCorrect - (kimWrong / 4m) },
+                    new StudentExamSubjectResult
+                    {
+                        Id = DemoSubjectResultGuid(s, eIdx, 1),
+                        InstitutionId = DemoInstitutionId,
+                        StudentExamAttemptId = attempt.Id,
+                        ExamSectionId = secTur.Id,
+                        Correct = turC,
+                        Wrong = turW,
+                        Blank = turB,
+                        Net = turC - (turW / 4m)
+                    },
+                    new StudentExamSubjectResult
+                    {
+                        Id = DemoSubjectResultGuid(s, eIdx, 2),
+                        InstitutionId = DemoInstitutionId,
+                        StudentExamAttemptId = attempt.Id,
+                        ExamSectionId = secMat.Id,
+                        Correct = matC,
+                        Wrong = matW,
+                        Blank = matB,
+                        Net = matC - (matW / 4m)
+                    },
+                    new StudentExamSubjectResult
+                    {
+                        Id = DemoSubjectResultGuid(s, eIdx, 3),
+                        InstitutionId = DemoInstitutionId,
+                        StudentExamAttemptId = attempt.Id,
+                        ExamSectionId = secFiz.Id,
+                        Correct = fizC,
+                        Wrong = fizW,
+                        Blank = fizB,
+                        Net = fizC - (fizW / 4m)
+                    },
+                    new StudentExamSubjectResult
+                    {
+                        Id = DemoSubjectResultGuid(s, eIdx, 4),
+                        InstitutionId = DemoInstitutionId,
+                        StudentExamAttemptId = attempt.Id,
+                        ExamSectionId = secKim.Id,
+                        Correct = kimC,
+                        Wrong = kimW,
+                        Blank = kimB,
+                        Net = kimC - (kimW / 4m)
+                    }
                 };
 
-                int matTkCorrect = 2;
-                int matPrbCorrect = 1;
-                int matFonkCorrect = idx < 2 ? 1 : 2;
-                int matTrigCorrect = idx == 4 ? 1 : 0;
+                // 8 Active Topics
+                // 1. Türkçe Topics (Paragraf 5, DilBilgisi 5)
+                int parC = Math.Min(5, (turC + 1) / 2);
+                int dbgC = turC - parC;
+                int remTurW = turW;
+                int parW = Math.Min(remTurW, 5 - parC);
+                int dbgW = remTurW - parW;
+                int parB = 5 - parC - parW;
+                int dbgB = 5 - dbgC - dbgW;
 
-                int fizElekCorrect = idx == 0 ? 3 : idx < 3 ? 2 : 0;
-                int fizHkCorrect = fizCorrect - fizElekCorrect;
-                if (fizHkCorrect < 0) fizHkCorrect = 0;
+                // 2. Matematik Topics (TK 3, Prb 3, Fonk 2, Trig 2)
+                int tkC = Math.Min(3, (matC + 2) / 3);
+                int prbC = Math.Min(3, (matC + 1) / 3);
+                int fonkC = Math.Min(2, Math.Max(0, matC - tkC - prbC));
+                int trigC = matC - tkC - prbC - fonkC;
+                int remMatW = matW;
+                int tkCap = 3 - tkC; int tkW = Math.Min(remMatW, tkCap); remMatW -= tkW; int tkB = tkCap - tkW;
+                int prbCap = 3 - prbC; int prbW = Math.Min(remMatW, prbCap); remMatW -= prbW; int prbB = prbCap - prbW;
+                int fonkCap = 2 - fonkC; int fonkW = Math.Min(remMatW, fonkCap); remMatW -= fonkW; int fonkB = fonkCap - fonkW;
+                int trigCap = 2 - trigC; int trigW = Math.Min(remMatW, trigCap); remMatW -= trigW; int trigB = trigCap - trigW;
+
+                // 3. Fizik Topics (Elektrik 5, HK 5)
+                int elekC = (archetype == DemoPerformanceArchetype.Declining && eIdx >= 7) ? 1 : Math.Min(5, (fizC + 1) / 2);
+                int hkC = fizC - elekC;
+                int remFizW = fizW;
+                int elekCap = 5 - elekC; int elekW = Math.Min(remFizW, elekCap); remFizW -= elekW; int elekB = elekCap - elekW;
+                int hkCap = 5 - hkC; int hkW = Math.Min(remFizW, hkCap); remFizW -= hkW; int hkB = hkCap - hkW;
 
                 attempt.TopicResults = new List<StudentExamTopicResult>
                 {
-                    new StudentExamTopicResult { Id = Guid.NewGuid(), InstitutionId = DemoInstitutionId, StudentExamAttemptId = attempt.Id, ExamSectionId = exam.Sections[0].Id, TopicId = tax.TopTurPar.Id, Correct = turCorrect / 2, Wrong = (10 - turCorrect) / 2, Blank = 0, Net = (turCorrect / 2m) },
-                    new StudentExamTopicResult { Id = Guid.NewGuid(), InstitutionId = DemoInstitutionId, StudentExamAttemptId = attempt.Id, ExamSectionId = exam.Sections[0].Id, TopicId = tax.TopTurDbg.Id, Correct = turCorrect - (turCorrect / 2), Wrong = 0, Blank = 0, Net = turCorrect - (turCorrect / 2m) },
-                    new StudentExamTopicResult { Id = Guid.NewGuid(), InstitutionId = DemoInstitutionId, StudentExamAttemptId = attempt.Id, ExamSectionId = exam.Sections[1].Id, TopicId = tax.TopMatTk.Id, Correct = matTkCorrect, Wrong = 0, Blank = 0, Net = matTkCorrect },
-                    new StudentExamTopicResult { Id = Guid.NewGuid(), InstitutionId = DemoInstitutionId, StudentExamAttemptId = attempt.Id, ExamSectionId = exam.Sections[1].Id, TopicId = tax.TopMatPrb.Id, Correct = matPrbCorrect, Wrong = 1, Blank = 0, Net = matPrbCorrect - 0.25m },
-                    new StudentExamTopicResult { Id = Guid.NewGuid(), InstitutionId = DemoInstitutionId, StudentExamAttemptId = attempt.Id, ExamSectionId = exam.Sections[1].Id, TopicId = tax.TopMatFonk.Id, Correct = matFonkCorrect, Wrong = 1, Blank = 0, Net = matFonkCorrect - 0.25m },
-                    new StudentExamTopicResult { Id = Guid.NewGuid(), InstitutionId = DemoInstitutionId, StudentExamAttemptId = attempt.Id, ExamSectionId = exam.Sections[1].Id, TopicId = tax.TopMatTrig.Id, Correct = matTrigCorrect, Wrong = 2, Blank = 0, Net = matTrigCorrect - 0.5m },
-                    new StudentExamTopicResult { Id = Guid.NewGuid(), InstitutionId = DemoInstitutionId, StudentExamAttemptId = attempt.Id, ExamSectionId = exam.Sections[2].Id, TopicId = tax.TopFizElek.Id, Correct = fizElekCorrect, Wrong = 5 - fizElekCorrect, Blank = 0, Net = fizElekCorrect - ((5 - fizElekCorrect) / 4m) },
-                    new StudentExamTopicResult { Id = Guid.NewGuid(), InstitutionId = DemoInstitutionId, StudentExamAttemptId = attempt.Id, ExamSectionId = exam.Sections[2].Id, TopicId = tax.TopFizHk.Id, Correct = fizHkCorrect, Wrong = 5 - fizHkCorrect, Blank = 0, Net = fizHkCorrect - ((5 - fizHkCorrect) / 4m) },
+                    new StudentExamTopicResult { Id = DemoTopicResultGuid(s, eIdx, 1), InstitutionId = DemoInstitutionId, StudentExamAttemptId = attempt.Id, ExamSectionId = secTur.Id, TopicId = tax.TopTurPar.Id, Correct = parC, Wrong = parW, Blank = parB, Net = parC - (parW / 4m) },
+                    new StudentExamTopicResult { Id = DemoTopicResultGuid(s, eIdx, 2), InstitutionId = DemoInstitutionId, StudentExamAttemptId = attempt.Id, ExamSectionId = secTur.Id, TopicId = tax.TopTurDbg.Id, Correct = dbgC, Wrong = dbgW, Blank = dbgB, Net = dbgC - (dbgW / 4m) },
+                    new StudentExamTopicResult { Id = DemoTopicResultGuid(s, eIdx, 3), InstitutionId = DemoInstitutionId, StudentExamAttemptId = attempt.Id, ExamSectionId = secMat.Id, TopicId = tax.TopMatTk.Id, Correct = tkC, Wrong = tkW, Blank = tkB, Net = tkC - (tkW / 4m) },
+                    new StudentExamTopicResult { Id = DemoTopicResultGuid(s, eIdx, 4), InstitutionId = DemoInstitutionId, StudentExamAttemptId = attempt.Id, ExamSectionId = secMat.Id, TopicId = tax.TopMatPrb.Id, Correct = prbC, Wrong = prbW, Blank = prbB, Net = prbC - (prbW / 4m) },
+                    new StudentExamTopicResult { Id = DemoTopicResultGuid(s, eIdx, 5), InstitutionId = DemoInstitutionId, StudentExamAttemptId = attempt.Id, ExamSectionId = secMat.Id, TopicId = tax.TopMatFonk.Id, Correct = fonkC, Wrong = fonkW, Blank = fonkB, Net = fonkC - (fonkW / 4m) },
+                    new StudentExamTopicResult { Id = DemoTopicResultGuid(s, eIdx, 6), InstitutionId = DemoInstitutionId, StudentExamAttemptId = attempt.Id, ExamSectionId = secMat.Id, TopicId = tax.TopMatTrig.Id, Correct = trigC, Wrong = trigW, Blank = trigB, Net = trigC - (trigW / 4m) },
+                    new StudentExamTopicResult { Id = DemoTopicResultGuid(s, eIdx, 7), InstitutionId = DemoInstitutionId, StudentExamAttemptId = attempt.Id, ExamSectionId = secFiz.Id, TopicId = tax.TopFizElek.Id, Correct = elekC, Wrong = elekW, Blank = elekB, Net = elekC - (elekW / 4m) },
+                    new StudentExamTopicResult { Id = DemoTopicResultGuid(s, eIdx, 8), InstitutionId = DemoInstitutionId, StudentExamAttemptId = attempt.Id, ExamSectionId = secFiz.Id, TopicId = tax.TopFizHk.Id, Correct = hkC, Wrong = hkW, Blank = hkB, Net = hkC - (hkW / 4m) },
                 };
 
                 _db.Set<StudentExamAttempt>().Add(attempt);
-                await _db.SaveChangesAsync(ct);
             }
+
+            await _db.SaveChangesAsync(ct);
         }
     }
 
@@ -690,46 +994,29 @@ public class DemoDataSeeder
     }
 
     // ───────────────────────── Showcase enrichment (idempotent) ─────────────────────────
-    // Adds linked classrooms, a second student, question-level/style-tagged exam data,
+    // Adds linked classrooms, teachers, coaches, parents, students, question-level/style-tagged exam data,
     // an active study plan and sample notes. Every record is scoped to DemoInstitutionId
     // and uses deterministic IDs so repeated runs never duplicate data.
 
-    public static readonly Guid DemoStudent2Id = Guid.Parse("d0000000-0000-0000-0000-00000000000d");
-    public static readonly Guid DemoClassroom12AId = Guid.Parse("d0000000-0000-0000-0000-000000000060");
-    public static readonly Guid DemoClassroom12BId = Guid.Parse("d0000000-0000-0000-0000-000000000061");
-    public static readonly Guid DemoStudyPlanId = Guid.Parse("d0000000-0000-0000-0000-000000000070");
-
     private async Task SeedShowcaseEnrichmentAsync(CancellationToken ct)
     {
-        await SeedClassroomsAsync(ct);
+        var tax = await SeedTaxonomyAsync(ct);
+        await SeedExpandedHierarchyAsync(tax, ct);
+        await SeedExpandedExamsAndAttemptsAsync(tax, ct);
         await SeedQuestionStyleAssignmentsAsync(ct);
         await SeedQuestionLevelResultsAsync(ct);
         await SeedStudyPlanAsync(ct);
         await SeedNotesAsync(ct);
     }
 
-    private async Task SeedClassroomsAsync(CancellationToken ct)
+    private async Task SeedExpandedHierarchyAsync(DemoTaxonomyContainer tax, CancellationToken ct)
     {
-        if (!await _db.Set<Student>().IgnoreQueryFilters().AnyAsync(s => s.Id == DemoStudent2Id, ct))
-        {
-            _db.Set<Student>().Add(new Student
-            {
-                Id = DemoStudent2Id,
-                InstitutionId = DemoInstitutionId,
-                FirstName = "Zeynep",
-                LastName = "Demir",
-                StudentNumber = "1202",
-                GradeLevel = 12,
-                SchoolName = "Demo Anadolu Lisesi",
-                EnrollmentDate = DateTimeOffset.UtcNow.AddMonths(-6),
-                Status = StudentStatus.Active
-            });
-        }
-
+        // 1. Ensure Classrooms (12-A, 12-B, 12-C)
         var classrooms = new[]
         {
             (Id: DemoClassroom12AId, Name: "12-A", Branch: "Sayısal"),
-            (Id: DemoClassroom12BId, Name: "12-B", Branch: "Eşit Ağırlık")
+            (Id: DemoClassroom12BId, Name: "12-B", Branch: "Eşit Ağırlık"),
+            (Id: DemoClassroom12CId, Name: "12-C", Branch: "Sözel")
         };
         foreach (var c in classrooms)
         {
@@ -748,69 +1035,230 @@ public class DemoDataSeeder
         }
         await _db.SaveChangesAsync(ct);
 
-        var teacherLinkId = Guid.Parse("d0000000-0000-0000-0000-000000000062");
-        if (!await _db.Set<ClassroomTeacher>().IgnoreQueryFilters().AnyAsync(x => x.Id == teacherLinkId, ct))
+        // 2. Ensure Teachers (5 teachers)
+        for (int t = 1; t <= 5; t++)
         {
-            _db.Set<ClassroomTeacher>().Add(new ClassroomTeacher
-            {
-                Id = teacherLinkId,
-                InstitutionId = DemoInstitutionId,
-                ClassroomId = DemoClassroom12AId,
-                TeacherId = DemoTeacherEntityId,
-                IsPrimary = true
-            });
-        }
+            var profile = TeacherProfiles[t - 1];
+            var userId = DemoTeacherUserGuid(t);
+            var entityId = DemoTeacherEntityGuid(t);
+            var email = t == 1 ? _settings.TeacherEmail : $"ogretmen{t}@bilimakademi.com";
 
-        var studentLinks = new[]
-        {
-            (Id: Guid.Parse("d0000000-0000-0000-0000-000000000063"), StudentId: DemoStudentId),
-            (Id: Guid.Parse("d0000000-0000-0000-0000-000000000064"), StudentId: DemoStudent2Id)
-        };
-        foreach (var l in studentLinks)
-        {
-            if (!await _db.Set<ClassroomStudent>().IgnoreQueryFilters().AnyAsync(x => x.Id == l.Id, ct))
+            await EnsureDemoUserAsync(userId, email, Roles.Teacher, _settings.TeacherPassword!);
+
+            if (!await _db.Set<Teacher>().IgnoreQueryFilters().AnyAsync(x => x.Id == entityId, ct))
             {
-                _db.Set<ClassroomStudent>().Add(new ClassroomStudent
+                _db.Set<Teacher>().Add(new Teacher
                 {
-                    Id = l.Id,
+                    Id = entityId,
                     InstitutionId = DemoInstitutionId,
-                    ClassroomId = DemoClassroom12AId,
-                    StudentId = l.StudentId
+                    UserId = userId,
+                    FirstName = profile.FirstName,
+                    LastName = profile.LastName,
+                    Title = profile.Title
+                });
+            }
+        }
+        await _db.SaveChangesAsync(ct);
+
+        // 3. Ensure ClassroomTeacher links
+        // Ayşe (T1) -> 12-A only (Primary). Keep 12-B unassigned so UAT assignment test passes!
+        // Mehmet (T2) -> 12-A
+        // Fatma (T3) -> 12-B (Primary)
+        // Ali (T4) -> 12-B
+        // Zeynep (T5) -> 12-C (Primary)
+        var classroomTeacherLinks = new (Guid LinkId, int TeacherIdx, Guid ClassroomId, bool IsPrimary)[]
+        {
+            (Guid.Parse("d0000000-0000-0000-0000-000000000062"), 1, DemoClassroom12AId, true),
+            (Guid.Parse("d0000000-0000-0033-0000-000000000002"), 2, DemoClassroom12AId, false),
+            (Guid.Parse("d0000000-0000-0033-0000-000000000003"), 3, DemoClassroom12BId, true),
+            (Guid.Parse("d0000000-0000-0033-0000-000000000004"), 4, DemoClassroom12BId, false),
+            (Guid.Parse("d0000000-0000-0033-0000-000000000005"), 5, DemoClassroom12CId, true)
+        };
+        foreach (var l in classroomTeacherLinks)
+        {
+            if (!await _db.Set<ClassroomTeacher>().IgnoreQueryFilters().AnyAsync(x => x.Id == l.LinkId, ct))
+            {
+                _db.Set<ClassroomTeacher>().Add(new ClassroomTeacher
+                {
+                    Id = l.LinkId,
+                    InstitutionId = DemoInstitutionId,
+                    ClassroomId = l.ClassroomId,
+                    TeacherId = DemoTeacherEntityGuid(l.TeacherIdx),
+                    IsPrimary = l.IsPrimary
                 });
             }
         }
 
-        var coachLink2Id = Guid.Parse("d0000000-0000-0000-0000-000000000065");
-        if (!await _db.Set<StudentCoachAssignment>().IgnoreQueryFilters().AnyAsync(x => x.Id == coachLink2Id, ct))
+        // 4. Ensure TeacherSubject links
+        var teacherSubjectLinks = new (Guid LinkId, int TeacherIdx, Guid SubjectId)[]
         {
-            _db.Set<StudentCoachAssignment>().Add(new StudentCoachAssignment
+            (Guid.Parse("d0000000-0000-0000-0000-000000000066"), 1, tax.SubMat.Id),
+            (Guid.Parse("d0000000-0000-0034-0000-000000000002"), 2, tax.SubTur.Id),
+            (Guid.Parse("d0000000-0000-0034-0000-000000000003"), 3, tax.SubFiz.Id),
+            (Guid.Parse("d0000000-0000-0034-0000-000000000004"), 4, tax.SubKim.Id),
+            (Guid.Parse("d0000000-0000-0034-0000-000000000005"), 5, tax.SubBiy.Id)
+        };
+        foreach (var ts in teacherSubjectLinks)
+        {
+            if (!await _db.Set<TeacherSubject>().IgnoreQueryFilters().AnyAsync(x => x.Id == ts.LinkId, ct))
             {
-                Id = coachLink2Id,
-                InstitutionId = DemoInstitutionId,
-                StudentId = DemoStudent2Id,
-                CoachId = DemoCoachEntityId,
-                IsPrimary = true,
-                IsActive = true,
-                AssignedAt = DateTimeOffset.UtcNow.AddMonths(-2)
-            });
+                _db.Set<TeacherSubject>().Add(new TeacherSubject
+                {
+                    Id = ts.LinkId,
+                    InstitutionId = DemoInstitutionId,
+                    TeacherId = DemoTeacherEntityGuid(ts.TeacherIdx),
+                    SubjectId = ts.SubjectId
+                });
+            }
+        }
+        await _db.SaveChangesAsync(ct);
+
+        // 5. Ensure Coaches (3 coaches)
+        for (int c = 1; c <= 3; c++)
+        {
+            var profile = CoachProfiles[c - 1];
+            var userId = DemoCoachUserGuid(c);
+            var entityId = DemoCoachEntityGuid(c);
+            var email = c == 1 ? _settings.CoachEmail : $"koc{c}@bilimakademi.com";
+
+            await EnsureDemoUserAsync(userId, email, Roles.Coach, _settings.CoachPassword!);
+
+            if (!await _db.Set<Coach>().IgnoreQueryFilters().AnyAsync(x => x.Id == entityId, ct))
+            {
+                _db.Set<Coach>().Add(new Coach
+                {
+                    Id = entityId,
+                    InstitutionId = DemoInstitutionId,
+                    UserId = userId,
+                    FirstName = profile.FirstName,
+                    LastName = profile.LastName
+                });
+            }
+        }
+        await _db.SaveChangesAsync(ct);
+
+        // 6. Ensure Parents (10 parents)
+        for (int p = 1; p <= 10; p++)
+        {
+            var profile = ParentProfiles[p - 1];
+            var userId = DemoParentUserGuid(p);
+            var entityId = DemoParentEntityGuid(p);
+            var email = p == 1 ? _settings.ParentEmail : $"veli{p}@bilimakademi.com";
+
+            await EnsureDemoUserAsync(userId, email, Roles.Parent, _settings.ParentPassword!);
+
+            if (!await _db.Set<Parent>().IgnoreQueryFilters().AnyAsync(x => x.Id == entityId, ct))
+            {
+                _db.Set<Parent>().Add(new Parent
+                {
+                    Id = entityId,
+                    InstitutionId = DemoInstitutionId,
+                    UserId = userId,
+                    FirstName = profile.FirstName,
+                    LastName = profile.LastName,
+                    Email = email,
+                    Phone = profile.Phone
+                });
+            }
+        }
+        await _db.SaveChangesAsync(ct);
+
+        // 7. Ensure Students (30 students)
+        for (int s = 1; s <= 30; s++)
+        {
+            var profile = StudentProfiles[s - 1];
+            var userId = DemoStudentUserGuid(s);
+            var entityId = DemoStudentEntityGuid(s);
+            var email = s == 1 ? _settings.StudentEmail : $"ogrenci{s}@bilimakademi.com";
+            var studentNumber = $"12{s:D2}";
+
+            await EnsureDemoUserAsync(userId, email, Roles.Student, _settings.StudentPassword!);
+
+            if (!await _db.Set<Student>().IgnoreQueryFilters().AnyAsync(x => x.Id == entityId, ct))
+            {
+                _db.Set<Student>().Add(new Student
+                {
+                    Id = entityId,
+                    InstitutionId = DemoInstitutionId,
+                    UserId = userId,
+                    FirstName = profile.FirstName,
+                    LastName = profile.LastName,
+                    StudentNumber = studentNumber,
+                    GradeLevel = 12,
+                    SchoolName = "Demo Anadolu Lisesi",
+                    EnrollmentDate = DateTimeOffset.UtcNow.AddMonths(-6),
+                    Status = StudentStatus.Active
+                });
+            }
+        }
+        await _db.SaveChangesAsync(ct);
+
+        // 8. Ensure ClassroomStudent links (10 per classroom)
+        for (int s = 1; s <= 30; s++)
+        {
+            var linkId = s == 1 ? Guid.Parse("d0000000-0000-0000-0000-000000000063")
+                       : s == 2 ? Guid.Parse("d0000000-0000-0000-0000-000000000064")
+                       : Guid.Parse($"d0000000-0000-0030-0000-{s:D12}");
+            var classroomId = s <= 10 ? DemoClassroom12AId : s <= 20 ? DemoClassroom12BId : DemoClassroom12CId;
+            var studentId = DemoStudentEntityGuid(s);
+
+            if (!await _db.Set<ClassroomStudent>().IgnoreQueryFilters().AnyAsync(x => x.Id == linkId, ct))
+            {
+                _db.Set<ClassroomStudent>().Add(new ClassroomStudent
+                {
+                    Id = linkId,
+                    InstitutionId = DemoInstitutionId,
+                    ClassroomId = classroomId,
+                    StudentId = studentId
+                });
+            }
         }
 
-        // Teacher subject scope: Matematik (resolved via the demo question bank taxonomy)
-        var matSubjectId = await _db.Set<Question>().IgnoreQueryFilters()
-            .Where(q => q.Id == DemoQuestionId(21))
-            .Select(q => (Guid?)q.SubjectId)
-            .FirstOrDefaultAsync(ct);
-        var teacherSubjectId = Guid.Parse("d0000000-0000-0000-0000-000000000066");
-        if (matSubjectId.HasValue &&
-            !await _db.Set<TeacherSubject>().IgnoreQueryFilters().AnyAsync(x => x.Id == teacherSubjectId, ct))
+        // 9. Ensure StudentCoachAssignment links (10 per coach)
+        for (int s = 1; s <= 30; s++)
         {
-            _db.Set<TeacherSubject>().Add(new TeacherSubject
+            var linkId = s == 1 ? Guid.Parse("d0000000-0000-0000-0000-00000000000c")
+                       : s == 2 ? Guid.Parse("d0000000-0000-0000-0000-000000000065")
+                       : Guid.Parse($"d0000000-0000-0031-0000-{s:D12}");
+            var coachId = s <= 10 ? DemoCoachEntityGuid(1) : s <= 20 ? DemoCoachEntityGuid(2) : DemoCoachEntityGuid(3);
+            var studentId = DemoStudentEntityGuid(s);
+
+            if (!await _db.Set<StudentCoachAssignment>().IgnoreQueryFilters().AnyAsync(x => x.Id == linkId, ct))
             {
-                Id = teacherSubjectId,
-                InstitutionId = DemoInstitutionId,
-                TeacherId = DemoTeacherEntityId,
-                SubjectId = matSubjectId.Value
-            });
+                _db.Set<StudentCoachAssignment>().Add(new StudentCoachAssignment
+                {
+                    Id = linkId,
+                    InstitutionId = DemoInstitutionId,
+                    StudentId = studentId,
+                    CoachId = coachId,
+                    IsPrimary = true,
+                    IsActive = true,
+                    AssignedAt = DateTimeOffset.UtcNow.AddMonths(-3)
+                });
+            }
+        }
+
+        // 10. Ensure StudentParent links (P1 -> S1 only, P2 -> S2, ..., P10 -> S10)
+        for (int p = 1; p <= 10; p++)
+        {
+            var linkId = p == 1 ? Guid.Parse("d0000000-0000-0000-0000-00000000000b")
+                                : Guid.Parse($"d0000000-0000-0032-0000-{p:D12}");
+            var parentId = DemoParentEntityGuid(p);
+            var studentId = DemoStudentEntityGuid(p);
+            var relationship = ParentProfiles[p - 1].Relationship;
+
+            if (!await _db.Set<StudentParent>().IgnoreQueryFilters().AnyAsync(x => x.Id == linkId, ct))
+            {
+                _db.Set<StudentParent>().Add(new StudentParent
+                {
+                    Id = linkId,
+                    InstitutionId = DemoInstitutionId,
+                    StudentId = studentId,
+                    ParentId = parentId,
+                    RelationshipType = relationship,
+                    IsActive = true
+                });
+            }
         }
 
         await _db.SaveChangesAsync(ct);

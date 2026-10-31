@@ -134,12 +134,33 @@ public class DemoSeederUnitTests
         var ca = await db.Set<StudentCoachAssignment>().IgnoreQueryFilters().FirstOrDefaultAsync(x => x.StudentId == DemoDataSeeder.DemoStudentId);
         Assert.NotNull(ca);
 
-        // Verify 5 Exams & 5 Attempts
+        // Verify 10 Chronological Exams & 300 Attempts (Phase 1 Expansion)
         var exams = await db.Set<Exam>().IgnoreQueryFilters().Where(e => e.InstitutionId == DemoDataSeeder.DemoInstitutionId).ToListAsync();
-        Assert.Equal(5, exams.Count);
+        Assert.Equal(10, exams.Count);
 
         var attempts = await db.Set<StudentExamAttempt>().IgnoreQueryFilters().Where(a => a.InstitutionId == DemoDataSeeder.DemoInstitutionId).ToListAsync();
-        Assert.Equal(5, attempts.Count);
+        Assert.Equal(300, attempts.Count);
+
+        var subjectResults = await db.Set<StudentExamSubjectResult>().IgnoreQueryFilters().Where(r => r.InstitutionId == DemoDataSeeder.DemoInstitutionId).ToListAsync();
+        Assert.Equal(1200, subjectResults.Count);
+
+        var topicResults = await db.Set<StudentExamTopicResult>().IgnoreQueryFilters().Where(r => r.InstitutionId == DemoDataSeeder.DemoInstitutionId).ToListAsync();
+        Assert.Equal(2400, topicResults.Count);
+
+        var students = await db.Set<Student>().IgnoreQueryFilters().Where(s => s.InstitutionId == DemoDataSeeder.DemoInstitutionId).ToListAsync();
+        Assert.Equal(30, students.Count);
+
+        var classrooms = await db.Set<Classroom>().IgnoreQueryFilters().Where(c => c.InstitutionId == DemoDataSeeder.DemoInstitutionId).ToListAsync();
+        Assert.Equal(3, classrooms.Count);
+
+        var teachers = await db.Set<Teacher>().IgnoreQueryFilters().Where(t => t.InstitutionId == DemoDataSeeder.DemoInstitutionId).ToListAsync();
+        Assert.Equal(5, teachers.Count);
+
+        var coaches = await db.Set<Coach>().IgnoreQueryFilters().Where(c => c.InstitutionId == DemoDataSeeder.DemoInstitutionId).ToListAsync();
+        Assert.Equal(3, coaches.Count);
+
+        var parents = await db.Set<Parent>().IgnoreQueryFilters().Where(p => p.InstitutionId == DemoDataSeeder.DemoInstitutionId).ToListAsync();
+        Assert.Equal(10, parents.Count);
 
         // Verify Historical CoachTask
         var coachTask = await db.Set<CoachTask>().IgnoreQueryFilters().FirstOrDefaultAsync(t => t.InstitutionId == DemoDataSeeder.DemoInstitutionId);
@@ -158,6 +179,12 @@ public class DemoSeederUnitTests
         Assert.Equal(1, instCount);
 
         var attemptCount = await db.Set<StudentExamAttempt>().IgnoreQueryFilters().CountAsync(a => a.InstitutionId == DemoDataSeeder.DemoInstitutionId);
-        Assert.Equal(5, attemptCount);
+        Assert.Equal(300, attemptCount);
+
+        var subjectCount = await db.Set<StudentExamSubjectResult>().IgnoreQueryFilters().CountAsync(r => r.InstitutionId == DemoDataSeeder.DemoInstitutionId);
+        Assert.Equal(1200, subjectCount);
+
+        var topicCount = await db.Set<StudentExamTopicResult>().IgnoreQueryFilters().CountAsync(r => r.InstitutionId == DemoDataSeeder.DemoInstitutionId);
+        Assert.Equal(2400, topicCount);
     }
 }

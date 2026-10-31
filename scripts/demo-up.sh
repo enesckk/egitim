@@ -37,7 +37,7 @@ fi
 echo "Waiting for MSSQL engine readiness on port ${DB_PORT}..."
 MSSQL_READY=false
 for i in {1..40}; do
-  if nc -z 127.0.0.1 "${DB_PORT}" 2>/dev/null; then
+  if docker exec "${DB_CONTAINER}" /opt/mssql-tools18/bin/sqlcmd -S localhost -U sa -P "${DB_PASSWORD}" -C -Q "SELECT 1;" >/dev/null 2>&1; then
     MSSQL_READY=true
     echo "MSSQL engine is fully recovered and ready."
     break
